@@ -37,7 +37,7 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 - **Hints:** when you ask about something specific (a boss, puzzle, item), he can search the web for guides first. Web search costs about 1 cent per search on top of the question.
 - **Nags:** after 90 minutes without a 5-minute break, or between 1 and 6 AM, he tells you to take a break or go to bed (at most every 45 minutes).
 - **Wake word:** the mic stays on and listens for "Hey Vorn". Everything is transcribed on your PC; nothing is sent anywhere until he hears his name. If game sound or music keeps setting him off, raise `WAKE_LEVEL` or set `WAKE_WORD = False`.
-- **Post-match breakdowns:** after a loss, he goes over the last minute of screenshots and tells you what went wrong (at most every 3 minutes, about 2 cents each).
+- **Post-match breakdowns:** after a loss, he goes over the last minute of screenshots and tells you what went wrong (at most every 3 minutes; uses the smart model, so roughly what a question costs).
 - **Grudge list:** he tracks which bosses and enemies kill you most in each game and throws it in your face.
 - **Evolving look:** his gear upgrades as your respect grows: polished armor and a gold sigil at 25, white fur and a gold-trimmed cape at 50, a war-crown and a golden glow at 75. His aura flares when he levels up.
 - **Moods by time of day:** grumpy in the morning, tactical in the afternoon, hyped in the evening, unhinged after 11 PM, extra smug on weekends.
@@ -54,12 +54,14 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 
 ## Cost
 
-Each look sends one screenshot to Claude. Two models split the work (set in `config.py`):
+Each look sends a screenshot of every display he watches. Two models split the work (pick them in Settings). The costs below were measured from real calls with two displays:
 
-- `MODEL` (Claude Haiku 5.5) handles his automatic comments and roasts, which are most of the calls. About 0.05 cents each, so roughly 5 cents per hour.
-- `SMART_MODEL` (Claude Opus 5.5) is used only when you talk to him (F8/F9) or press F10, so hints are sharp. About 2 cents each.
+- `MODEL` (Claude Haiku 5.5) makes his automatic comments and roasts. About 0.07 cents each. How many depends on **Seconds between comments** (`LOOK_COOLDOWN`), counted from when he last spoke: at 60 s he makes at most ~55 an hour (up to ~4 cents an hour); at the default 15 s, a fast-moving game can push it to ~180 an hour (up to ~13 cents an hour). On a desktop or in menus it's far fewer.
+- `SMART_MODEL` (Claude Opus 5.5) answers when you talk to him (voice, F8, F9), when you press F10, and writes post-match breakdowns. About 4.6 cents each, plus 1 cent per web search. Talking to him is usually most of the bill.
 
-With two displays and about 15 questions an hour, that's roughly 40-45 cents per hour, so a $100 monthly budget covers about 230 hours of play. Each display adds to the cost, so `MONITOR = 1` (main display only) brings it down to about 30 cents per hour (~300 hours). To spend even less, set `SMART_MODEL = "claude-haiku-5-5"` too (about $100 = 1,500+ hours). Set a monthly spend limit in the Anthropic Console as a hard backstop.
+Example: 8 active hours a day, comments every 60 s, and 10 questions a day comes to at most ~80 cents a day, about $24 a month. With the default 15 s it's up to ~$1.50 a day, about $45 a month.
+
+To spend less: watch one display (`MONITOR = 1`), raise the seconds between comments, or set the model for talking to him to Haiku (questions drop to about a tenth of a cent, but hints get weaker). Set a monthly spend limit in the Anthropic Console as a hard backstop. The spend in the tray menu is his own estimate from token counts; the Console is the real bill.
 
 ## Privacy
 
