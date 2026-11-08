@@ -4,10 +4,11 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 
 ## Setup
 
-1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
-2. Paste it into a file named `api_key.txt` next to `main.py`.
-3. Double-click `run.bat`. The first run installs everything (a few minutes).
-4. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
+1. Get the code: `git clone https://github.com/DivxPlays/vorn` (private repo, so sign in to GitHub first), or download the ZIP from the repo page.
+2. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
+3. Paste it into a file named `api_key.txt` next to `main.py`. It is never uploaded to GitHub.
+4. Double-click `run.bat`. The first run installs everything (a few minutes).
+5. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
 
 ## Controls
 
@@ -66,6 +67,10 @@ Screenshots go to Anthropic's API, which means whatever is on your screen, inclu
 
 ## Tweaking
 
-Right-click the tray icon > **Settings...** to change his name, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Settings are stored in `settings.json`; **Restore Defaults** deletes it. The defaults live in `config.py`.
+Right-click the tray icon > **Settings...** to change his name, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Only the settings you changed are stored in `settings.json`, so improvements to the defaults in `config.py` still reach you; **Restore Defaults** deletes it.
+
+## What's on GitHub
+
+The code, this README and [ROADMAP.md](ROADMAP.md) (planned features). Your API key, his memory of you, your settings, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
 
 If something breaks, look at `companion.log`. Run `.venv\Scripts\python test_selfcheck.py` to check the parts that work without the internet.
