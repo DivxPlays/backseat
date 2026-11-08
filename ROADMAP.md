@@ -21,5 +21,10 @@ A full-body character instead of the bust, with more animations: idle stance, ar
 ## Black hair and black eyes
 Change his hair and eyes to black.
 
+## Cheaper (or free) brain
+- Cheaper Claude: smaller screenshots (images are most of each call), skip displays that didn't change, cache the parts of the prompt that repeat every call, and look less often in menus.
+- Free option: a local vision model on your own GPU (for example through Ollama). No API bill, but slower, weaker roasts and hints, and it competes with your game for the GPU, so it could cost frames.
+- Maybe a mix: the free local model for automatic comments, Claude only when you talk to him.
+
 ## Power-up form
 A transformation he triggers on epic plays or win streaks, with his own original name and look.
