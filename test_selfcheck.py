@@ -1419,6 +1419,36 @@ finally:
 assert out["lines"] == {"poke": {"moment": "poke", "mood": "smug", "lines": ["Ow."]}} and "EXAMPLE PERSONA" in prompts[0][0]
 assert prompts[0][1]["properties"]["lines"]["items"]["properties"]["moment"]["enum"] == list(commands.LINES["vorn"])
 
+# frame-rate guard: the GPU's load from nvidia-smi (the busiest card; None without one), and in a game with the card at
+# GPU_BUSY % or more, Claude takes the comment instead of the free local model
+import subprocess  # noqa: E402
+
+real_run = memory_mod.subprocess.run
+try:
+    memory_mod.subprocess.run = lambda *a, **k: SimpleNamespace(stdout="12\n87\n")
+    assert memory_mod.gpu_load() == 87
+    memory_mod.subprocess.run = lambda *a, **k: SimpleNamespace(stdout="")
+    assert memory_mod.gpu_load() is None
+
+    def no_driver(*a, **k):
+        raise FileNotFoundError("nvidia-smi")
+    memory_mod.subprocess.run = no_driver
+    assert memory_mod.gpu_load() is None
+finally:
+    memory_mod.subprocess.run = real_run
+assert memory_mod.gpu_load() is None or 0 <= memory_mod.gpu_load() <= 100  # the real one runs
+real_load, saved_busy = main.gpu_load, config.GPU_BUSY
+try:
+    config.GPU_BUSY = 90
+    for in_game, load, busy in ((True, 97, True), (True, 60, False), (False, 99, False), (True, None, False)):
+        main.gpu_load = lambda: load
+        guard = SimpleNamespace(current_game=lambda: ("cod4.exe", "CoD4") if in_game else None)
+        assert main.Companion.gpu_busy(guard) == busy, (in_game, load)
+    main.gpu_load, config.GPU_BUSY = (lambda: 99), 0  # turned off
+    assert not main.Companion.gpu_busy(SimpleNamespace(current_game=lambda: ("cod4.exe", "CoD4")))
+finally:
+    main.gpu_load, config.GPU_BUSY = real_load, saved_busy
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

@@ -60,6 +60,8 @@ MODEL = "claude-haiku-5-5"  # his automatic comments and roasts (most calls): ~0
 TRIVIA_MODEL = "claude-sonnet-5-5"  # mini-game trivia questions, ~0.8 cents each (Haiku gets the facts wrong)
 SMART_MODEL = "claude-opus-5-5"  # when you talk to him or press the look key: better hints, ~2 cents each
 LOCAL_MODEL = ""  # a free vision model in Ollama (e.g. "qwen3-vl:8b-instruct") for his automatic comments; "" = Claude does them
+GPU_BUSY = 90  # frame-rate guard, with the local model: in a game with the graphics card this busy (%), Claude makes the
+# comment instead, so the local model doesn't take frames from the game (NVIDIA cards; 0 = off)
 CHECK_EVERY = 5  # with the local model: every this many minutes Claude takes a comment and keeps score (it also double-checks
 # when the local model thinks you won, died or lost; at most every 2 minutes). About 10 cents a day. 0 = never (nothing scored)
 SWEAR = False  # let him swear (never slurs)

@@ -11,12 +11,12 @@
 
 ### Under the hood
 - **Auto-update:** checks your GitHub for a new version and updates himself, also on your friends' PCs.
-- **Frame-rate guard:** the local model pauses if your FPS drops while it thinks.
 
 ## Not planned
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Frame-rate guard: with the free local model, a game keeping the GPU 90%+ busy gets its comments from Claude Haiku instead, so the local model never takes frames (NVIDIA, via nvidia-smi; adjustable, 0 = off).
 - Squad leaderboard: weekly shame points for your Discord friends (deaths, fails and epic plays seen on screen or told, their talk roasted or praised), standings when asked, and last week's worst player award announced when a friend first talks that week.
 - Character creator: your own character on Vorn's or Mika's body (name, who they are, voice, power-up, hair, eye, skin and outfit colours, live preview); Claude writes their full personality, misheard names and their own voice-command lines (about 6 cents). Colours for Vorn and Mika too; created characters travel with Export memory.
 - Challenges and bounties: one thing for your next match they can check on screen, with a bounty (easy, hard, brutal) paid by whoever set it, a fine when you fail or dodge it, settled from your screen, and a record. Ask for one any time ("give me a challenge").

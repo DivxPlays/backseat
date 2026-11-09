@@ -60,7 +60,7 @@ from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
 from memory import (SHAME, Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen,  # noqa: E402
-                    idle_seconds, is_game, steam_app, steam_hours, week as memory_week)
+                    gpu_load, idle_seconds, is_game, steam_app, steam_hours, week as memory_week)
 from senses import SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
@@ -772,6 +772,17 @@ class Companion:
             self.dodged = (f' (They never did {c["who"]}\'s challenge, "{c["dare"]}": time ran out, so {c["who"]} takes '
                            f"{c['fine']} respect for dodging it. {c['who']} rubs it in.)")
 
+    def gpu_busy(self):
+        """Frame-rate guard: True in a game with the graphics card at GPU_BUSY % or more, where the free local model
+        thinking on the same card would cost frames."""
+        if not config.GPU_BUSY or not self.current_game():
+            return False
+        load = gpu_load()
+        if load is None or load < config.GPU_BUSY:
+            return False
+        logging.info("frame-rate guard: the GPU is at %d%% in a game, so Claude takes this comment", load)
+        return True
+
     def current_game(self):
         """(key, name) of the game in front (a Steam game by its Steam name), or None when it isn't a game."""
         exe, title, _ = self.app
@@ -1097,6 +1108,8 @@ class Companion:
             return self.speak("disgusted", "You forgot my API key, fool. Put it in api underscore key dot text.")
         level, crossed = self.mem.budget_level()
         local = config.LOCAL_MODEL and kind in AUTO and kind != "breakdown" and time.monotonic() > self.local_down_until
+        if local and self.gpu_busy():  # frame-rate guard: Claude takes it (or, budget used up, they stay quiet)
+            local = False
         if level == 2 and kind in AUTO and not crossed and not local:
             return  # budget used up: he only answers when you talk to him (the free local model keeps going)
         if kind == "coach":  # tray > coaching report: write this week's if it's due, then open the page

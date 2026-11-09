@@ -3,6 +3,7 @@ import ctypes
 import json
 import os
 import re
+import subprocess
 import threading
 import time
 import winreg
@@ -607,6 +608,17 @@ def foreground_center():
     r = _Rect()
     user32.GetWindowRect(user32.GetForegroundWindow(), ctypes.byref(r))
     return (r.left + r.right) // 2, (r.top + r.bottom) // 2
+
+
+def gpu_load():
+    """How busy the graphics card is right now (0-100; the busiest one), from nvidia-smi (comes with NVIDIA's driver);
+    None without one."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], capture_output=True,
+                             text=True, timeout=3, creationflags=subprocess.CREATE_NO_WINDOW).stdout
+        return max(int(x) for x in out.split())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
 
 
 class _LastInput(ctypes.Structure):

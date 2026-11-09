@@ -310,11 +310,13 @@ class SettingsWindow(QDialog):
         w["MONTHLY_BUDGET"] = _spin(config.MONTHLY_BUDGET, 0, 100000, " $")
         w["LOCAL_MODEL"] = _combo(["", "qwen3-vl:8b-instruct", "qwen3-vl:4b-instruct"], config.LOCAL_MODEL, editable=True)
         w["CHECK_EVERY"] = _spin(config.CHECK_EVERY, 0, 120, " min")
+        w["GPU_BUSY"] = _spin(config.GPU_BUSY, 0, 100, " %")
         w["GAME_PROFILES"] = QCheckBox("Look each new game up on the web once (about 1 cent a game)")
         w["GAME_PROFILES"].setChecked(config.GAME_PROFILES)
         brain = self._page([("Model for his automatic comments", w["MODEL"]), ("Model when you talk to him", w["SMART_MODEL"]),
                             ("Free local model for automatic comments\n(Ollama; blank = use Claude)", w["LOCAL_MODEL"]),
                             ("With the local model, Claude keeps score every\n(and on wins and deaths; 0 = never)", w["CHECK_EVERY"]),
+                            ("Frame-rate guard: Claude comments instead when\na game has the GPU this busy (0 = off)", w["GPU_BUSY"]),
                             ("Game profiles", w["GAME_PROFILES"]),
                             ("Monthly budget (0 = no limit)", w["MONTHLY_BUDGET"])])
 
