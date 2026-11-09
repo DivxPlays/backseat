@@ -22,7 +22,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
 HERE = Path(__file__).parent
-APP, VERSION, AUTHOR = "Backseat", "2.0.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
+APP, VERSION, AUTHOR = "Backseat", "2.0.1", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
 STAGE = "beta"  # how finished this version is: pre-alpha, alpha, pre-beta, beta or release (stable)
 FULL_VERSION = VERSION if STAGE == "release" else f"{VERSION}-{STAGE}"  # "2.0.0-beta": the git tag and what updates compare
 RUNNING = __name__ == "__main__"  # (imported by the self-checks or make_images.py: no log file, no crash box)
@@ -288,7 +288,7 @@ def run_entry_on():
 def set_run_entry(on):
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
         if on:
-            winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, f'"{PYTHONW}" "{HERE / "main.py"}" --wait-for-game')
+            winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, f'"{PYTHONW}" "{HERE / "main.py"}" --startup')
         for name in OLD_RUN_NAMES + (() if on else (RUN_NAME,)):  # (an entry from when the app was called Vorn goes too)
             try:
                 winreg.DeleteValue(k, name)
@@ -301,7 +301,7 @@ def task_xml(user, command, arguments, folder):
     user, command, arguments, folder = (xml_escape(str(x)) for x in (user, command, arguments, folder))
     return f"""<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>Starts Backseat hidden; Vorn and Mika wake up when a game starts.</Description></RegistrationInfo>
+  <RegistrationInfo><Description>Starts Backseat when you log in: Vorn and Mika, your gaming companions.</Description></RegistrationInfo>
   <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId><Delay>PT20S</Delay></LogonTrigger></Triggers>
   <Principals><Principal id="Author"><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
@@ -315,13 +315,13 @@ def autostart_on():
 
 
 def set_autostart(on):
-    """Start with Windows, hidden, and wake up when a game starts: a log-on task in Task Scheduler (Windows' startup
-    list skipped him at log-on on some PCs, without a word), or the startup list if the task can't be made."""
+    """Start with Windows, on screen and watching, as if you'd opened him: a log-on task in Task Scheduler (Windows'
+    startup list skipped him at log-on on some PCs, without a word), or the startup list if the task can't be made."""
     task = False
     if on:
         user = f'{os.environ.get("USERDOMAIN", ".")}\\{os.environ.get("USERNAME", "")}'
         xml = Path(tempfile.gettempdir()) / "backseat-task.xml"
-        xml.write_text(task_xml(user, PYTHONW, f'"{HERE / "main.py"}" --wait-for-game', HERE), encoding="utf-16")
+        xml.write_text(task_xml(user, PYTHONW, f'"{HERE / "main.py"}" --startup', HERE), encoding="utf-16")
         made = schtasks("/create", "/tn", TASK, "/xml", str(xml), "/f")
         xml.unlink(missing_ok=True)
         task = made.returncode == 0
@@ -1748,14 +1748,15 @@ def main():
     k32.CreateMutexW.restype = wintypes.HANDLE
     k32.CloseHandle.argtypes = [wintypes.HANDLE]
     mutex = k32.CreateMutexW(None, False, "Local\\BackseatCompanion")
-    waiting = "--wait-for-game" in sys.argv
+    waiting = "--wait-for-game" in sys.argv  # (hidden until a game starts: how 2.0.0 started with Windows)
+    boot = waiting or "--startup" in sys.argv  # started with Windows
     if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS: one Vorn at a time (two would double your API bill)
-        if not waiting:  # (started with Windows while he's already up: just bow out)
+        if not boot:  # (started with Windows while he's already up: just bow out)
             user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
         return
-    if waiting:
-        logging.info("started with Windows: hidden until a game starts")
-    if run_entry_on() and schtasks("/query", "/tn", TASK).returncode != 0:  # 2.0.0's startup entry: move it to the task
+    if boot:
+        logging.info("started with Windows%s", ": hidden until a game starts" if waiting else "")
+    if waiting or (run_entry_on() and schtasks("/query", "/tn", TASK).returncode != 0):  # 2.0.0's way: on to the task
         threading.Thread(target=set_autostart, args=(True,), daemon=True).start()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)

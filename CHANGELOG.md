@@ -3,6 +3,19 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## 2.0.1 Beta (2026-11-09)
+
+A hotfix.
+
+### Fixed
+- **Start with Windows didn't start him.** Windows' startup list skipped Backseat at log-in without a word. Start with
+  Windows is now a task in Task Scheduler ("Backseat", 20 seconds after you log in, as you, no admin rights), with the
+  startup list as a fallback. If you turned it on in 2.0.0, it moves to the task by itself the next time Backseat starts.
+- **Started with Windows, he's on screen right away**, watching and talking as if you'd opened him, instead of hiding
+  until a game starts.
+- Started with Windows, he now notes it in companion.log, and a second copy quietly bows out instead of showing
+  "already running".
+
 ## 2.0.0 Beta (2026-11-09)
 
 The whole first roadmap. Beta: everything is built and tested, but some of it (clips, Steam stats, updates) hasn't seen

@@ -1773,18 +1773,20 @@ root = ET.fromstring(xml.split("?>", 1)[1])  # (parses: the & is escaped)
 assert root.find(".//t:LogonTrigger/t:UserId", ns).text == "PC\\me & you" and root.find(".//t:LogonTrigger/t:Delay", ns).text == "PT20S"
 assert root.find(".//t:Principal/t:RunLevel", ns).text == "LeastPrivilege" and root.find(".//t:Principal/t:LogonType", ns).text == "InteractiveToken"
 assert root.find(".//t:Exec/t:Arguments", ns).text.endswith("--wait-for-game") and root.find(".//t:ExecutionTimeLimit", ns).text == "PT0S"
-asked, entry = [], []
-real_schtasks, real_entry = main.schtasks, main.set_run_entry
+asked, entry, made = [], [], []
+real_schtasks, real_entry, real_xml = main.schtasks, main.set_run_entry, main.task_xml
 try:
     main.set_run_entry = entry.append
+    main.task_xml = lambda *a: (made.append(a), real_xml(*a))[1]
     for code, want_entry in ((0, False), (1, True)):  # the task made: no startup-list entry; refused: the startup list instead
         main.schtasks = lambda *a, code=code: (asked.append(a), SimpleNamespace(returncode=code, stderr="Access is denied."))[1]
         assert main.set_autostart(True) is (code == 0) and entry[-1] is want_entry
         assert asked[-1][:4] == ("/create", "/tn", "Backseat", "/xml") and not Path(asked[-1][4]).exists()  # (its file cleaned up)
     main.set_autostart(False)
     assert asked[-1] == ("/delete", "/tn", "Backseat", "/f") and entry[-1] is False
+    assert made[-1][2].endswith('main.py" --startup')  # on screen and watching at log-on, not hidden until a game
 finally:
-    main.schtasks, main.set_run_entry = real_schtasks, real_entry
+    main.schtasks, main.set_run_entry, main.task_xml = real_schtasks, real_entry, real_xml
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
