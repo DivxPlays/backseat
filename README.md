@@ -6,6 +6,8 @@ Version 2.0.0 (beta) · Made by DivxPlays (tray > About Backseat shows the versi
 
 Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
+<p align="center"><a href="https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4"><img src="docs/images/trailer.gif" width="560" alt="Backseat trailer: Vorn and Mika roasting a player, then Vorn thrown across the screen"></a><br><a href="https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4"><b>Watch the full trailer (74 s, with sound)</b></a></p>
+
 <p align="center"><img src="docs/images/duo.png" width="520" alt="Vorn and Mika in duo mode, Mika talking"></p>
 
 **Warlord Vorn**: idle, smug, angry, laughing, and in Bloodfire.

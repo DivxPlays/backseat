@@ -60,7 +60,9 @@ def publish():
     run("git", "fetch", "-q", "origin")
     if run("git", "rev-parse", "HEAD") != run("git", "rev-parse", "origin/main"):
         sys.exit("Push first: GitHub's main must be this commit.")
-    run(GH, "release", "create", f"v{version}", str(HERE / "dist" / "Backseat.zip"), str(HERE / "dist" / "Install-Backseat.bat"),
+    trailer = HERE / "dist" / "trailer.mp4"  # (make_trailer.py: re-render it first when they or their features changed)
+    files = [str(HERE / "dist" / "Backseat.zip"), str(HERE / "dist" / "Install-Backseat.bat")] + ([str(trailer)] if trailer.exists() else [])
+    run(GH, "release", "create", f"v{version}", *files,
         "--title", f"Backseat {pretty(version)}", "--notes-file", str(notes), "--target", run("git", "rev-parse", "HEAD"), "--latest")
     print(f"released v{version}")
 
