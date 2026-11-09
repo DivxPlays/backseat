@@ -1,7 +1,9 @@
-"""Publish the current version as a GitHub release, after its version bump is committed and pushed:
-    .venv\\Scripts\\python release.py notes.md
-It attaches Backseat.zip (the app with its installer inside; what auto-update downloads) and Install-Backseat.bat (the
-one-file installer: on its own it downloads the latest Backseat.zip itself)."""
+"""Publish the current version as a GitHub release, after its version bump and CHANGELOG.md entry are committed and
+pushed:  .venv\\Scripts\\python release.py publish
+Its notes are how to install plus the version's CHANGELOG.md entry. It attaches Backseat.zip (the app with its installer
+inside; what auto-update downloads) and Install-Backseat.bat (the one-file installer: on its own it downloads the latest
+Backseat.zip itself)."""
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +25,19 @@ def full_version(main_py):
     return version if stage == "release" else f"{version}-{stage}"
 
 
+INSTALL = ("## Install\n\nDownload **Install-Backseat.bat** below and double-click it: it downloads the rest itself. Or download "
+           "**Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. You need an Anthropic API key "
+           "(console.anthropic.com); the installer asks for it. If Windows says the file came from the internet, click **More "
+           "info > Run anyway**. Already installed? Backseat updates itself (it asks first); your memory, settings, key, Hall of "
+           "Shame and characters stay as they are.\n\nProblems: [Issues](https://github.com/DivxPlays/backseat/issues).\n\n")
+
+
+def changelog(version, text):
+    """The CHANGELOG.md entry for a version ("2.0.0-beta": the "## 2.0.0 Beta (date)" section), or None."""
+    m = re.search(rf"^## {re.escape(pretty(version))} \(.*?\)\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    return m.group(1).strip() if m else None
+
+
 def build():
     """dist/Backseat.zip (the committed files, in a Backseat folder) and dist/Install-Backseat.bat; returns the version."""
     version = full_version((HERE / "main.py").read_text(encoding="utf-8"))
@@ -35,15 +50,20 @@ def build():
     return version
 
 
-def publish(notes):
+def publish():
     version = build()
+    entry = changelog(version, (HERE / "CHANGELOG.md").read_text(encoding="utf-8"))
+    if not entry:
+        sys.exit(f"Add a CHANGELOG.md entry for {pretty(version)} first (## {pretty(version)} (date)).")
+    notes = HERE / "dist" / "notes.md"
+    notes.write_text(INSTALL + "## Changelog\n\n" + entry + "\n", encoding="utf-8")
     run("git", "fetch", "-q", "origin")
     if run("git", "rev-parse", "HEAD") != run("git", "rev-parse", "origin/main"):
         sys.exit("Push first: GitHub's main must be this commit.")
     run(GH, "release", "create", f"v{version}", str(HERE / "dist" / "Backseat.zip"), str(HERE / "dist" / "Install-Backseat.bat"),
-        "--title", f"Backseat {pretty(version)}", "--notes-file", notes, "--target", run("git", "rev-parse", "HEAD"), "--latest")
+        "--title", f"Backseat {pretty(version)}", "--notes-file", str(notes), "--target", run("git", "rev-parse", "HEAD"), "--latest")
     print(f"released v{version}")
 
 
 if __name__ == "__main__":
-    publish(sys.argv[1]) if len(sys.argv) > 1 else print(f"built {build()} in dist/ (pass a notes file to publish)")
+    publish() if sys.argv[1:] == ["publish"] else print(f"built {build()} in dist/ (release.py publish to release it)")

@@ -1618,6 +1618,9 @@ assert updater.newer("2.0.0-alpha", "2.0.0-pre-alpha") and updater.pretty("1.0.0
 assert updater.pretty("2.0.0-pre-beta") == "2.0.0 Pre-Beta" and updater.pretty("2.0.0") == "2.0.0" and updater.pretty("2.0.0-beta") == "2.0.0 Beta"
 import release  # noqa: E402
 
+changes = Path("CHANGELOG.md").read_text(encoding="utf-8")  # every version has its changelog entry (its release notes)
+assert release.changelog(main.FULL_VERSION, changes), f"CHANGELOG.md has no entry for {updater.pretty(main.FULL_VERSION)}"
+assert release.changelog("1.0.0-pre-alpha", changes) and release.changelog("9.9.9-alpha", changes) is None
 assert release.full_version('APP, VERSION, AUTHOR = "Backseat", "3.1.0", "X"\nSTAGE = "alpha"\n') == "3.1.0-alpha"
 assert release.full_version('APP, VERSION, AUTHOR = "Backseat", "3.1.0", "X"\nSTAGE = "release"\n') == "3.1.0"
 assert not updater.newer(None, "1.2.0") and not updater.newer("1.1.9", "1.2.0")

@@ -216,7 +216,7 @@ Once a day (when he starts) he checks GitHub for a newer version (the version nu
 
 ## What's on GitHub
 
-The code, this README, [ROADMAP.md](ROADMAP.md) (planned features), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
+The code, this README, [CHANGELOG.md](CHANGELOG.md) (what changed in each version), [ROADMAP.md](ROADMAP.md) (planned features), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
 
 ## Moving him to another PC
 
