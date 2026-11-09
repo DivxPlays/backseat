@@ -1,7 +1,7 @@
 # Working on Vorn
 
 - **After every change, upload it.** Update README.md so it matches what changed (features, controls, settings, costs), take built items off ROADMAP.md, then commit and push to GitHub (origin = https://github.com/DivxPlays/vorn, private, branch main). The user asked for this on 2026-11-08, so don't ask first each time.
-- **Version number:** don't bump it on your own. Every so often, when a meaningful batch of changes has landed since the last bump (a new feature, or several fixes), suggest a bump to the user with the number you'd use (x.y.Z for fixes, x.Y.0 for features, X.0.0 for a big overhaul) and what it covers. Only on their yes: change VERSION in main.py and the version line at the top of README.md, commit and push. Current: 1.1.0.
+- **Version number:** don't bump it on your own. Every so often, when a meaningful batch of changes has landed since the last bump (a new feature, or several fixes), suggest a bump to the user with the number you'd use (x.y.Z for fixes, x.Y.0 for features, X.0.0 for a big overhaul) and what it covers. Only on their yes: change VERSION in main.py and the version line at the top of README.md, commit and push. Current: 1.2.0.
 - Before committing code changes, run `.venv\Scripts\python test_selfcheck.py`. Don't push if it fails; fix it or tell the user.
 - The GitHub CLI isn't on Git Bash's PATH: use `"/c/Program Files/GitHub CLI/gh.exe"`. Push with:
   `git -c credential.helper= -c 'credential.helper=!"/c/Program Files/GitHub CLI/gh.exe" auth git-credential' push`

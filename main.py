@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
-APP, VERSION, AUTHOR = "Vorn", "1.1.0", "DivxPlays"  # bump VERSION with every change: x.y.Z fixes, x.Y.0 features
+APP, VERSION, AUTHOR = "Vorn", "1.2.0", "DivxPlays"  # bump VERSION with every change: x.y.Z fixes, x.Y.0 features
 logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 for noisy in ("httpx", "httpx2", "huggingface_hub", "faster_whisper", "comtypes"):
     logging.getLogger(noisy).setLevel(logging.WARNING)

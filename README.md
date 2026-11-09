@@ -1,6 +1,6 @@
 # Vorn: your trash-talking gaming companion
 
-Version 1.1.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
+Version 1.2.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
 
 An animated, full-body character in the corner of your screen: Vorn the warlord, or Mika the yandere gamer girl. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
