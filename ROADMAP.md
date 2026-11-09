@@ -13,7 +13,6 @@
 - **Game profiles:** per-game knowledge (maps, weapons, perks) for sharper hints.
 
 ### Social
-- **Spotify:** they notice what you're listening to and comment on it (your taste, a song on repeat, music instead of playing). Read from the Spotify app on your PC (its window title or Windows' media controls), so no Spotify login.
 - **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
 
 ### Interaction
@@ -28,6 +27,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Spotify: they notice what you play (from the Spotify app's window), look a new song up with one web search (about 1 cent, remembered), and react now and then; repeats and your top artists too.
 - Idle animations: stretch, look around, sigh, lean in, nod off for both; knuckle cracks, gauntlet inspection, dusting off and a power stance for Vorn; waving, headset, hair twirl, heart hands and a bounce for Mika.
 - Click reactions: Ctrl+click pokes them (head or body, more annoyed the more you poke), Ctrl+drag throws them across the screen and they glide back.
 - Grudges that stick: rage-quits, days of being ignored and too many "shut up"s cost respect and get a cold greeting and digs, until you apologize (or 2 days pass).

@@ -801,6 +801,44 @@ with tempfile.TemporaryDirectory() as d:
     config.PRESET = real_preset
 assert main.preset_name("mika") == "Mika" and main.preset_name("nobody") == "Nobody"
 
+# Spotify: the song from the app's window title, repeats, your taste, and a web lookup once per song (cheap, not too often)
+import music  # noqa: E402
+
+assert music.parse("Sinoda - Abrakadabra") == ("Sinoda", "Abrakadabra")
+assert music.parse("Artist - Song - 2011 Remaster") == ("Artist", "Song - 2011 Remaster")
+assert music.parse("Spotify Premium") is None and music.parse("Spotify") is None and music.parse("Advertisement") is None
+assert music.now_playing() is None or len(music.now_playing()) == 2  # (works whether or not Spotify is playing)
+heard = music.Listening()
+assert heard.update(("A", "x"), 0) and not heard.update(("A", "x"), 5) and not heard.update(None, 9) and heard.update(("A", "x"), 12)
+assert heard.plays[("A", "x")] == 2 and heard.since == 12
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    m.listened("Sinoda", 300)
+    m.listened("Daft Punk", 900)
+    m.listened("Sinoda", 5)
+    assert m.top_artists(2) == [("Daft Punk", 900), ("Sinoda", 305)] and m.song_note("Sinoda - Abrakadabra") is None
+    looked = []
+    real_lookup = brain.look_up_song
+    brain.look_up_song = lambda client, model, artist, song: (looked.append(song), (f"a note on {song}", 0.012))[1]
+    try:
+        comp = SimpleNamespace(client=object(), mem=m, last_lookup=-9999.0)
+        main.Companion.look_up(comp, ("Sinoda", "Abrakadabra"))
+        assert looked == ["Abrakadabra"] and m.song_note("Sinoda - Abrakadabra") == "a note on Abrakadabra"
+        main.Companion.look_up(comp, ("Sinoda", "Abrakadabra"))  # known: never searched twice
+        main.Companion.look_up(comp, ("Sinoda", "Kujo"))  # a new song, but within 10 minutes of the last lookup
+        assert looked == ["Abrakadabra"] and abs(m.spent() - 0.012) < 1e-9
+        comp.last_lookup = -9999.0
+        saved_search, config.MUSIC_SEARCH = config.MUSIC_SEARCH, False
+        main.Companion.look_up(comp, ("Sinoda", "Kujo"))  # searching turned off
+        config.MUSIC_SEARCH = saved_search
+        saved_budget, config.MONTHLY_BUDGET = config.MONTHLY_BUDGET, 0.014
+        main.Companion.look_up(comp, ("Sinoda", "Kujo"))  # cheap mode (80% of the budget used): no lookups
+        config.MONTHLY_BUDGET = saved_budget
+        assert looked == ["Abrakadabra"]
+    finally:
+        brain.look_up_song = real_lookup
+assert "{song}" in main.SITUATIONS["music"] and "music" in main.AUTO
+
 # grudges: rage-quit after a loss, days of being ignored, too many "shut up"s; a respect hit once; an apology ends it
 import grudges  # noqa: E402
 from datetime import datetime, timedelta  # noqa: E402

@@ -9,7 +9,8 @@ from PySide6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout, QWidge
 import config
 
 GROUPS = [("Talking to him", {"ask", "look", "heard"}), ("Automatic comments", {"change", "quiet", "lore", "nag", "start"}),
-          ("Post-match breakdowns", {"breakdown"}), ("Battle reports", {"report"})]
+          ("Post-match breakdowns", {"breakdown"}), ("Battle reports", {"report"}),
+          ("Music (Spotify comments and song lookups)", {"music"})]
 
 
 def summary(total, days, today):

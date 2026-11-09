@@ -128,6 +128,10 @@ class SettingsWindow(QDialog):
         w["WAKE_WORD"] = QCheckBox(f'Listen for "Hey {config.NAME}"')
         w["WAKE_WORD"].setChecked(config.WAKE_WORD)
         w["WAKE_LEVEL"] = _real(config.WAKE_LEVEL, 0.001, 0.5, 0.005, 3)
+        w["MUSIC"] = QCheckBox("Comment on what you play on Spotify")
+        w["MUSIC"].setChecked(config.MUSIC)
+        w["MUSIC_SEARCH"] = QCheckBox("Look new songs up on the web first (about 1 cent a song)")
+        w["MUSIC_SEARCH"].setChecked(config.MUSIC_SEARCH)
         w["BIRTHDAY"] = QLineEdit(config.BIRTHDAY)
         w["BIRTHDAY"].setPlaceholderText("month-day, like 02-10")
         w["INTERRUPT"] = QCheckBox("Talk over them and they pause to listen (needs a headset)")
@@ -137,7 +141,8 @@ class SettingsWindow(QDialog):
                              ("You're AFK after", w["AFK_AFTER"]), ("Nag to take a break after", w["BREAK_AFTER"]),
                              ("Bedtime nags from / until", bed_row), ("Minimum time between nags", w["NAG_EVERY"]),
                              ("Wake word", w["WAKE_WORD"]), ("Mic loudness that counts as speech", w["WAKE_LEVEL"]),
-                             ("Interrupting", w["INTERRUPT"]), ("Your birthday (they celebrate it)", w["BIRTHDAY"])])
+                             ("Interrupting", w["INTERRUPT"]), ("Your birthday (they celebrate it)", w["BIRTHDAY"]),
+                             ("Music", w["MUSIC"]), ("", w["MUSIC_SEARCH"])])
 
         keys = []
         for name, label in KEYS:

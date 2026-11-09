@@ -184,6 +184,22 @@ def report(client, model, session_text):
     return (out["report"] if out else ""), spent
 
 
+SONG_SCHEMA = {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"], "additionalProperties": False}
+def look_up_song(client, model, artist, song):
+    """Learn about a song with one web search (about a cent on Haiku: the search fee is most of it; ~9 cents on Sonnet).
+    Returns (a short note, dollars)."""
+    ask = (f'Look up the song "{song}" by {artist} with web search. In under 35 words, as plain notes (not in character): '
+           "what it is (genre, year, album), what it's about, and one notable thing about the artist. If you can't find it, "
+           "say the little you can.")
+    tool = "web_search_20250305" if "haiku" in model else "web_search_20260209"  # Haiku only runs the basic search tool
+    try:
+        out, spent = _ask(client, model, [{"type": "text", "text": ask}], SONG_SCHEMA, [{"type": tool, "name": "web_search", "max_uses": 1}])
+    except anthropic.BadRequestError:  # no web search on this model: what it knows without one
+        logging.warning("web search unavailable for a song, answering without it", exc_info=True)
+        out, spent = _ask(client, model, [{"type": "text", "text": ask}], SONG_SCHEMA)
+    return (out["note"].strip() if out else ""), spent
+
+
 PROFILE_SCHEMA = {"type": "object", "properties": {"profile": {"type": "string"}}, "required": ["profile"], "additionalProperties": False}
 
 

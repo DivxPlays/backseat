@@ -80,7 +80,7 @@ class Memory:
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
                            ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {}),
                            ("unlocked", []), ("talks", 0), ("alone", {}), ("seen", {}), ("held", []),
-                           ("last_with", {})):
+                           ("last_with", {}), ("music", {}), ("songs", {})):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
@@ -106,6 +106,26 @@ class Memory:
             d["days"][today] = d["days"].get(today, 0) + dt
             for old in sorted(d["days"])[:-MAX_DAYS]:
                 del d["days"][old]
+
+    def listened(self, artist, seconds):
+        """Spotify: time you've spent on an artist (your taste)."""
+        with self.lock:
+            self.d["music"][artist] = self.d["music"].get(artist, 0) + seconds
+
+    def top_artists(self, n=3):
+        with self.lock:
+            return sorted(self.d["music"].items(), key=lambda kv: -kv[1])[:n]
+
+    def song_note(self, key):
+        """What a web search found about a song ("Artist - Song"), or None if it was never looked up."""
+        with self.lock:
+            return self.d["songs"].get(key)
+
+    def learn_song(self, key, note):
+        with self.lock:
+            self.d["songs"][key] = note
+            for old in list(self.d["songs"])[:-300]:  # the 300 most recent are plenty
+                del self.d["songs"][old]
 
     def missed(self, preset):
         """While `preset` was off screen: {another character: seconds you spent alone with them}."""

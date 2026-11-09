@@ -88,6 +88,8 @@ KEY_MUTE = "f4"  # shut-up mode: he keeps watching and keeping score, but only t
 
 WAKE_WORD = True  # say "Hey Vorn, ..." instead of holding the talk key (the mic stays on; speech is processed on this PC)
 WAKE_LEVEL = 0.02  # mic loudness that counts as speech; raise it if game sound or music keeps setting him off
+MUSIC = True  # they notice what you play on Spotify (read from the Spotify app on this PC) and comment on it now and then
+MUSIC_SEARCH = True  # and look a new song up on the web first (one search, about 1 cent; at most every 10 minutes)
 INTERRUPT = True  # talk over him and he pauses to listen (stops if you say his name). Needs a headset: turn off with speakers
 
 BREAK_AFTER = 90  # minutes of play without a 5-minute break before he nags you to take one

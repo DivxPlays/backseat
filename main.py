@@ -46,6 +46,7 @@ import character  # noqa: E402
 import config  # noqa: E402
 import grudges  # noqa: E402
 import highlights  # noqa: E402
+import music  # noqa: E402
 import holidays  # noqa: E402
 import transfer  # noqa: E402
 import unlocks  # noqa: E402
@@ -81,16 +82,19 @@ SITUATIONS = {
     "lore": "You've been quiet a while. Tell a new, very short story from your own past: one not in your listed past (it "
             "must fit with it, never retell it), "
             "then turn it into a jab at the player. Under 25 words.",
+    "music": 'The player just put on "{song}" by {artist} on Spotify. React to the song or their taste in music, in one short '
+             "sentence (under 15 words), in character. If you know something real about it (see Music above), use it.",
     "look": "The player pressed the look hotkey. Comment on what they're looking at, or give a hint about it.",
     "nag": "It's late, or the player has gone a long time without a break (see the local time and break time in the stats). "
            "Nag them to take a break or go to sleep, as a roast.",
     "breakdown": "The player just lost. These screenshots are from the last minute or so, oldest first. Break down what went "
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
 }
-AUTO = {"change", "quiet", "lore", "nag", "breakdown"}  # jobs he starts himself; they stop when the budget runs out
+AUTO = {"change", "quiet", "lore", "nag", "breakdown", "music"}  # jobs he starts himself; they stop when the budget runs out
 COMEBACK = 0.6  # duo mode, local model: how often the other one fires back at a comment
 CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one of these gets Claude to double-check
 CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
+MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
                  "words), in your own style: roast what {a} said, or take the player's side against {a}. Your past is your "
                  "own: never tell {a}'s stories or claim {a}'s deeds as yours.")
@@ -562,6 +566,8 @@ class Companion:
         self.streak = 0  # wins and epic plays in a row, for Bloodfire
         self.local_down_until = 0.0  # after the local model fails, use Claude until then
         self.last_check = time.monotonic()  # free mode: when Claude last took a comment to keep score
+        self.listening = music.Listening()  # Spotify: what's on, and repeats this session
+        self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
         self.partner = brain.partner()  # duo mode: the other character, on screen too
@@ -584,6 +590,23 @@ class Companion:
             cls.earned |= set(self.mem.mind(p).get("unlocked", []))
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
+
+    def look_up(self, playing):
+        """Learn about a song with a web search, once per song (MUSIC_SEARCH; about a cent; at most every LOOKUP_GAP s,
+        and not in cheap mode). What it finds stays in memory, so a song on repeat or played again is free."""
+        key = f"{playing[0]} - {playing[1]}"
+        cheap = config.MONTHLY_BUDGET and self.mem.spent() >= 0.8 * config.MONTHLY_BUDGET
+        if (not config.MUSIC_SEARCH or self.client is None or cheap or self.mem.song_note(key) is not None
+                or time.monotonic() - self.last_lookup < LOOKUP_GAP):
+            return
+        self.last_lookup = time.monotonic()
+        try:
+            note, spent = brain.look_up_song(self.client, config.MODEL, *playing)
+        except Exception:
+            return logging.warning("couldn't look up %s", key, exc_info=True)
+        self.mem.spend(spent, "music")
+        self.mem.learn_song(key, note)
+        logging.info("looked up %s ($%.4f): %s", key, spent, note)
 
     def jealousy(self):
         """What each character on screen missed: the time you spent alone with another one while they were away."""
@@ -874,6 +897,11 @@ class Companion:
                          f'with the player, says to you: "{arg}". Answer them.')
         else:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
+        if kind == "music":  # a new song on Spotify: look it up once (if allowed), then react
+            self.look_up(arg)
+            plays = self.listening.plays.get(tuple(arg), 1)
+            situation = SITUATIONS["music"].format(song=arg[1], artist=arg[0]) + (
+                f" They've played it {plays} times this session: it's on repeat." if plays >= 3 else "")
         if kind == "start" and self.fresh_grudges:
             situation += (f" {self.fresh_grudges} Open with it, cold and in character, and make them work for forgiveness "
                           "(an apology ends it).")
@@ -1014,6 +1042,18 @@ class Companion:
             if held:
                 text += (f"\n{preset_name(p)} is holding a grudge against the player for {'; and '.join(g['why'] for g in held)}. "
                          f"Stay cold about it and bring it up now and then, until they apologize.")
+        playing = self.listening.now if config.MUSIC else None
+        if playing:  # Spotify
+            artist, song = playing
+            plays = self.listening.plays.get(playing, 1)
+            text += (f'\nMusic: the player is listening to "{song}" by {artist} on Spotify '
+                     f"({fmt(time.monotonic() - self.listening.since)} so far" + (f", {plays} plays this session" if plays > 1 else "") + ").")
+            note = self.mem.song_note(f"{artist} - {song}")
+            if note:
+                text += f" About it: {note}"
+            top = self.mem.top_artists(3)
+            if top:
+                text += " Their most-played artists: " + ", ".join(f"{a} ({fmt(s)})" for a, s in top) + "."
         if self.season:  # a holiday or your birthday
             text += "\n" + self.season[1]
         return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
@@ -1101,7 +1141,7 @@ class Companion:
                 time.sleep(5)
 
     def _watch(self):
-        prev = last_save = time.monotonic()
+        prev = last_save = last_music = time.monotonic()
         while True:
             time.sleep(1)
             now = time.monotonic()
@@ -1126,11 +1166,23 @@ class Companion:
                 self.mem.saw(self.on_screen)  # whoever is on screen knows how you've spent your time up to now
                 self.mem.save()
                 last_save = now
+            if config.MUSIC and now - last_music >= 5:  # what's on Spotify
+                last_music, playing = now, music.now_playing()
+                if playing:
+                    self.mem.listened(playing[0], 5)
+                if self.listening.update(playing, now):
+                    self.music_news = playing  # a new song: maybe worth a comment, once they're free
             quiet = now - self.last_spoke
             broke = not config.LOCAL_MODEL and config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET
             talking_to_him = self.ears.recording or any(listener.active() for listener in self.listeners)
             if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or talking_to_him or quiet < config.LOOK_COOLDOWN:
                 continue
+            if self.music_news and not self.muted and now - self.last_music_said > MUSIC_GAP:
+                playing, self.music_news = self.music_news, None
+                if self.listening.now == playing and random.random() < (0.8 if self.listening.plays[playing] >= 3 else 0.35):
+                    self.last_music_said = now  # (more likely when it's on repeat)
+                    self.jobs.put(("music", playing))
+                    continue
             start, end = config.BEDTIME
             hour = datetime.now().hour
             late = start <= hour < end if start < end else (hour >= start or hour < end)
