@@ -1,5 +1,6 @@
 """Eyes (screen capture), ears (push-to-talk speech-to-text), voice (neural TTS with lip-sync levels)."""
 import asyncio
+import contextlib
 import base64
 import io
 import logging
@@ -191,6 +192,28 @@ def device_names(kind):
     return sorted({d["name"] for d in sd.query_devices() if d["hostapi"] == wasapi and d[key] > 0})
 
 
+def loopback_mic(speaker):
+    """A recorder of what `speaker` (part of its name) plays, or None. Built by hand: soundcard's own lookup reads
+    every device's name and fails on half-removed devices (error 0xE000020B)."""
+    import soundcard
+    from soundcard.mediafoundation import _Microphone
+
+    for s in soundcard.all_speakers():
+        try:
+            if speaker.lower() in s.name.lower():
+                return _Microphone(s, isloopback=True)
+        except RuntimeError:  # a device that's being removed
+            continue
+    return None
+
+
+def listen_source_ok(name):
+    """True if the friends' ear can open `name`: an input device, or "loopback:<speaker>"."""
+    if name.startswith("loopback:"):
+        return loopback_mic(name[9:]) is not None
+    return find_device(name, "input") is not None
+
+
 class Ears:
     def __init__(self):
         self._model = None
@@ -255,11 +278,19 @@ class WakeListener:
         return self.speaking or self.pending is not None
 
     def run(self):
-        with sd.InputStream(samplerate=16000, channels=1, dtype="float32", blocksize=1600,  # 0.1 s chunks
-                            device=find_device(self.device, "input"), callback=lambda data, *_: self.q.put(data[:, 0].copy())):
+        if (self.device or "").startswith("loopback:"):  # what a speaker plays (a call's audio), not a mic
+            threading.Thread(target=self._loopback, args=(self.device[9:],), daemon=True).start()
+            source = contextlib.nullcontext()
+        else:
+            source = sd.InputStream(samplerate=16000, channels=1, dtype="float32", blocksize=1600,  # 0.1 s chunks
+                                    device=find_device(self.device, "input"), callback=lambda data, *_: self.q.put(data[:, 0].copy()))
+        with source:
             speech, silent = [], 0
             while True:
-                chunk = self.q.get()
+                try:
+                    chunk = self.q.get(timeout=0.3)
+                except queue.Empty:
+                    chunk = np.zeros(1600, np.float32)  # a source with nothing to say still lets questions finish
                 self.speaking = bool(speech)
                 self.flush()
                 if self.voice.busy() or self.ears.recording:  # ignore his own voice and push-to-talk
@@ -274,6 +305,13 @@ class WakeListener:
                     speech, silent = [], 0
                     if len(audio) > 16000 * 0.5:
                         self.hear(self.ears.transcribe(audio, prompt=f"Hey {config.NAME}."), audio)
+
+    def _loopback(self, speaker):
+        """Feed what `speaker` plays into the listener, in 0.1 s chunks at 16 kHz."""
+        mic = loopback_mic(speaker)
+        with mic.recorder(samplerate=16000, channels=1, blocksize=1600) as rec:
+            while True:
+                self.q.put(rec.record(numframes=1600)[:, 0].astype(np.float32))
 
     def hear(self, text, audio=None):
         """Collect what's said after "Hey Vorn"; flush() sends it once you stop talking."""

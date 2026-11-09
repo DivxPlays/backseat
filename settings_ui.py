@@ -143,7 +143,8 @@ class SettingsWindow(QDialog):
 
         w["MIC_DEVICE"] = _combo([""] + device_names("input"), config.MIC_DEVICE, editable=True)
         w["VOICE_DEVICE"] = _combo([""] + device_names("output"), config.VOICE_DEVICE, editable=True)
-        w["FRIENDS_DEVICE"] = _combo([""] + device_names("input"), config.FRIENDS_DEVICE, editable=True)
+        w["FRIENDS_DEVICE"] = _combo([""] + [f"loopback:{d}" for d in device_names("output")] + device_names("input"),
+                                     config.FRIENDS_DEVICE, editable=True)  # loopback: what a speaker plays (a call)
         w["CAMERA"] = _combo(["off", "current", "both"], config.CAMERA)
         w["CAMERA_BACKGROUND"] = _combo(["dark", "green", "game", "webcam"], config.CAMERA_BACKGROUND)
         w["CAMERA_WEBCAM"] = _combo([""] + webcams(), config.CAMERA_WEBCAM, editable=True)

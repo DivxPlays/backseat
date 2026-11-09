@@ -512,6 +512,9 @@ for mode in ("current", "both"):
         assert frame.shape == (720, 1280, 3) and frame.std() > 5, (mode, bg)
 config.CAMERA, config.CAMERA_BACKGROUND = "off", "dark"
 
+# friends' ear on a call's audio: a missing speaker or device is refused (never a silent fallback to your own mic)
+assert not senses.listen_source_ok("loopback:No Such Speaker 123") and not senses.listen_source_ok("No Such Mic 123")
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
