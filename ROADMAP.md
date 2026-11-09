@@ -1,10 +1,6 @@
 # Roadmap
 
-Planned, not built yet. Order: Bloodfire, then the free local model, then Discord.
-
-## Bloodfire (power-up form)
-- His own original form: his black hair ignites into dark-red flame, his eyes burn white, his armor cracks with molten light.
-- Triggers: big plays (epic plays and win streaks; he powers up for a few seconds, then cools down) and reaching 100 respect.
+Planned, not built yet. Order: the free local model, then Discord.
 
 ## Free local model (mix)
 - A free vision model on your RTX 4090 (through Ollama) makes his automatic comments; Claude still answers when you talk to him. Roughly halves the bill.
@@ -19,5 +15,6 @@ Planned, not built yet. Order: Bloodfire, then the free local model, then Discor
 - Friends' questions come out of your monthly budget; consider sending them to Haiku.
 
 ## Done
+- Bloodfire: flaming hair, white-hot eyes, molten armor cracks, crimson aura; on epic plays, two wins in a row, and reaching 100 respect.
 - Full body with poses by mood (crossed arms, fist, hands on hips, hands up, lecturing finger) and a slump when you lose.
 - Cheaper calls: web search only when asked (questions 4.6 -> 1.9 cents), smaller screenshots of displays without the game (comments 0.07 -> 0.05 cents). Prompt caching doesn't apply: the repeated part of a call is below the minimum length that can be cached.

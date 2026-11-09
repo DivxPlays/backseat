@@ -309,5 +309,24 @@ with tempfile.TemporaryDirectory() as old_pc, tempfile.TemporaryDirectory() as n
     frozen.save()
     assert json.loads((new / "memory.json").read_text(encoding="utf-8")) == {"respect": 77}  # no save over an import
 
+# Bloodfire: epic plays, two wins in a row, or reaching 100 respect; he ignites, then cools down
+assert main.bloodfire(0, "epic", 40, 43) == (1, "bloodfire")
+assert main.bloodfire(0, "win", 40, 43) == (1, None) and main.bloodfire(1, "win", 40, 43) == (2, "bloodfire")
+assert main.bloodfire(2, "death", 40, 38) == (0, None) and main.bloodfire(3, "menu", 40, 40) == (3, None)
+assert main.bloodfire(0, "none", 98, 100) == (0, "bloodfire-max") and main.bloodfire(0, "win", 100, 100) == (1, None)
+v = Vorn()
+v.set_mood("angry")
+plain = v.render()
+v.bloodfire(8)
+for _ in range(60):
+    v.step(1 / 30, 0.0)
+burning = v.render()
+assert v.blood > 0.95 and burning != plain
+hair = burning.pixelColor(int(main.CW / 2), int(main.HEAD_Y - 40))  # above his eyes: flaming red hair
+assert hair.red() > 2 * hair.blue(), hair.name()
+for _ in range(300):  # 10 s later he has cooled down
+    v.step(1 / 30, 0.0)
+assert v.blood < 0.05
+
 print("all self-checks passed", flush=True)
 os._exit(0)  # same exit as main.py: skip Qt's teardown order

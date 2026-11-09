@@ -120,6 +120,18 @@ def alpha(color, a):
     return c
 
 
+def mix(c0, c1, k):
+    """Blend two colors, k=0 -> c0, k=1 -> c1."""
+    return QColor.fromRgbF(*(a + (b - a) * k for a, b in zip(c0.getRgbF(), c1.getRgbF())))
+
+
+# Bloodfire, his power-up form: flaming hair, white-hot eyes, molten cracks in the armor
+EMBER, EMBER_CORE, BLOOD = QColor("#ff3a1a"), QColor("#ffe2a0"), QColor("#b0001c")
+CHEST_CRACKS = [[(150, 326), (142, 346), (148, 362), (134, 392), (140, 414)], [(150, 326), (162, 344), (156, 366), (172, 396)],
+                [(96, 296), (104, 322), (96, 342), (102, 368)], [(206, 298), (198, 324), (206, 348)]]
+PAULDRON_CRACKS = [[(30, 280), (50, 272), (60, 284), (80, 276), (96, 292)], [(70, 304), (78, 290)]]
+
+
 def face_path():
     f = QPainterPath(P(100, 96))
     f.cubicTo(P(98, 130), P(100, 150), P(104, 162))
@@ -160,8 +172,13 @@ class Vorn:
         self.flare_amt = 0.0
         self.tier = 0  # set by the overlay from your respect score
         self.slump_t0 = -100.0
+        self.blood, self.blood_until = 0.0, -1.0  # Bloodfire: current strength 0..1, and until when it burns
         self.arms = {side: [*POSES["idle"][0][:2], POSES["idle"][0][3]] for side in (-1, 1)}  # current upper, forearm, length
         self.d = self._effective()
+
+    def bloodfire(self, seconds):
+        """Power up into Bloodfire for a while; it ignites fast and cools down slowly."""
+        self.blood_until = max(self.blood_until, self.t + seconds)
 
     def slump(self):
         """Shoulders drop, arms hang, head down: you lost and he's ashamed of you."""
@@ -214,6 +231,8 @@ class Vorn:
             self.turn_until, self.turn_at = self.t + 1.6, self.t + random.uniform(18, 40)
         self.turn += ((self.toward if self.t < self.turn_until else 0.0) - self.turn) * (1 - math.exp(-dt * 6))
         self.flare_amt = max(0.0, self.flare_amt - dt / 2.5)
+        burning = self.t < self.blood_until
+        self.blood += (float(burning) - self.blood) * (1 - math.exp(-dt * (6 if burning else 1.2)))
         ka = 1 - math.exp(-dt * 7)
         for side, (upper, fore, _, length) in self.pose().items():
             for i, target in enumerate((upper, fore, length)):
@@ -232,6 +251,8 @@ class Vorn:
         rp = (self.t - self.roll_t0) / 1.1
         a = math.pi * rp
         p["roll_x"], p["roll_y"] = (-math.cos(a) * 6, -math.sin(a) * 6) if 0 <= rp <= 1 else (0.0, 0.0)
+        p["blood"] = self.blood
+        p["aura"] = max(p["aura"], self.blood)
         sl = self.slumping()  # ashamed: heavy lids, brows up, mouth down
         p["slump"] = sl
         p["open"] *= 1 - 0.45 * sl
@@ -320,13 +341,14 @@ class Vorn:
         g.translate(150, FULL_H)
         g.scale(1.25, FULL_H / 345)
         g.translate(-150, -345)
+        b = self.d["blood"]  # Bloodfire turns the orange aura deep crimson
         glow = QRadialGradient(P(150, 190), 180)
-        glow.setColorAt(0, alpha(QColor("#ff4a1a"), 0.45 * a))
+        glow.setColorAt(0, alpha(mix(QColor("#ff4a1a"), BLOOD, b), 0.45 * a + 0.15 * b))
         glow.setColorAt(1, alpha(QColor("#ff2a00"), 0))
         g.setPen(Qt.NoPen)
         g.setBrush(QBrush(glow))
         g.drawEllipse(P(150, 190), 180, 180)
-        for layer, (col, size) in enumerate([(QColor("#ff3d12"), 1.0), (QColor("#ffc23d"), 0.6)]):
+        for layer, (col, size) in enumerate([(mix(QColor("#ff3d12"), BLOOD, b), 1.0 + 0.3 * b), (mix(QColor("#ffc23d"), EMBER, b), 0.6 + 0.2 * b)]):
             for i in range(17):
                 u = i / 16
                 x = 18 + 264 * u
@@ -343,7 +365,7 @@ class Vorn:
             ph = (t * 0.55 + i * 0.137) % 1.0
             x = 30 + (i * 97) % 240 + math.sin(t * 2 + i) * 7
             y = 335 - ph * 320
-            g.setBrush(QBrush(alpha(QColor("#ffd27a"), a * (1 - ph))))
+            g.setBrush(QBrush(alpha(mix(QColor("#ffd27a"), EMBER_CORE, b), a * (1 - ph))))
             g.drawEllipse(P(x, y), 2.6 * (1 - ph) + 0.6, 2.6 * (1 - ph) + 0.6)
         g.restore()
 
@@ -405,6 +427,7 @@ class Vorn:
             ankle = (knee[0] + sx * 186, knee[1] + cy * 186)
             self._limb(g, hip, knee, 42, 30, SUIT, SUIT_SH)
             self._limb(g, knee, ankle, 31, 23, STEEL, STEEL_SH, ridge=polished)
+            self._cracks(g, [self._seam(knee, ankle, 22)])
             boot = poly(*[(ankle[0] + side * x, ankle[1] + y) for x, y in
                           ((-23, -14), (23, -14), (25, 30), (46, 38), (54, 50), (50, 58), (-24, 58), (-26, 30))])
             fill(g, boot, vgrad(ankle[1] - 14, ankle[1] + 58, LEATHER, LEATHER_SH))
@@ -478,6 +501,15 @@ class Vorn:
             c = QPainterPath(P(144 + i * 8, 297))
             c.quadTo(P(149 + i * 8, 307), P(154 + i * 8, 319))
             stroke(g, c, INK, 2.6)
+        self._cracks(g, CHEST_CRACKS)
+
+    def _seam(self, a, b, r):
+        """A jagged crack running down a limb segment from a to b, r wide."""
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / n, dx / n
+        return [(a[0] + dx * f + nx * r * o, a[1] + dy * f + ny * r * o)
+                for f, o in ((0.15, 0.0), (0.32, 0.35), (0.5, -0.2), (0.68, 0.3), (0.85, -0.1))]
 
     def _arms(self, g):
         pose = self.pose()
@@ -498,6 +530,7 @@ class Vorn:
         def forearm(side):
             _, elbow, wrist, dx, dy = arm[side]
             self._limb(g, elbow, wrist, 26, 21, STEEL, STEEL_SH, ridge=polished)
+            self._cracks(g, [self._seam(elbow, wrist, 18)])
             band = QPainterPath(P(wrist[0] - dy * 22 - dx * 14, wrist[1] + dx * 22 - dy * 14))
             band.lineTo(P(wrist[0] + dy * 22 - dx * 14, wrist[1] - dx * 22 - dy * 14))
             stroke(g, band, trim, 4.5)
@@ -554,6 +587,38 @@ class Vorn:
         back = poly((96, 110), (86, 80), (92, 58), (104, 52), (104, 34 + s), (124, 40), (136, 24 + s), (152, 36),
                     (168, 22 + s), (178, 38), (198, 30 + s), (198, 50), (214, 54 + s), (212, 80), (204, 110))
         fill(g, back, vgrad(10, 110, HAIR, HAIR_SH))
+        if self.d["blood"] > 0.02:
+            fill(g, back, vgrad(10, 110, alpha(EMBER, 0.7 * self.d["blood"]), alpha(BLOOD, 0.3 * self.d["blood"])), 0)
+
+    def _hair_fire(self, g, b):
+        """Dark-red flames rising off his hair (head coordinates)."""
+        t = self.t
+        for layer, (c0, c1, size) in enumerate(((BLOOD, EMBER, 1.0), (EMBER, QColor("#ff8a2a"), 0.55))):
+            for i in range(9):
+                u = i / 8
+                x = 94 + 112 * u
+                base = 100 - 64 * (1 - ((x - 150) / 58) ** 2)  # along the top of his hair
+                h = (46 + 20 * math.sin(t * 9 + i * 1.3) + 10 * math.sin(t * 13.7 + i)) * size * b * (1.25 - 0.6 * abs(u - 0.5))
+                w = 13 * size
+                sway = math.sin(t * 6 + i * 0.7) * 5
+                fl = QPainterPath(P(x - w, base + 6))
+                fl.cubicTo(P(x - w, base - h * 0.5), P(x - w * 0.2 + sway * 0.5, base - h * 0.8), P(x + sway, base - h))
+                fl.cubicTo(P(x + w * 0.2 + sway * 0.5, base - h * 0.8), P(x + w, base - h * 0.5), P(x + w, base + 6))
+                fl.closeSubpath()
+                fill(g, fl, vgrad(base - h, base + 6, alpha(c1, 0), alpha(c0 if layer == 0 else c1, (0.9 if layer else 0.8) * b)), 0)
+
+    def _cracks(self, g, lines):
+        """Molten light glowing through cracks in the armor (Bloodfire)."""
+        b = self.d["blood"]
+        if b < 0.02:
+            return
+        pulse = 0.75 + 0.25 * math.sin(self.t * 7)
+        for pts in lines:
+            crack = QPainterPath(P(*pts[0]))
+            for pt in pts[1:]:
+                crack.lineTo(P(*pt))
+            stroke(g, crack, alpha(EMBER, 0.45 * b * pulse), 8)
+            stroke(g, crack, alpha(EMBER_CORE, b), 2.4)
 
     def _body(self, g):
         """Neck and fur collar (the armor is in _torso)."""
@@ -635,6 +700,9 @@ class Vorn:
         hi = QPainterPath(P(120, 56))
         hi.quadTo(P(148, 44), P(178, 54))
         stroke(g, hi, alpha(HAIR_HI, 0.9), 3)
+        if p["blood"] > 0.02:  # Bloodfire: the hair glows from within and ignites
+            fill(g, top, vgrad(38, 100, alpha(EMBER, 0.75 * p["blood"]), alpha(BLOOD, 0.35 * p["blood"])), 0)
+            self._hair_fire(g, p["blood"])
 
         if self.tier >= 3:  # jagged war-crown
             def arc_y(x):
@@ -676,14 +744,15 @@ class Vorn:
             g.save()
             g.setClipPath(almond)
             ix, iy = cx + (p["look"] + self.glance) * 6 + p["roll_x"], cy + p["roll_y"]
+            k = p["blood"]  # Bloodfire: the eyes burn white
             iris = QRadialGradient(P(ix, iy), 7)
-            iris.setColorAt(0, IRIS)
-            iris.setColorAt(1, IRIS_SH)
+            iris.setColorAt(0, mix(IRIS, QColor("white"), k))
+            iris.setColorAt(1, mix(IRIS_SH, EMBER_CORE, k))
             g.setBrush(QBrush(iris))
             g.setPen(pen(INK, 1.2))
             g.drawEllipse(P(ix, iy), 6.6, 6.6)
             g.setPen(Qt.NoPen)
-            g.setBrush(QBrush(INK))
+            g.setBrush(QBrush(alpha(INK, 1 - k)))
             g.drawEllipse(P(ix, iy), 2.8 * p["pupil"], 3.0 * p["pupil"])
             g.setBrush(QBrush(QColor("white")))
             g.drawEllipse(P(ix - 2, iy - 2.5), 1.6, 1.6)
@@ -700,6 +769,14 @@ class Vorn:
         low = QPainterPath(P(cx - side * 8, cy + 0.9 * h + 1))
         low.quadTo(P(cx + side * 4, cy + 1.1 * h + 1), P(cx + side * 12, cy + 0.4 * h))
         stroke(g, low, alpha(INK, 0.7), 1.2)
+        if p["blood"] > 0.02 and h > 0.5:  # white-hot glow spilling out of the eye
+            glow = QRadialGradient(P(cx, cy), 24)
+            glow.setColorAt(0, alpha(QColor("white"), 0.75 * p["blood"]))
+            glow.setColorAt(0.4, alpha(EMBER_CORE, 0.45 * p["blood"]))
+            glow.setColorAt(1, alpha(EMBER, 0))
+            g.setPen(Qt.NoPen)
+            g.setBrush(QBrush(glow))
+            g.drawEllipse(P(cx, cy), 24, 24)
 
     def _brow(self, g, cx, cy, side):
         p = self.d
@@ -761,6 +838,7 @@ class Vorn:
             g.save()
             g.setClipPath(plate)
             fill(g, poly(*m([(60, 290), (130, 250), (130, 330), (60, 330)])), alpha(STEEL_SH, 0.6), 0)
+            self._cracks(g, [m(c) for c in PAULDRON_CRACKS])
             g.restore()
             rim = QPainterPath(P(*m([(24, 268)])[0]))
             for pt in m([(56, 246), (100, 248), (114, 266)]):

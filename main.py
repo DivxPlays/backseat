@@ -69,6 +69,19 @@ SITUATIONS = {
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
 }
 AUTO = {"change", "quiet", "lore", "nag", "breakdown"}  # jobs he starts himself; they stop when the budget runs out
+BLOODFIRE = {"bloodfire": 8, "bloodfire-max": 25}  # seconds he burns: a big play, or reaching 100 respect
+
+
+def bloodfire(streak, event, before, after):
+    """(new win streak, "bloodfire" / "bloodfire-max" / None) after a look, from the event and respect before/after it."""
+    streak = streak + 1 if event in ("win", "epic") else 0 if event in ("death", "loss", "fail") else streak
+    if after >= 100 > before:
+        return streak, "bloodfire-max"
+    if event == "epic" or (event == "win" and streak >= 2):
+        return streak, "bloodfire"
+    return streak, None
+
+
 SEARCH_ASKED = re.compile(r"\b(search|look (it |that |this )?up|google|wiki|guide|walkthrough)", re.I)
 BUDGET_NEWS = {1: "Also tell them they've burned through 80% of this month's budget on you, so you're switching to cheap mode.",
                2: "Also tell them this month's budget is gone, so from now on you only speak when they talk to you."}
@@ -161,7 +174,9 @@ class Overlay(QWidget):
 
     def show_line(self, mood, line, audio, event="none"):
         self.char.set_mood(mood)
-        if event in ("win", "epic"):
+        if event in BLOODFIRE:
+            self.char.bloodfire(BLOODFIRE[event])
+        elif event in ("win", "epic"):
             self.char.flare()
         elif event == "menu":
             self.char.roll()
@@ -313,6 +328,7 @@ class Companion:
         self.focus = foreground_center()  # middle of the last window you used that isn't him: which display the game is on
         self.base_thumb = None
         self.history = deque(maxlen=3)  # the game's display from the last few looks, for post-match breakdowns
+        self.streak = 0  # wins and epic plays in a row, for Bloodfire
 
     def start(self):
         for target in (self.worker, self.watcher, self.ears.model):  # ears.model preloads Whisper
@@ -415,9 +431,11 @@ class Companion:
         out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
         logging.info("%s ($%.4f) -> %s", kind, spent, out)
-        tier = tier_for(self.mem.d["respect"])
+        before = self.mem.d["respect"]
         self.mem.record(app, out)
-        event = "epic" if tier_for(self.mem.d["respect"]) > tier else out.get("event", "none")  # new gear: aura flare
+        event = "epic" if tier_for(self.mem.d["respect"]) > tier_for(before) else out.get("event", "none")  # new gear: aura flare
+        self.streak, fire = bloodfire(self.streak, out.get("event"), before, self.mem.d["respect"])
+        event = fire or event
         shame = None
         if out.get("save_moment") and shot and time.monotonic() - self.last_shame > 60:
             self.last_shame = time.monotonic()
@@ -469,7 +487,9 @@ class Companion:
             return None
 
     def speak(self, mood, line, event="none"):
-        if random.random() < 0.4 and not ALREADY_A_SOUND.match(line):  # a scoff, laugh or grunt first
+        if event in BLOODFIRE:
+            line = f"Bloodfire! {line}"  # he roars it as he transforms
+        elif random.random() < 0.4 and not ALREADY_A_SOUND.match(line):  # a scoff, laugh or grunt first
             line = f"{random.choice(SOUNDS.get(mood, ['Hmph.']))} {line}"
         audio = self.synth(line)
         self.bridge.say.emit(mood, line, audio, event)
