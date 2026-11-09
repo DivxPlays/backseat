@@ -159,7 +159,7 @@ class Mika(Vorn):
 
     def _back_hair(self, g):
         t = self.t
-        sw = math.sin(t * 1.3) * 5
+        sw = math.sin(t * 1.3 * (1 + 4 * self.rag)) * 5 * (1 + 3 * self.rag)  # (thrown: her hair streams)
         hair = QPainterPath(P(92, 120))
         hair.cubicTo(P(78, 40), P(222, 40), P(208, 120))
         hair.cubicTo(P(228, 260), P(238 + sw, 470), P(226 + sw, 600))
@@ -178,6 +178,10 @@ class Mika(Vorn):
     def _legs(self, g, o):
         for side in (-1, 1):
             hip, knee, ankle = (150 + side * 30, 470), (150 + side * 31, 728), (150 + side * 32, 948)
+            if self.legs[side]:  # kicking while thrown: the leg swings out around the hip
+                a = math.radians(self.legs[side]) * side
+                knee, ankle = ((hip[0] + (x - hip[0]) * math.cos(a) + (y - hip[1]) * math.sin(a),
+                                hip[1] - (x - hip[0]) * math.sin(a) + (y - hip[1]) * math.cos(a)) for x, y in (knee, ankle))
             leg = self._limb(g, hip, knee, 35, 21, SKIN, SKIN_SH, width=1.8)
             shin = self._limb(g, knee, ankle, 21, 13, SKIN, SKIN_SH, width=1.8)
             g.save()  # socks or tights over the skin from sock_top down

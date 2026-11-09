@@ -21,7 +21,7 @@ for key, value in config._DEFAULTS.items():
 config.DUO, config.CAMERA_BACKGROUND = True, "dark"
 import main  # noqa: E402
 import character  # noqa: E402
-from character import VORN_HOLIDAY, VORN_LOOKS, VORN_UNLOCKS, Vorn  # noqa: E402
+from character import H, VORN_HOLIDAY, VORN_LOOKS, VORN_UNLOCKS, W, Vorn  # noqa: E402
 from mika import UNLOCKS as MIKA_UNLOCKS, Mika  # noqa: E402
 from senses import Voice  # noqa: E402
 
@@ -68,6 +68,27 @@ def acting(char, name, mood="idle"):
     return char
 
 
+def thrown(char, angle, rag, heap=False):
+    """A character mid-throw (flailing and turned) or in a heap after it, as the flying window draws them."""
+    pose(char, "angry" if heap else "surprised")
+    char.rag = rag
+    if heap:
+        char.slump()
+    for _ in range(12):
+        char.step(1 / 30, 0.0)
+    side = int(H * 1.15)
+    img = QImage(side, side, QImage.Format_ARGB32_Premultiplied)
+    img.fill(0)
+    g = QPainter(img)
+    g.setRenderHint(QPainter.Antialiasing)
+    g.translate(side / 2, side / 2)
+    g.rotate(angle)
+    g.translate(-W / 2, -H / 2)
+    char.paint(g)
+    g.end()
+    return img.scaled(int(side * 0.8), int(side * 0.8))
+
+
 def lineup(chars, name, scale=1.2):
     backdrop([c.render(scale) for c in chars], name)
 
@@ -87,6 +108,8 @@ def main_images():
     lineup([pose(Mika(o), m) for o, m in zip(MIKA_UNLOCKS, ("idle", "laugh", "smug", "laugh"))], "mika-unlockables.png")
     lineup([acting(Vorn("warlord"), n) for n in ("stretch", "crack knuckles", "inspect gauntlet", "power stance", "nod off")]
            + [acting(Mika("jacket"), n) for n in ("wave", "heart hands", "adjust headset", "twirl hair")], "idle.png", scale=1.0)
+    backdrop([thrown(Vorn("warlord"), 0, 1.0), thrown(Vorn("warlord"), 55, 1.0), thrown(Vorn("warlord"), 90, 0.0, True),
+              thrown(Mika("jacket"), -30, 1.0), thrown(Mika("jacket"), -90, 0.0, True)], "thrown.png")
     seasons = []
     for holiday, weather in (("halloween", "bats"), ("christmas", "snow")):  # each pair in their holiday's weather
         character.WEATHER = weather

@@ -656,7 +656,11 @@ assert "=== Vorn ===" in brain.system() and "=== Mika ===" in brain.system() and
 assert "lore" not in brain.schema()["properties"] and "lore" in brain.schema()["properties"]["turns"]["items"]["required"]
 assert "conquests" not in main.SITUATIONS["lore"]  # Vorn's word, and every character tells stories
 comeback = main.COMEBACK_SAYS.format(a="Mika", line="I stole a {controller}.")  # the other one fires back, keeping to their own past
-assert '"I stole a {controller}."' in comeback and "never tell Mika's stories" in comeback and 0 < main.COMEBACK < 1
+assert '"I stole a {controller}."' in comeback and "never tell Mika's stories" in comeback
+lengths = main.BANTER[0]  # duo exchanges: usually short, now and then long, never past what turns_of keeps
+assert min(lengths) == 1 and max(lengths) == 6 and main.LOCAL_BANTER <= 6
+assert len(main.turns_of({"turns": [{"speaker": ("Vorn", "Mika")[i % 2], "mood": "smug", "line": f"l{i}"} for i in range(9)]},
+                         ["Vorn", "Mika"])) == 6
 wake_of = {"Vorn": VORN_NAMES, "Mika": brain.partner()["WAKE_NAMES"]}
 assert main.addressed("Hey Mika, how was your day?", wake_of) == "Mika"
 assert main.addressed("hey vern, ask mika what she thinks", wake_of) == "Vorn"  # the first one called
@@ -982,26 +986,45 @@ def mouse(kind, x, y, home):
 
 home = duo.pos()
 duo.pokeable = True
+duo.scream = lambda i: (None, "Raaaagh!")  # (no sound in a test)
 duo.mousePressEvent(mouse(QEvent.MouseButtonPress, x0 + 30, 300, home))
 for step in range(1, 5):  # a quick flick up and to the left
     time.sleep(0.01)
     duo.mouseMoveEvent(mouse(QEvent.MouseMove, x0 + 30 - 25 * step, 300 - 20 * step, home))
+assert duo.phase == "drag" and duo.chars[0].rag > 0.3  # dangling from your hand, limbs flailing
 duo.mouseReleaseEvent(mouse(QEvent.MouseButtonRelease, x0 + 30 - 100, 300 - 80, home))
 assert said[-1][1] == "grabbed" and duo.flight and duo.flight[0] < 0 and duo.flyer and duo.thrown_by == 0
 assert duo.pos() == home  # only the one you grabbed flies: the overlay (and the other one) stays put
-t = 1000.0
-for _ in range(2000):  # fly, bounce, land
+assert duo.phase == "fly" and "Raaaagh!" in duo.text and duo.flight[2] < 0  # a scream, and a spin with the throw
+t, angles = 1000.0, set()
+for _ in range(3000):  # fly, spin, bounce, land
     t += 1 / 60
     duo.fly(t, 1 / 60)
-    if not duo.flight:
+    angles.add(round(duo.flyer.angle))
+    if duo.phase != "fly":
         break
-assert not duo.flight and said[-1] == (0, "thrown", True) and duo.chars[0].mood == "angry" and duo.pos() == home
-for _ in range(600):  # wait, then glide home and step back into the overlay
+assert duo.phase == "down" and len(angles) > 20 and said[-1] == (0, "thrown", True) and duo.chars[0].mood == "angry"
+assert duo.rest in (0.0, 90.0, -90.0) and duo.chars[0].rag == 0.0 and duo.pos() == home
+for _ in range(60):  # in a heap: settled onto their side (or feet), resting on the floor
+    t += 1 / 60
+    duo.fly(t, 1 / 60)
+assert abs(duo.flyer.angle - duo.rest) < 5
+for _ in range(1500):  # then they get up, walk back, and step into the overlay
     t += 1 / 60
     duo.fly(t, 1 / 60)
     if not duo.flyer:
         break
-assert duo.flyer is None and duo.pos() == home
+assert duo.flyer is None and duo.phase is None and duo.pos() == home
+flail = Vorn("warlord")  # thrown: arms flail, legs kick, and it all still draws
+flail.rag = 1.0
+for _ in range(20):
+    flail.step(1 / 30, 0.0)
+assert abs(flail.legs[1]) > 1 and flail.arms[1][0] > 30 and not flail.render().isNull()
+kicker = Mika("jacket")
+kicker.rag = 1.0
+for _ in range(20):
+    kicker.step(1 / 30, 0.0)
+assert not kicker.render().isNull()
 config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA = saved_duo
 assert brain.partner() is None or config.DUO
 heard_duo = []

@@ -50,7 +50,7 @@ SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the play
             "Never slurs, and never mock real-world identity.")
 
 
-DUO_RULES = """Duo mode: you write both characters. Instead of a single line and mood, fill "turns": 1 to 3 short lines (each under 20 words) between {a} and {b}, as one quick exchange. When someone talks to one of them by name, only that one speaks (one turn) and the other stays silent. Otherwise they react to each other: when one is hard on the player, the other takes the player's side in their own way, and they snipe at each other. Each stays fully in character, and each one's past, powers and story are theirs alone: {a} never claims {b}'s, and {b} never claims {a}'s. "remember" is a fact either of them learned; a turn's "lore" is a new fact from that speaker's own past, usually empty. The line rules above apply to every turn."""
+DUO_RULES = """Duo mode: you write both characters. Instead of a single line and mood, fill "turns": short lines (each under 20 words) between {a} and {b}, as one exchange, as many lines as the moment asks for (usually 1 to 3; when it says so, a longer back-and-forth where they really go at each other). When someone talks to one of them by name, only that one speaks (one turn) and the other stays silent. Otherwise they react to each other: when one is hard on the player, the other takes the player's side in their own way, and they snipe at each other. Each stays fully in character, and each one's past, powers and story are theirs alone: {a} never claims {b}'s, and {b} never claims {a}'s. "remember" is a fact either of them learned; a turn's "lore" is a new fact from that speaker's own past, usually empty. The line rules above apply to every turn."""
 
 
 def partner():

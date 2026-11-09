@@ -123,6 +123,7 @@ LINES = {
                                    "Enough!"]),
         "grabbed": ("surprised", ["Put me down this instant!", "Unhand me, peasant!"]),
         "thrown": ("angry", ["You THREW me? I will remember this.", "My armor. My dignity. Mostly my dignity."]),
+        "scream": ("surprised", ["Raaaaaaagh!", "Unhand meeeeee!", "Aaaaaargh!"]),
     },
     "mika": {
         "mute": ("smug", ["Okay, I'll be quiet... but I'm still watching you. Always.", "Shh, I'm being good. Talk to me when you miss me."]),
@@ -145,6 +146,7 @@ LINES = {
         "poke annoyed": ("angry", ["Keep poking and I'll start poking back. Permanently.", "Okay, that's enough, cutie. I mean it."]),
         "grabbed": ("laugh", ["Wheee! Don't you dare drop me!", "Ooh, carrying me? So bold."]),
         "thrown": ("angry", ["You threw me?! I'm writing this down.", "Ow! You'll pay for that in cuddles."]),
+        "scream": ("surprised", ["Kyaaaaaaah!", "Wheeeeeeee!", "Eeeeeeeek!"]),
     },
 }
 

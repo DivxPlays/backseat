@@ -36,7 +36,7 @@ threading.excepthook = lambda a: logging.critical("thread crash", exc_info=(a.ex
 
 import anthropic  # noqa: E402
 import keyboard  # noqa: E402
-from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, Signal  # noqa: E402
+from PySide6.QtCore import QObject, QPoint, QPointF, QRectF, Qt, QTimer, Signal  # noqa: E402
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap  # noqa: E402
 from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMenu, QMessageBox, QSystemTrayIcon, QWidget  # noqa: E402
 
@@ -92,7 +92,9 @@ SITUATIONS = {
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
 }
 AUTO = {"change", "quiet", "lore", "nag", "breakdown", "music"}  # jobs he starts himself; they stop when the budget runs out
-COMEBACK = 0.6  # duo mode, local model: how often the other one fires back at a comment
+BANTER = ([1, 2, 3, 4, 5, 6], [2, 4, 3, 2, 1, 1])  # duo mode: how many lines an exchange runs (weights): usually short,
+# now and then a real argument. The small local model goes up to LOCAL_BANTER (each line is a call of its own)
+LOCAL_BANTER = 4
 CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one of these gets Claude to double-check
 CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
 MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
@@ -138,7 +140,7 @@ def turns_of(out, names):
     if "turns" in out:
         turns = [(t["speaker"], t.get("mood", "idle"), t["line"].strip()) for t in out["turns"]
                  if t.get("speaker") in names and t.get("line", "").strip()]
-        return turns[:3] or [(names[0], "idle", "")]
+        return turns[:6] or [(names[0], "idle", "")]
     return [(names[0], out.get("mood", "idle"), out.get("line", ""))]
 
 
@@ -214,15 +216,30 @@ class Flyer(QWidget):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.char = char
-        self.resize(int(CW * config.SCALE), int(CH * config.SCALE))
-        self.move(at)
+        self.char, self.angle = char, 0.0  # the physics: where their middle is (center) and how far they've turned
+        self.cw, self.ch = CW * config.SCALE, CH * config.SCALE
+        self.side = int(self.ch * 1.15)  # square, with room to spin and flail
+        self.resize(self.side, self.side)
+        self.center = QPointF(at.x() + self.cw / 2, at.y() + self.ch / 2)
+        self.place()
         set_clickthrough(self, True)  # the overlay keeps the mouse while you drag
         self.show()
+
+    def place(self):
+        self.move(int(self.center.x() - self.side / 2), int(self.center.y() - self.side / 2))
+
+    def half(self):
+        """Half the width and height they take up at this angle (for bounces, and to lie on the floor)."""
+        a = math.radians(self.angle)
+        c, s = abs(math.cos(a)), abs(math.sin(a))
+        return (c * self.cw * 0.6 + s * self.ch) / 2, (s * self.cw * 0.6 + c * self.ch) / 2  # (their body is ~60% of the width)
 
     def paintEvent(self, _):
         g = QPainter(self)
         g.setRenderHint(QPainter.Antialiasing)
+        g.translate(self.side / 2, self.side / 2)
+        g.rotate(self.angle)
+        g.translate(-self.cw / 2, -self.ch / 2)
         g.scale(config.SCALE, config.SCALE)
         self.char.paint(g)
         g.end()
@@ -247,8 +264,10 @@ class Overlay(QWidget):
         self.later = {}  # {character index: (when, mood)}: duo mode, each one changes face in their own time
         self.pokeable = False  # Ctrl held: clicks on them land on them instead of your game
         self.grab = None  # Ctrl+drag: [which one, grab offset, recent (time, position) for the throw's speed, dragged yet]
-        self.flight = None  # thrown: [vx, vy] in px/s while they fly
-        self.flyer, self.home_at = None, 0.0  # the thrown one's own window (see Flyer), and when they head home
+        self.flight = None  # thrown: [vx, vy in px/s, spin in degrees/s] while they fly
+        self.flyer = None  # the thrown one's own window (see Flyer)
+        self.phase, self.phase_t0, self.rest = None, 0.0, 0.0  # "drag", "fly", "down" (in a heap), "up", "home"
+        self.scream = None  # a throw: scream(i) -> (audio, text), set by main (the companion has them ready)
         self.pokes, self.jolts, self.last_said, self.thrown_by = deque(maxlen=12), {}, 0.0, 0
         self.span = CW * config.SCALE * len(self.chars)  # how wide the characters are together
         self.resize(int(BUBBLE_W + self.span), int(CH * config.SCALE) + 26)  # + a strip under their feet for the cost tag
@@ -300,12 +319,17 @@ class Overlay(QWidget):
             p = e.globalPosition()
             if not dragged and (p - trail[0][1]).manhattanLength() > 12:  # a drag, not a poke: grabbed
                 self.grab[3] = dragged = True
-                self.flyer, self.thrown_by = Flyer(self.chars[i], self.slot(i)), i  # out of the overlay, into your hand
-                self.grab[1] = offset = trail[0][1].toPoint() - self.slot(i)
+                self.flyer, self.thrown_by, self.phase = Flyer(self.chars[i], self.slot(i)), i, "drag"  # into your hand
+                self.grab[1] = offset = trail[0][1] - self.flyer.center
                 self.chars[i].set_mood("surprised")
                 self.react(i, "grabbed")
-            if dragged:
-                self.flyer.move(p.toPoint() - offset)
+            if dragged:  # they dangle from your hand: tilting against the motion, limbs flailing with the speed
+                last_t, last_p = trail[-1]
+                vx = (p.x() - last_p.x()) / max(time.monotonic() - last_t, 1 / 120)
+                self.flyer.center = p - offset
+                self.flyer.angle += (max(-35.0, min(35.0, -vx * 0.03)) - self.flyer.angle) * 0.25
+                self.flyer.place()
+                self.chars[i].rag = min(1.0, abs(vx) / 900 + 0.35)
             self.grab[2] = (trail + [(time.monotonic(), p)])[-6:]
 
     def mouseReleaseEvent(self, e):
@@ -317,7 +341,11 @@ class Overlay(QWidget):
             return self.poke(i, e.position().y())
         (t0, p0), (t1, p1) = trail[0], trail[-1]
         dt = max(t1 - t0, 1 / 60)
-        self.flight = [(p1.x() - p0.x()) / dt, (p1.y() - p0.y()) / dt]  # let go: thrown at that speed
+        vx, vy = (p1.x() - p0.x()) / dt, (p1.y() - p0.y()) / dt  # let go: thrown at that speed, spinning with it
+        self.flight, self.phase, self.chars[i].rag = [vx, vy, max(-720.0, min(720.0, vx * 0.45))], "fly", 1.0
+        got = self.scream(i) if self.scream else None
+        if got:  # and they scream
+            self.show_line("surprised", got[1], got[0], "none", self.names[i])
 
     def poke(self, i, y):
         """Ctrl+click: they flinch, and say something (more annoyed the more you poke)."""
@@ -342,37 +370,63 @@ class Overlay(QWidget):
         return self.pos() + QPoint(int((0 if self.left else BUBBLE_W) + i * CW * config.SCALE), 0)
 
     def fly(self, now, dt):
-        """Thrown: gravity and bounces off the screen's edges; once they land they complain, then glide home."""
+        """Thrown, ragdoll style: gravity, spin and bounces off the screen's edges; they land in a heap, lie there a
+        moment and complain, get up, and walk back to their spot."""
         w = self.flyer
-        if not w:
+        if not w or self.grab:
             return
-        if self.flight:
-            vx, vy = self.flight[0], self.flight[1] + self.GRAVITY * dt
-            x, y = w.x() + vx * dt, w.y() + vy * dt
-            geo = (QApplication.screenAt(w.geometry().center()) or QApplication.primaryScreen()).availableGeometry()
-            if x < geo.left() or x + w.width() > geo.right():
-                x, vx = min(max(x, geo.left()), geo.right() - w.width()), -vx * 0.6
-            if y < geo.top():
-                y, vy = geo.top(), -vy * 0.5
-            if y + w.height() > geo.bottom():
-                y, vy, vx = geo.bottom() - w.height(), -vy * 0.45, vx * 0.85
-            w.move(int(x), int(y))
-            self.flight = [vx, vy]
-            if y + w.height() >= geo.bottom() - 1 and abs(vy) < 160 and abs(vx) < 80:  # landed
-                self.flight, self.home_at = None, now + 2.5
-                self.chars[self.thrown_by].set_mood("angry")
-                self.chars[self.thrown_by].pop = 1.0
-                self.react(self.thrown_by, "thrown", force=True)
-        elif not self.grab and now > self.home_at:  # back to their spot, then back into the overlay
-            home = self.slot(self.thrown_by)
-            dx, dy = home.x() - w.x(), home.y() - w.y()
-            if abs(dx) + abs(dy) < 16:  # the last few pixels: snap (whole-pixel steps would stall short of it)
+        char = self.chars[self.thrown_by]
+        geo = (QApplication.screenAt(w.center.toPoint()) or QApplication.primaryScreen()).availableGeometry()
+        if self.phase == "fly":
+            vx, vy, spin = self.flight
+            vy += self.GRAVITY * dt
+            spin *= math.exp(-0.5 * dt)  # air slows the spin a little
+            w.angle += spin * dt
+            x, y = w.center.x() + vx * dt, w.center.y() + vy * dt
+            hw, hh = w.half()
+            if x - hw < geo.left() or x + hw > geo.right():  # a wall: bounce, and the spin reverses
+                x, vx, spin = min(max(x, geo.left() + hw), geo.right() - hw), -vx * 0.6, -spin * 0.7
+            if y - hh < geo.top():
+                y, vy = geo.top() + hh, -vy * 0.5
+            if y + hh > geo.bottom():  # the floor: bounce, lose speed, and once it's slow they land
+                y, vy, vx, spin = geo.bottom() - hh, -vy * 0.4, vx * 0.7, spin * 0.6
+                if abs(vy) < 220:
+                    self.land(now)
+            w.center = QPointF(x, y)
+            if self.phase == "fly":
+                self.flight = [vx, vy, spin]
+                char.rag = min(1.0, math.hypot(vx, vy) / 1200 + 0.3)
+        elif self.phase == "down":  # in a heap: settle onto their side (or feet), lie there, then get up
+            w.angle += (self.rest - w.angle) * (1 - math.exp(-dt * 10))
+            w.center = QPointF(w.center.x(), geo.bottom() - w.half()[1])
+            if now - self.phase_t0 > 1.6:
+                self.phase = "up"
+        elif self.phase == "up":
+            w.angle += -w.angle * (1 - math.exp(-dt * 5))
+            w.center = QPointF(w.center.x(), geo.bottom() - w.half()[1])
+            if abs(w.angle) < 1:
+                w.angle, self.phase = 0.0, "home"
+        elif self.phase == "home":  # back to their spot, then back into the overlay
+            slot = self.slot(self.thrown_by)
+            d = QPointF(slot.x() + w.cw / 2, slot.y() + w.ch / 2) - w.center
+            if abs(d.x()) + abs(d.y()) < 16:  # the last few pixels: snap (whole-pixel steps would stall short of it)
                 w.close()
                 w.deleteLater()
-                self.flyer = None
-            else:
-                k = 1 - math.exp(-dt * 5)
-                w.move(int(w.x() + dx * k), int(w.y() + dy * k))
+                self.flyer, self.phase, char.rag = None, None, 0.0
+                return
+            w.center += d * (1 - math.exp(-dt * 5))
+        w.place()
+
+    def land(self, now):
+        """They hit the floor for good: in a heap on their side (or on their feet), dazed, and they complain."""
+        w, char = self.flyer, self.chars[self.thrown_by]
+        w.angle = (w.angle + 180) % 360 - 180
+        self.rest = 0.0 if abs(w.angle) < 35 else (90.0 if w.angle > 0 else -90.0)
+        self.flight, self.phase, self.phase_t0, char.rag = None, "down", now, 0.0
+        char.slump()  # limp
+        char.set_mood("angry")
+        char.pop = 1.0
+        self.react(self.thrown_by, "thrown", force=True)
 
     def show_line(self, mood, line, audio, event="none", who=""):
         self.speaking = self.names.index(who) if who in self.names else 0
@@ -569,6 +623,7 @@ class Companion:
         self.last_check = time.monotonic()  # free mode: when Claude last took a comment to keep score
         self.listening = music.Listening()  # Spotify: what's on, and repeats this session
         self.coached = ""  # a new weekly coaching report's headline, for the greeting
+        self.screams = {}  # {character index: [(audio, text)]}, ready before anyone gets thrown
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
@@ -653,6 +708,20 @@ class Companion:
         """The preset of the character at position i on screen (0: the current one, 1: duo mode's partner)."""
         return config.PRESET if i == 0 else self.partner["PRESET"]
 
+    def prepare_screams(self):
+        """Their screams for when you throw them, in their own voices, a bit faster (a throw can't wait for the voice)."""
+        for i, name in enumerate(self.names):
+            voice = self.voices_of[name]
+            _, lines = commands.LINES.get(self.preset_of(i), commands.LINES["vorn"])["scream"]
+            try:
+                self.screams[i] = [(self.voice.synth(text, voice["VOICE"], "+15%", voice["VOICE_PITCH"]), text) for text in lines]
+            except Exception:
+                logging.warning("couldn't make %s's screams", name, exc_info=True)
+
+    def scream(self, i):
+        """(audio, text) of one of character i's screams, or None if they aren't ready yet."""
+        return random.choice(self.screams[i]) if self.screams.get(i) else None
+
     def check_unlocks(self):
         """Hand out outfits whose goal you've reached; each one is announced in character (see unlocks.py)."""
         for i, dresser in enumerate(self.dressers):
@@ -668,7 +737,7 @@ class Companion:
 
     def start(self):
         preload = [self.ears.model] + ([self.voice.kokoro] if config.VOICE.startswith("kokoro:") else [])  # Whisper, Kokoro
-        for target in [self.worker, self.watcher] + preload:
+        for target in [self.worker, self.watcher, self.prepare_screams] + preload:
             threading.Thread(target=target, daemon=True).start()
         if self.awake:
             self.wake_up()
@@ -936,6 +1005,10 @@ class Companion:
         if to:  # duo mode: without this the other one answers too ("My day?") when only one was asked
             other = next(n for n in self.names if n != to)
             situation += f" (This was said to {to}: only {to} speaks, in one turn. {other} stays silent.)"
+        lines = random.choices(*BANTER)[0] if self.partner and not to else 1  # duo mode: this exchange's length
+        if self.partner and not to:
+            situation += (f" (This exchange runs {lines} line{'s' if lines > 1 else ''}"
+                          + (": a real back-and-forth, they go at each other.)" if lines >= 4 else ".)"))
         if crossed:
             situation += " " + BUDGET_NEWS[level]
         # smarter free mode: the local model only talks, so every CHECK_EVERY minutes Claude (Haiku) takes the comment and
@@ -964,13 +1037,14 @@ class Companion:
                     # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
                     # (it reads your memory, it doesn't write it); Claude does those
                     out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="")
-                    said = out["turns"][0] if alone else None
-                    if said and said["line"].strip() and random.random() < COMEBACK:  # duo mode: the other one fires back
-                        other = brain.me() if alone is self.partner else self.partner  # from their own head: own past only
-                        back, _ = brain.local_think(config.LOCAL_MODEL, self.knowledge(app, title, exe, query, other),
-                                                    self.recent[-3:] + [f"{said['speaker']}: {said['line']}"],
-                                                    COMEBACK_SAYS.format(a=said["speaker"], line=said["line"]), jpegs, only=other)
+                    said, voice = (out["turns"][0] if alone else None), alone
+                    while said and said["line"].strip() and len(out["turns"]) < min(lines, LOCAL_BANTER):  # they go back and forth
+                        voice = brain.me() if voice is self.partner else self.partner  # each from their own head: own past only
+                        back, _ = brain.local_think(config.LOCAL_MODEL, self.knowledge(app, title, exe, query, voice),
+                                                    self.recent[-3:] + [f"{t['speaker']}: {t['line']}" for t in out["turns"]],
+                                                    COMEBACK_SAYS.format(a=said["speaker"], line=said["line"]), jpegs, only=voice)
                         out["turns"] += back["turns"]
+                        said = back["turns"][0]
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
@@ -1275,6 +1349,7 @@ def main():
             comp.jobs.put(("poke", (i, what, time.monotonic())))
 
     overlay.poked.connect(poked)
+    overlay.scream = comp.scream  # thrown: they scream
     set_clickthrough(overlay, True)  # also creates his window, even while he's hidden waiting for a game
 
     def set_stream(on):  # off = WDA_EXCLUDEFROMCAPTURE: hidden from OBS, recordings and his own screenshots

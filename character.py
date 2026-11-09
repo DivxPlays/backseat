@@ -259,6 +259,8 @@ class Vorn:
         self.talk = 0.0
         self.say = (0.0, 0.0, 0.0)  # the mouth shape the voice asks for right now: open, wide (- round), teeth
         self.lips = [0.0, 0.0, 0.0]  # where the mouth is, easing toward that
+        self.rag = 0.0  # thrown: how hard they flail, 0..1 (set by the overlay while they fly)
+        self.legs = {-1: 0.0, 1: 0.0}  # leg swing in degrees, outward + (kicking while thrown)
         self.blink = 0.0
         self.blink_at = t + random.uniform(0.5, 4)
         self.glance = 0.0
@@ -430,10 +432,18 @@ class Vorn:
         self.flare_amt = max(0.0, self.flare_amt - dt / 2.5)
         burning = self.t < self.blood_until
         self.blood += (float(burning) - self.blood) * (1 - math.exp(-dt * (6 if burning else 1.2)))
-        ka = 1 - math.exp(-dt * 7)
+        ka = 1 - math.exp(-dt * (16 if self.rag > 0.05 else 7))
         for side, (upper, fore, _, length) in self.pose().items():
+            if self.rag > 0.05:  # thrown: arms flail instead of holding a pose
+                t = self.t * (1 + side * 0.13)
+                upper = 95 + 60 * math.sin(t * 7.3 + side * 1.7) * self.rag
+                fore = upper + 55 * math.sin(t * 9.1 + side) * self.rag
+                length = 1.0
             for i, target in enumerate((upper, fore, length)):
                 self.arms[side][i] += (target - self.arms[side][i]) * ka
+        for side in (-1, 1):  # and legs kick
+            target = 26 * math.sin(self.t * 8.2 + side * 2.1) * self.rag
+            self.legs[side] += (target - self.legs[side]) * ka
 
     def _effective(self):
         """Mood values plus the short-lived extras on top: yawns, glances, eye-rolls, aura flares."""
@@ -634,8 +644,9 @@ class Vorn:
             g.translate(150, 256)
             g.scale(0.6 + 0.4 * f, f)
             g.translate(-150, -256)
-        hem = [(-22 + 344 * i / 10 + math.sin(t * 1.3 + i * 0.8) * 4, 984 - (30 if i % 2 else 0) + math.sin(t * 1.1 + i) * 3)
-               for i in range(11)]
+        flap = 1 + 5 * self.rag  # thrown: the cape streams and snaps
+        hem = [(-22 + 344 * i / 10 + math.sin(t * 1.3 * flap + i * 0.8) * 4 * flap,
+                984 - (30 if i % 2 else 0) + math.sin(t * 1.1 * flap + i) * 3 * flap) for i in range(11)]
         cape = QPainterPath(P(52, 256))
         cape.quadTo(P(4, 560), P(*hem[0]))
         for pt in hem[1:]:
@@ -706,7 +717,8 @@ class Vorn:
         polished, trim = self._polish(), self._trim()[0]
         for side in (-1, 1):
             hip = (150 + side * 28, 540)
-            sx, cy = side * math.sin(math.radians(7)), math.cos(math.radians(7))  # a wide, planted stance
+            a = math.radians(7 + self.legs[side])  # a wide, planted stance (kicking while thrown)
+            sx, cy = side * math.sin(a), math.cos(a)
             knee = (hip[0] + sx * 208, hip[1] + cy * 208)
             ankle = (knee[0] + sx * 186, knee[1] + cy * 186)
             self._limb(g, hip, knee, 42, 30, *k["legs"])
