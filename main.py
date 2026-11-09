@@ -39,6 +39,7 @@ import brain  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
 import transfer  # noqa: E402
+import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, Vorn, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
@@ -82,6 +83,8 @@ def bloodfire(streak, event, before, after):
     return streak, None
 
 
+ENROLL = re.compile(r"\b(?:remember|learn|save)\s+my\s+voice\W+(?:please\W+)?(?:(?:i'?m|i am|my name is|it'?s|this is|call me)\s+)?"
+                    r"(?!please\b)([a-z][a-z'-]{1,20})", re.I)
 SEARCH_ASKED = re.compile(r"\b(search|look (it |that |this )?up|google|wiki|guide|walkthrough)", re.I)
 BUDGET_NEWS = {1: "Also tell them they've burned through 80% of this month's budget on you, so you're switching to cheap mode.",
                2: "Also tell them this month's budget is gone, so from now on you only speak when they talk to you."}
@@ -330,6 +333,7 @@ class Companion:
         self.history = deque(maxlen=3)  # the game's display from the last few looks, for post-match breakdowns
         self.streak = 0  # wins and epic plays in a row, for Bloodfire
         self.local_down_until = 0.0  # after the local model fails, use Claude until then
+        self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
 
@@ -345,16 +349,48 @@ class Companion:
             return
         self.started = self.awake = True
         if config.WAKE_WORD:  # the mic only opens once he's awake
-            threading.Thread(target=WakeListener(self.ears, self.voice, self.wake_heard).run, daemon=True).start()
+            threading.Thread(target=WakeListener(self.ears, self.voice, self.wake_heard, config.MIC_DEVICE).run, daemon=True).start()
+        if config.FRIENDS_DEVICE:  # his second ear, on your friends' voices from Discord
+            threading.Thread(target=WakeListener(self.ears, self.voice, self.friend_heard, config.FRIENDS_DEVICE).run, daemon=True).start()
         self.bridge.awake.emit()
         self.jobs.put(("start", None))
 
-    def wake_heard(self, text):
+    def wake_heard(self, text, audio=None):
         if text is None:  # just "Hey Vorn": he's listening for the question
             cue("on")
             self.bridge.note.emit("(listening...)")
         else:
             self.jobs.put(("ask", text))
+
+    def friend_heard(self, text, audio):
+        if text is None:
+            self.bridge.note.emit("(listening to your friend...)")
+        else:
+            self.jobs.put(("friend", (text, audio)))
+
+    def who(self, text, clip):
+        """(the friend's name or None, whether they just taught him their voice). Fingerprints never leave this PC."""
+        m = ENROLL.search(text)
+        fp = None
+        if clip is not None and len(clip) > 16000 * 0.8:
+            try:
+                fp = self.voices.fingerprint(clip)
+            except Exception:
+                logging.warning("voice fingerprint failed", exc_info=True)
+        with self.mem.lock:
+            friends = self.mem.d.setdefault("friends", {})
+            if m:
+                name = m.group(1).lower()
+                friend = friends.setdefault(name, {"notes": []})
+                if fp is not None:
+                    friend["voice"] = voices.learn(friend.get("voice"), fp)
+                return name, True
+            if fp is None:
+                return None, False
+            name, score = voices.identify({n: f["voice"] for n, f in friends.items() if f.get("voice")}, fp)
+            if name and score > 0.65:
+                friends[name]["voice"] = voices.learn(friends[name]["voice"], fp, 0.15)  # he keeps learning their voice
+            return name, False
 
     # hotkeys (these run on the keyboard library's thread)
     def talk_down(self):
@@ -404,6 +440,11 @@ class Companion:
             kind = "ask"
         if kind == "ask":
             self.bridge.note.emit(f'You: "{arg}"')
+        speaker, enrolled = None, False
+        if kind == "friend":  # someone in your Discord call said "Hey Vorn"
+            arg, clip = arg
+            speaker, enrolled = self.who(arg, clip)
+            self.bridge.note.emit(f'{(speaker or "Friend").title()}: "{arg}"')
         if self.client is None:
             return self.speak("disgusted", "You forgot my API key, fool. Put it in api underscore key dot text.")
         level, crossed = self.mem.budget_level()
@@ -423,7 +464,14 @@ class Companion:
             if shot:
                 self.base_thumb = shot[0]
                 self.history.append(shot[1][game_display(shot[2], self.focus)])
-        situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
+        if kind == "friend":
+            name = speaker.title() if speaker else None
+            situation = (f"{name}, the player's friend in their voice call, just asked you to remember their voice. You will now. "
+                         f"Greet {name} with a roast." if enrolled else
+                         f'{name or "One of the player`s friends (you can`t tell which; if they say their name, use it)"}, in the voice call '
+                         f'with the player, says to you: "{arg}". Answer them.')
+        else:
+            situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
         if crossed:
             situation += " " + BUDGET_NEWS[level]
         context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start)
@@ -444,7 +492,7 @@ class Companion:
         self.mem.spend(spent, kind)
         logging.info("%s%s ($%.4f) -> %s", kind, " (local)" if spent == 0 and local else "", spent, out)
         before = self.mem.d["respect"]
-        self.mem.record(app, out)
+        self.mem.record(app, out, friend=speaker)
         event = "epic" if tier_for(self.mem.d["respect"]) > tier_for(before) else out.get("event", "none")  # new gear: aura flare
         self.streak, fire = bloodfire(self.streak, out.get("event"), before, self.mem.d["respect"])
         event = fire or event
@@ -460,9 +508,10 @@ class Companion:
             if shame:
                 self.hall_entry(shame, out["line"], title or app, self.synth(out["line"]))
             return
-        if kind == "ask":
-            self.recent.append(f"Player: {arg}")
-            self.mem.line(f"Player: {arg}")
+        if kind in ("ask", "friend"):
+            said = f"Player: {arg}" if kind == "ask" else f"{(speaker or 'unknown').title()} (friend): {arg}"
+            self.recent.append(said)
+            self.mem.line(said)
         self.recent = (self.recent + [f"You: {out['line']}"])[-12:]
         self.mem.line(f"You: {out['line']}")
         line, audio = self.speak(out.get("mood", "idle"), out["line"], event)

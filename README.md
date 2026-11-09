@@ -86,9 +86,21 @@ He starts Ollama himself if it isn't running. Each local comment takes about a s
 
 To spend less: watch one display (`MONITOR = 1`), raise the seconds between comments, or set the model for talking to him to Haiku (questions drop to about a tenth of a cent, but hints get weaker). Set a monthly spend limit in the Anthropic Console as a hard backstop. The spend in the tray menu is his own estimate from token counts; the Console is the real bill.
 
+## Discord calls
+
+Put him in your Discord calls: everyone hears him, your friends can say "Hey Vorn, ..." too, and he learns their voices so he roasts the right person.
+
+1. Install **VoiceMeeter Banana** (free) from vb-audio.com and reboot. Its installer may switch Windows' default speakers and mic to VoiceMeeter devices: if your sound disappears, set them back in Windows Settings > System > Sound.
+2. Tray > Settings > **Discord & audio** > **Set up VoiceMeeter for Discord**. It starts VoiceMeeter and routes it: your mic and his voice to Discord, Discord's sound to your headset and to his second ear. Then follow the three steps it shows: pick your mic and headset in VoiceMeeter, set Discord's input to `Voicemeeter Out B1` and output to `Voicemeeter Input`, and pick your real mic under "Your mic". Save & restart.
+3. Each friend says **"Hey Vorn, remember my voice, I'm Mike"** once. After that he recognizes them by voice (and keeps learning it); if he can't tell, he asks or uses the name they say.
+
+He keeps running jokes on each friend (in `memory.json`, exported with your memory) and pits you all against each other. Friends' questions use Haiku (about 0.05 cents each) and count toward your budget. Voice fingerprints are made and stored on your PC only. VoiceMeeter has to be running during calls; without it, clear "His voice" in Settings or you won't hear him.
+
+**Let him swear:** Settings > Him > Language. He swears freely, but never uses slurs.
+
 ## Privacy
 
-Screenshots go to Anthropic's API, which means whatever is on your screen, including Discord or browser tabs. Press F7 first. While paused he answers questions without seeing the screen.
+Screenshots go to Anthropic's API, which means whatever is on your screen, including Discord or browser tabs. Press F7 first. While paused he answers questions without seeing the screen. Everything you and your friends say is transcribed on your PC; only what's said after "Hey Vorn" is sent. Friends' voice fingerprints never leave your PC.
 
 ## Tweaking
 

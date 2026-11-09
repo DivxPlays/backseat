@@ -139,7 +139,7 @@ with tempfile.TemporaryDirectory() as d:
 
 # wake word: tolerant of Whisper's mishearings, ignores everything else
 heard = []
-w = WakeListener(None, None, heard.append)
+w = WakeListener(None, None, lambda text, audio: heard.append(text))
 for said in ("Hey Vorn, what does this boss do?", "hey born. where's the key", "Okay, Vern! reload faster"):
     w.hear(said)
 w.hear("hey there buddy")
@@ -346,6 +346,59 @@ except OSError:
     pass
 brain.OLLAMA = real_ollama
 server.shutdown()
+
+# Discord calls: devices by name, "remember my voice", voice matching, friend notes, VoiceMeeter routes, swearing
+import senses  # noqa: E402
+import voicemeeter  # noqa: E402
+import voices  # noqa: E402
+
+fake_devices = [{"name": "Microphone (HyperX Cloud Alpha ", "hostapi": 0, "max_input_channels": 1, "max_output_channels": 0},
+                {"name": "Voicemeeter AUX Input (VB-Audio", "hostapi": 0, "max_input_channels": 0, "max_output_channels": 2},
+                {"name": "Voicemeeter Out B2 (VB-Audio Vo", "hostapi": 0, "max_input_channels": 2, "max_output_channels": 0},
+                {"name": "Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)", "hostapi": 1, "max_input_channels": 0,
+                 "max_output_channels": 2}]
+with mock.patch.object(senses.sd, "query_devices", lambda: fake_devices), \
+        mock.patch.object(senses.sd, "query_hostapis", lambda: [{"name": "MME"}, {"name": "Windows WASAPI"}]):
+    assert senses.find_device("Microphone (HyperX Cloud Alpha 2 Wireless Chat)", "input") == 0  # MME cut the name
+    assert senses.find_device("voicemeeter aux input", "output") == 1 and senses.find_device("Voicemeeter Out B2", "input") == 2
+    assert senses.find_device("", "input") is None and senses.find_device("Voicemeeter AUX Input", "input") is None
+    assert senses.device_names("output") == ["Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)"]
+for said, name in (("remember my voice, I'm Mike.", "Mike"), ("Learn my voice. My name is Sam", "Sam"),
+                   ("remember my voice please, it's Tess", "Tess"), ("save my voice: Raj", "Raj"), ("remember my voice", None)):
+    m = main.ENROLL.search(said)
+    assert (m.group(1) if m else None) == name, (said, m and m.group(1))
+a, b = np.eye(4, dtype=np.float32)[:2]
+prints = {"mike": voices.learn(None, a), "sam": voices.learn(None, b)}
+assert voices.identify(prints, voices.learn(None, a + 0.2 * b))[0] == "mike"
+assert voices.identify(prints, voices.learn(None, a + b))[0] is None  # too close to call: nobody, rather than the wrong one
+assert voices.identify({}, a) == (None, 0.0)
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    m.record("g.exe", {"remember": "Mike blames lag for everything."}, friend="mike")
+    m.record("g.exe", {"remember": "The player camps in corners."})
+    assert m.d["friends"]["mike"]["notes"] == ["Mike blames lag for everything."] and len(m.d["notes"]) == 1
+    assert "Mike: Mike blames lag for everything." in m.context("g.exe", "G", None, 0)
+
+
+class FakeVoices:
+    def fingerprint(self, clip):
+        return a
+
+
+comp = SimpleNamespace(voices=FakeVoices(), mem=Memory(Path(tempfile.mkdtemp(), "memory.json")))
+clip = np.zeros(16000 * 2, np.float32)
+assert main.Companion.who(comp, "remember my voice, I'm Mike", clip) == ("mike", True)
+assert main.Companion.who(comp, "roast him, he's trash", clip) == ("mike", False)  # known by his voice now
+assert main.Companion.who(comp, "short", np.zeros(100, np.float32)) == (None, False)  # too short to tell
+assert voicemeeter.routes(2) == {"Strip[0].A1": 0, "Strip[0].B1": 1, "Strip[0].B2": 0, "Strip[3].A1": 1, "Strip[3].B1": 0,
+                                 "Strip[3].B2": 1, "Strip[4].A1": 1, "Strip[4].B1": 1, "Strip[4].B2": 0}
+assert set(voicemeeter.routes(3)) == {k.replace("[3]", "[5]").replace("[4]", "[6]") for k in voicemeeter.routes(2)}
+swear = config.SWEAR
+config.SWEAR = True
+assert "swear freely" in brain.system() and "Never slurs" in brain.system()
+config.SWEAR = False
+assert "swear freely" not in brain.system()
+config.SWEAR = swear
 
 # Bloodfire: epic plays, two wins in a row, or reaching 100 respect; he ignites, then cools down
 assert main.bloodfire(0, "epic", 40, 43) == (1, "bloodfire")

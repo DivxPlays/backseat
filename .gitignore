@@ -13,3 +13,6 @@ memory backup *.zip
 # rebuilt by run.bat
 .venv/
 __pycache__/
+
+# downloaded on first use
+models/

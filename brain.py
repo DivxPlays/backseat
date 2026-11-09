@@ -45,6 +45,15 @@ QUIET_REPLY = {"mood": "disgusted", "line": "Hmph. Not worth my breath.", "event
                "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": ""}
 
 
+SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the player and their friends want it raw and asked for it. "
+            "Never slurs, and never mock real-world identity.")
+
+
+def system():
+    # replace, not format: an edited persona may contain braces
+    return config.PERSONA.replace("{name}", config.NAME) + (SWEARING if config.SWEAR else "")
+
+
 def make_client():
     key = os.environ.get("ANTHROPIC_API_KEY") or (KEY_FILE.read_text(encoding="utf-8").strip() if KEY_FILE.exists() else "")
     return anthropic.Anthropic(api_key=key, timeout=60, max_retries=1) if key else None
@@ -58,7 +67,7 @@ def _ask(client, model, content, schema, tools=None):
     r = client.beta.messages.create(
         model=model,
         max_tokens=4000,
-        system=config.PERSONA.replace("{name}", config.NAME),  # replace, not format: an edited persona may contain braces
+        system=system(),
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
         messages=[{"role": "user", "content": content}],
         **extra,
@@ -82,7 +91,7 @@ def prompt(context, recent, situation, jpegs):
 def local_think(model, context, recent, situation, jpegs):
     """think() on a free vision model running on this PC through Ollama. Returns (reply, 0.0); raises if Ollama fails."""
     body = {"model": model, "stream": False, "format": SCHEMA, "keep_alive": "15m", "options": {"num_predict": 400},
-            "messages": [{"role": "system", "content": config.PERSONA.replace("{name}", config.NAME)},
+            "messages": [{"role": "system", "content": system()},
                          {"role": "user", "content": prompt(context, recent, situation, jpegs), "images": jpegs}]}
     req = urllib.request.Request(f"{OLLAMA}/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:  # the first call also loads the model onto the GPU

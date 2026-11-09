@@ -167,10 +167,33 @@ def save_moment(pairs, point, caption, folder):
     return path
 
 
+def find_device(name, kind):
+    """Index of the input or output device whose name contains `name` (any case); None = the Windows default.
+    Only MME devices: they accept any sample rate. MME cuts names at 31 characters, so a cut name also matches."""
+    if not name:
+        return None
+    want, key = name.lower(), "max_input_channels" if kind == "input" else "max_output_channels"
+    mme = next(i for i, api in enumerate(sd.query_hostapis()) if api["name"] == "MME")
+    for i, d in enumerate(sd.query_devices()):
+        dev = d["name"].lower()
+        if d["hostapi"] == mme and d[key] > 0 and (want in dev or (len(dev) >= 31 and dev.rstrip() in want)):
+            return i
+    logging.warning("no %s device named %r, using the Windows default", kind, name)
+    return None
+
+
+def device_names(kind):
+    """Full names of the input or output devices, for the Settings window."""
+    key = "max_input_channels" if kind == "input" else "max_output_channels"
+    wasapi = next((i for i, api in enumerate(sd.query_hostapis()) if api["name"] == "Windows WASAPI"), None)
+    return sorted({d["name"] for d in sd.query_devices() if d["hostapi"] == wasapi and d[key] > 0})
+
+
 class Ears:
     def __init__(self):
         self._model = None
         self._lock = threading.Lock()
+        self._busy = threading.Lock()  # your mic and the Discord ear share one Whisper model
         self._frames = []
         self._stream = None
         self.recording = False
@@ -184,7 +207,7 @@ class Ears:
 
     def start(self):
         self._frames = []
-        self._stream = sd.InputStream(samplerate=16000, channels=1, dtype="float32",
+        self._stream = sd.InputStream(samplerate=16000, channels=1, dtype="float32", device=find_device(config.MIC_DEVICE, "input"),
                                       callback=lambda data, *_: self._frames.append(data.copy()))
         self._stream.start()
         self.recording = True
@@ -200,8 +223,9 @@ class Ears:
     def transcribe(self, audio, prompt=None):
         if len(audio) < 16000 * 0.3:
             return ""
-        segments, _ = self.model().transcribe(audio, language="en", beam_size=1, initial_prompt=prompt)
-        return " ".join(s.text.strip() for s in segments).strip()
+        with self._busy:
+            segments, _ = self.model().transcribe(audio, language="en", beam_size=1, initial_prompt=prompt)
+            return " ".join(s.text.strip() for s in segments).strip()
 
 
 class WakeListener:
@@ -210,14 +234,14 @@ class WakeListener:
     # Whisper often mishears an invented name, so accept the usual near-misses
     WAKE = re.compile(r"\b(?:hey|hay|hi|a|okay|ok)[\s,.!]+(?:vorn|vorne|vern|born|bourne|vaughn|vaughan|von|forn|fawn|warn|horn|bjorn)\b[\s,.!?]*", re.I)
 
-    def __init__(self, ears, voice, on_heard):
-        self.ears, self.voice, self.on_heard = ears, voice, on_heard
+    def __init__(self, ears, voice, on_heard, device=None):
+        self.ears, self.voice, self.on_heard, self.device = ears, voice, on_heard, device
         self.q = queue.Queue()
         self.armed_until = 0.0  # after a bare "Hey Vorn", the next sentence is the question
 
     def run(self):
         with sd.InputStream(samplerate=16000, channels=1, dtype="float32", blocksize=1600,  # 0.1 s chunks
-                            callback=lambda data, *_: self.q.put(data[:, 0].copy())):
+                            device=find_device(self.device, "input"), callback=lambda data, *_: self.q.put(data[:, 0].copy())):
             speech, silent = [], 0
             while True:
                 chunk = self.q.get()
@@ -232,17 +256,18 @@ class WakeListener:
                     audio = np.concatenate(speech)
                     speech, silent = [], 0
                     if len(audio) > 16000 * 0.5:
-                        self.hear(self.ears.transcribe(audio, prompt=f"Hey {config.NAME}."))
+                        self.hear(self.ears.transcribe(audio, prompt=f"Hey {config.NAME}."), audio)
 
-    def hear(self, text):
+    def hear(self, text, audio=None):
+        """Calls on_heard(question or None, the clip it came from) when he's addressed."""
         m = self.WAKE.search(text)
         if m:
             rest = text[m.end():].strip()
             self.armed_until = 0.0 if rest else time.monotonic() + 6
-            self.on_heard(rest or None)  # None = he heard his name and is waiting for the question
+            self.on_heard(rest or None, audio)  # None = he heard his name and is waiting for the question
         elif text and time.monotonic() < self.armed_until:
             self.armed_until = 0.0
-            self.on_heard(text)
+            self.on_heard(text, audio)
 
 
 class Voice:
@@ -268,7 +293,7 @@ class Voice:
         """Start playing; returns the duration in seconds."""
         sd.stop()
         self._audio, self._t0 = audio, time.monotonic()
-        sd.play(audio, SR)
+        sd.play(audio, SR, device=find_device(config.VOICE_DEVICE, "output"))  # a VoiceMeeter input puts him in your calls
         return len(audio) / SR
 
     def stop(self):

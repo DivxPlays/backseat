@@ -80,8 +80,9 @@ class Memory:
             if note and not any(n.endswith(": " + note) for n in self.d["notes"]):
                 self.d["notes"] = (self.d["notes"] + [f"{date.today().isoformat()}: {note}"])[-MAX_NOTES:]
 
-    def record(self, app, out):
-        """Apply what Claude noticed on screen: keep score, move the respect meter, take per-game notes."""
+    def record(self, app, out, friend=None):
+        """Apply what Claude noticed on screen: keep score, move the respect meter, take per-game notes.
+        When a friend in a voice call was talking, his note goes on that friend instead of on you."""
         with self.lock:
             g = self.d["games"].setdefault(app, {"events": {}, "notes": []})
             if out.get("event") in COUNTED:
@@ -98,7 +99,13 @@ class Memory:
             lore = out.get("lore", "").strip()
             if lore and lore not in self.d["lore"]:
                 self.d["lore"] = (self.d["lore"] + [lore])[-MAX_NOTES:]
-        self.remember(out.get("remember", ""))
+            note = out.get("remember", "").strip()
+            if friend and note:
+                f = self.d.setdefault("friends", {}).setdefault(friend, {"notes": []})
+                if note not in f["notes"]:
+                    f["notes"] = (f["notes"] + [note])[-MAX_GAME_NOTES:]
+        if not friend:
+            self.remember(out.get("remember", ""))
 
     def spend(self, dollars, kind="other"):
         with self.lock:
@@ -187,6 +194,10 @@ class Memory:
             lines.append("Your own past (stay consistent with it):" + ("".join(f"\n- {n}" for n in d["lore"]) or " nothing told yet."))
             lines.append("Notes about the player in this game:" + ("".join(f"\n- {n}" for n in g["notes"]) or " nothing yet."))
             lines.append("Things you remember about the player:" + ("".join(f"\n- {n}" for n in d["notes"]) or " nothing yet."))
+            friends = d.get("friends", {})
+            if friends:
+                lines.append("The player's friends you know from voice calls (running jokes to use):" + "".join(
+                    f"\n- {name.title()}: " + ("; ".join(f["notes"]) or "nothing yet") for name, f in friends.items()))
         return "\n".join(lines)
 
 
