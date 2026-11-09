@@ -1,6 +1,8 @@
-"""The trailer: a ~70 s video showing off Backseat, rendered straight from the code: their real drawings, outfits, power-ups,
-voices, lip-sync and sound effects, over a made-up game screen (no real game footage). Writes dist/trailer.mp4 (attached
-to each release by release.py) and docs/images/trailer.gif (a short silent teaser for the README).
+"""The trailer: a ~75 s video showing off Backseat, rendered straight from the code: their real drawings, outfits, power-ups,
+voices, lip-sync and sound effects, over real gameplay from your own recordings (CLIPS: Medal's folder; the shots are
+named in SCENES; a made-up game screen stands in without them). Only your own footage: never other people's videos, no
+clip audio (one track is your mic), a stranger's name blurred. Writes dist/trailer.mp4 (attached to each release by
+release.py) and docs/images/trailer.gif (a short silent teaser for the README).
 Run it whenever their looks or features change:  .venv\\Scripts\\python make_trailer.py
 """
 import math
@@ -15,7 +17,7 @@ os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"
 
 import av  # noqa: E402
 import numpy as np  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageFilter  # noqa: E402
 from PySide6.QtCore import QPointF, QRectF, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
@@ -33,34 +35,46 @@ HERE = Path(__file__).parent
 VIDEO, GIF = HERE / "dist" / "trailer.mp4", HERE / "docs" / "images" / "trailer.gif"
 WIDTH, HEIGHT, FPS = 1280, 720, 30
 GOLD, CREAM, INK = QColor("#f2c64d"), QColor("#f1e9df"), QColor("#1b1418")
+CLIPS = Path(os.environ.get("BACKSEAT_CLIPS", r"C:\Medal\Clips"))  # your gameplay recordings
 VOICES = {"Vorn": ("kokoro:am_michael", "+6%"), "Mika": ("kokoro:jf_alpha", "+0%"), "Rook": ("kokoro:bm_george", "+0%")}
 
 
-# ---------------------------------------------------------------- the script: (seconds, caption, background, lines, extras)
+# ---------------------------------------------------------------- the script
+# shots: (recording, start s, length s) from CLIPS, cut one after another; blur: boxes (1280x720) hiding a stranger's name;
 # a line: (start s, speaker, mood, text); a sound: (start s, build, kind)
+FN_A, FN_B = "MedalTVFortnite20261029213000414", "MedalTVFortnite20261028210434981"
+DEATH = [(FN_A, 31 * 60 + 36.2, 6.5)]
+NAME_BOX = [(445, 596, 775, 680)]  # "Eliminated by <a stranger>" and the match id under it
 SCENES = [
-    dict(time=4.5, kind="title", sounds=[(1.4, "vorn", "chuckle"), (2.6, "mika", "giggle")]),
-    dict(time=8.5, kind="game", caption="They watch you play.",
-         lines=[(0.4, "Mika", "smug", "Nine minutes in the menu, sweetie? Pick a game before I pick one for you."),
-                (4.6, "Vorn", "disgusted", "You call that aim? I've seen statues with better reflexes.")]),
-    dict(time=6.0, kind="dead", caption="They roast every death.",
-         lines=[(0.5, "Vorn", "angry", "Dead again. Eleven worlds conquered, and I get you.")],
-         sounds=[(3.6, "mika", "giggle")]),
-    dict(time=7.0, kind="game", caption='Talk to them: "Hey Mika, ..."', player=(0.3, "Hey Mika, where do I go now?"),
-         lines=[(1.8, "Mika", "laugh", "Left tunnel, cutie, then up the stairs. And don't you dare die on me.")]),
-    dict(time=5.0, kind="power", caption="Bloodfire and Lovesick.",
+    dict(time=4.5, kind="title", shots=[(FN_A, 14 * 60 + 38, 4.5)], dim=0.62, sounds=[(1.4, "vorn", "chuckle"), (2.6, "mika", "giggle")]),
+    dict(time=8.5, kind="game", caption="They watch you play.", shots=[(FN_A, 13 * 60 + 6, 4.0), (FN_A, 14 * 60 + 38, 4.5)],
+         lines=[(0.4, "Mika", "smug", "Seconds to the bus and you're still emoting, sweetie? Focus. On me."),
+                (4.6, "Vorn", "disgusted", "You dive like a falling rock. At least rocks land somewhere useful.")]),
+    dict(time=6.0, kind="game", caption="Any game, Steam or not.",
+         shots=[("MedalTVBeatSaber20261024220146518", 178, 1.0), ("MedalTVRoblox20261030235142835", 24, 1.0),
+                ("MedalTVCyberpunk207720261024163732758", 12 * 60 + 8, 1.0), ("MedalTVRoblox20261029234339486", 3 * 60 + 28, 1.0),
+                (FN_A, 11 * 60 + 8, 1.0), (FN_B, 16 * 60 + 8, 1.0)],
+         lines=[(0.6, "Vorn", "smug", "Six games, and you're bad at every single one.")]),
+    dict(time=6.5, kind="game", caption="They roast every death.", shots=DEATH, blur=NAME_BOX,
+         lines=[(3.4, "Vorn", "angry", "Third place. Eleven worlds conquered, and I get third place.")]),
+    dict(time=7.0, kind="game", caption='Talk to them: "Hey Mika, ..."', shots=[(FN_A, 27 * 60 + 38, 7.0)],
+         player=(0.3, "Hey Mika, where's he hiding?"),
+         lines=[(1.8, "Mika", "laugh", "Behind the rock on the left, cutie. Peek, shoot, and don't you dare miss.")]),
+    dict(time=5.0, kind="power", caption="Bloodfire and Lovesick.", shots=[(FN_A, 15 * 60 + 38, 5.0)],
          lines=[(0.6, "Vorn", "angry", "Bloodfire!")], sounds=[(2.2, "mika", "giggle")]),
-    dict(time=6.0, kind="outfits", caption="{outfits} outfits: holidays, anime looks and ones you earn."),
-    dict(time=5.5, kind="throw", caption="Ctrl+drag to throw them.", sounds=[(1.8, "mika", "giggle")]),
-    dict(time=7.0, kind="menu", caption="Mini-games, challenges and bounties.",
-         lines=[(0.4, "Vorn", "smug", "A challenge, weakling: more kills than deaths this match. Bounty: eight respect.")],
-         note=(4.3, "(challenge: more kills than deaths, +8)")),
-    dict(time=6.0, kind="squad", caption="A leaderboard for your Discord squad.",
+    dict(time=6.0, kind="outfits", caption="{outfits} outfits: holidays, anime looks and ones you earn.",
+         shots=[(FN_B, 36 * 60 + 48, 6.0)], dim=0.55),
+    dict(time=5.5, kind="throw", caption="Ctrl+drag to throw them.", shots=[(FN_B, 16 * 60 + 8, 5.5)], sounds=[(1.8, "mika", "giggle")]),
+    dict(time=7.0, kind="menu", caption="Mini-games in menus and queues: trivia, challenges, bounties.",
+         shots=[(FN_B, 22 * 60 + 46, 7.0)],
+         lines=[(0.4, "Vorn", "smug", "A challenge, weakling: three eliminations this match. Bounty: eight respect.")],
+         note=(4.6, "(challenge: three eliminations, +8)")),
+    dict(time=6.0, kind="squad", caption="A leaderboard for your Discord squad.", shots=[(FN_A, 29 * 60 + 38, 6.0)], dim=0.5,
          lines=[(0.6, "Mika", "smug", "Worst player of the week: Mike. Again, sweetie.")]),
     dict(time=6.0, kind="creator", caption="Make your own character.",
          lines=[(1.2, "Rook", "smug", "Ahoy, deckhand. Try not to sink this time.")]),
-    dict(time=6.5, kind="clip", caption="Every fail saved, with the roast on top.",
-         lines=[(0.8, "Vorn", "laugh", "You walked into your own grenade. Framed forever.")]),
+    dict(time=6.5, kind="clip", caption="Every fail saved, with the roast on top.", card=DEATH, blur=NAME_BOX,
+         lines=[(0.8, "Vorn", "laugh", "Third place, framed forever. You're welcome.")]),
     dict(time=6.5, kind="end", sounds=[(1.0, "vorn", "scoff")]),
 ]
 FADE = 0.3  # s of fade between scenes
@@ -72,6 +86,68 @@ def version():
     import updater
     v, stage = updater.VERSION.search(text).group(1), updater.STAGE.search(text).group(1)
     return updater.pretty(v if stage == "release" else f"{v}-{stage}")
+
+
+# ---------------------------------------------------------------- footage
+class Footage:
+    """One shot from a recording: its frames from `start` on, the middle 16:9 of the screen at 1280x720, with `blur`
+    boxes blurred."""
+
+    def __init__(self, name, start, blur=()):
+        self.container = av.open(str(next(CLIPS.rglob(f"{name}.*"))))
+        self.stream = self.container.streams.video[0]
+        self.container.seek(int(start / self.stream.time_base), stream=self.stream, backward=True)
+        self.frames, self.start, self.blur = self.container.decode(self.stream), start, blur
+        self.frame, self.when, self.image = None, -1.0, None
+
+    def at(self, t):
+        """The picture `t` s into the shot (a QImage), holding the last one past the recording's end."""
+        target = self.start + t
+        moved = False
+        while self.when < target:
+            try:
+                self.frame = next(self.frames)
+            except (StopIteration, av.error.EOFError):
+                break
+            self.when, moved = float(self.frame.pts * self.frame.time_base), True
+        if moved or self.image is None:
+            im = self.frame.to_image()
+            w, h = im.size
+            cw, ch = (int(h * 16 / 9), h) if w / h > 16 / 9 else (w, int(w * 9 / 16))
+            im = im.crop(((w - cw) // 2, (h - ch) // 2, (w - cw) // 2 + cw, (h - ch) // 2 + ch)).resize((WIDTH, HEIGHT), Image.LANCZOS)
+            for box in self.blur:
+                im.paste(im.crop(box).filter(ImageFilter.GaussianBlur(16)), box[:2])
+            self.data = im.tobytes("raw", "RGB")  # (kept alive for the QImage)
+            self.image = QImage(self.data, WIDTH, HEIGHT, WIDTH * 3, QImage.Format_RGB888)
+        return self.image
+
+    def close(self):
+        self.container.close()
+
+
+class Shots:
+    """A scene's shots, cut one after another; None without the recordings (the made-up screen stands in)."""
+
+    def __init__(self):
+        self.open = {}
+
+    def frame(self, scene, shots, t):
+        if not shots or not CLIPS.is_dir():
+            return None
+        at = 0.0
+        for k, (name, start, length) in enumerate(shots):
+            if t < at + length or k == len(shots) - 1:
+                key = (id(scene), k)
+                if key not in self.open:
+                    for old in [o for o in self.open if o[0] != id(scene)]:  # (the last scene's are done)
+                        self.open.pop(old).close()
+                    try:
+                        self.open[key] = Footage(name, start, scene.get("blur", ()))
+                    except (StopIteration, OSError):
+                        return None
+                return self.open[key].at(t - at)
+            at += length
+        return None
 
 
 # ---------------------------------------------------------------- sound
@@ -283,10 +359,11 @@ def main():
     vorn_looks, mika_looks = list(Vorn.OUTFITS), list(Mika.OUTFITS)
     outfits_total = len(vorn_looks) + len(mika_looks)
     creator = creator_image()
+    shots = Shots()
 
     VIDEO.parent.mkdir(exist_ok=True)
     out = av.open(str(VIDEO), "w")
-    vs = out.add_stream("libx264", rate=FPS, options={"crf": "21", "preset": "medium"})
+    vs = out.add_stream("libx264", rate=FPS, options={"crf": "24", "preset": "slow"})
     vs.width, vs.height, vs.pix_fmt = WIDTH, HEIGHT, "yuv420p"
     rate48 = 48000
     audio48 = np.interp(np.arange(0, len(track), SR / rate48), np.arange(len(track)), track).astype(np.float32)
@@ -318,7 +395,12 @@ def main():
                 if not any(sp[2] == name and sp[1] <= t < sp[1] + 1.2 for sp in speech) and kind not in ("throw", "power", "dead"):
                     c.set_mood("idle")
             c.step(1 / FPS, min(1.0, lvl * 6))
-        if kind in ("game", "dead", "power", "throw"):
+        footage = shots.frame(s, s.get("shots"), lt)
+        if footage is not None:  # your gameplay
+            g.drawImage(0, 0, footage)
+            if s.get("dim"):
+                g.fillRect(0, 0, WIDTH, HEIGHT, QColor(10, 8, 14, int(255 * s["dim"])))
+        elif kind in ("game", "dead", "power", "throw"):
             game_screen(g, t, dead=kind == "dead")
         elif kind == "menu":
             game_screen(g, t, menu=True)
@@ -396,10 +478,12 @@ def main():
             g.drawImage(QRectF(40, 130 + (HEIGHT - 130 - chei) / 2, cwid, chei), creator)
             draw_char(g, chars["Rook"], WIDTH - cw - 10, HEIGHT - ch + 30, scale * 0.9)
         elif kind == "clip":
-            frame = QImage(WIDTH, HEIGHT, QImage.Format_RGB32)
-            fg = QPainter(frame)
-            game_screen(fg, 3.0 + lt * 0.2, dead=True)
-            fg.end()
+            frame = shots.frame(s, s.get("card"), lt)
+            if frame is None:
+                frame = QImage(WIDTH, HEIGHT, QImage.Format_RGB32)
+                fg = QPainter(frame)
+                game_screen(fg, 3.0 + lt * 0.2, dead=True)
+                fg.end()
             card = QRectF(110, 140, 760, 428)
             g.drawImage(card, frame)
             g.setPen(QPen(QColor("#3a2e33"), 3))
@@ -429,7 +513,7 @@ def main():
         if "note" in s and lt >= s["note"][0]:
             g.setFont(font(22, QFont.DemiBold))
             g.setPen(QColor("#e8c27a"))
-            g.drawText(QRectF(duo_x - 120, duo_y + 30, 2 * cw + 120, 40), Qt.AlignCenter, s["note"][1])
+            g.drawText(QRectF(44, 122, 800, 40), Qt.AlignLeft, s["note"][1])  # (under the caption, clear of them)
         if s.get("caption"):
             caption(g, s["caption"].format(outfits=outfits_total), lt, s["time"])
         fade = min(1.0, lt / FADE, (s["time"] - lt) / FADE)
@@ -450,8 +534,8 @@ def main():
             for p in as_.encode(af):
                 out.mux(p)
             apos += 1024
-        if n % 3 == 0 and ((i == 1 and 0.3 <= lt < 8.2) or (kind == "throw" and 0.6 <= lt < 3.2)):  # the README teaser
-            gif.append(Image.fromarray(arr).resize((448, 252), Image.LANCZOS))
+        if n % 3 == 0 and ((i == 1 and 4.0 <= lt < 8.4) or (kind == "throw" and 0.6 <= lt < 3.0)):  # the README teaser:
+            gif.append(Image.fromarray(arr).resize((360, 203), Image.LANCZOS).quantize(128, method=Image.Quantize.MEDIANCUT))
         if n % (FPS * 5) == 0:
             print(f"  {t:4.1f} s / {total:.0f} s", flush=True)
     for stream in (vs, as_):
