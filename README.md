@@ -1,5 +1,7 @@
 # Vorn: your trash-talking gaming companion
 
+Version 1.0.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
+
 An animated, full-body warlord in the corner of your screen. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
 ## Setup
@@ -31,7 +33,7 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 | F7 | pause / resume watching (falling chime = stopped, rising = watching). Use it before opening anything private |
 | F4 | shut-up mode: he keeps watching and keeping score, but only talks when you talk to him |
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
-| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, open Settings, turn on Start with Windows, or quit |
+| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, open Settings, turn on Start with Windows, see About (version and who made it), or quit |
 
 ## How it behaves
 

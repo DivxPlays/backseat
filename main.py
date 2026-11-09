@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
+APP, VERSION, AUTHOR = "Vorn", "1.0.0", "DivxPlays"  # bump VERSION with every change: x.y.Z fixes, x.Y.0 features
 logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 for noisy in ("httpx", "httpx2", "huggingface_hub", "faster_whisper", "comtypes"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
@@ -749,6 +750,10 @@ def main():
     boot.setCheckable(True)
     boot.setChecked(autostart_on())
     boot.toggled.connect(set_autostart)
+    menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
+        f"<h3>{APP} {VERSION}</h3><p>Your trash-talking gaming companion.</p><p>Made by <b>{AUTHOR}</b>.</p>"
+        "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "
+        "Hearing: Whisper on your PC.</p><p><a href='https://github.com/DivxPlays/vorn'>github.com/DivxPlays/vorn</a></p>")))
     menu.addAction("Quit").triggered.connect(app.quit)
     menu.aboutToShow.connect(lambda: spend.setText(
         f"Costs: ${comp.mem.spent():.2f}" + (f" of ${config.MONTHLY_BUDGET}" if config.MONTHLY_BUDGET else "") + " this month..."))

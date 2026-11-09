@@ -3,6 +3,7 @@ import base64
 import io
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -446,6 +447,9 @@ said = ["Player: nice", "You: Finally, the soundboard monk dares to kill someone
 assert main.repeats("Finally, the soundboard monk dares to kill someone. One kill doesn't make a warlord, you know.", said)
 assert not main.repeats("You died again? Fourteen deaths, that's a cry for help.", said)
 assert not main.repeats("Finally, the soundboard monk dares to kill someone.", ["Player: Finally, the soundboard monk dares to kill someone."])
+
+# About: a real version number and who made it
+assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
 # Bloodfire: epic plays, two wins in a row, or reaching 100 respect; he ignites, then cools down
 assert main.bloodfire(0, "epic", 40, 43) == (1, "bloodfire")
