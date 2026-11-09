@@ -120,7 +120,7 @@ assert o.char.flare_amt == 1.0
 
 # idle extras: yawn, glance, eye-roll and aura flare all render
 v = Vorn()
-v.afk, v.yawn_at = True, 0.0
+v.afk, v.was_afk, v.yawn_at = True, True, 0.0  # already AFK a while, and a yawn is due
 v.roll()
 v.flare()
 for _ in range(20):
@@ -763,7 +763,12 @@ with tempfile.TemporaryDirectory() as d:
 duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
 assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
 duo.show_line("angry", "Hands off my player.", None, "none", "Mika")
-assert duo.speaking == 1 and duo.text.startswith("Mika: ") and duo.chars[1].mood == "angry" and duo.chars[0].mood == "surprised"
+assert duo.speaking == 1 and duo.text.startswith("Mika: ") and duo.chars[1].mood == "angry" and duo.chars[0].mood != "surprised"
+QTest.qWait(900)  # the one listening reacts a beat later, not in the same frame
+assert duo.chars[0].mood == "surprised"
+duo.hide_at = time.monotonic()
+QTest.qWait(1700)  # the line ends: each settles back to idle in their own time
+assert [c.mood for c in duo.chars] == ["idle", "idle"] and not duo.later
 config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA = saved_duo
 assert brain.partner() is None or config.DUO
 heard_duo = []
@@ -866,6 +871,11 @@ finally:
 # two on screen never look like copies: the listener makes a different face, and their idle motion is out of step
 assert all(main.REACT[m] != m for m in main.REACT if m != "idle")
 assert main.make_character("vorn").t != main.make_character("vorn").t
+pair = [Vorn("warlord"), Mika("jacket")]  # going AFK: each yawns in their own time, not both at the same moment
+for c in pair:
+    c.afk = True
+    c.step(1 / 30, 0.0)
+assert all(c.yawn_at > c.t + 1 for c in pair) and abs((pair[0].yawn_at - pair[0].t) - (pair[1].yawn_at - pair[1].t)) > 1e-6
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

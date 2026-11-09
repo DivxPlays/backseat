@@ -82,6 +82,8 @@ def main_images():
     for c in overlay.chars:
         pose(c)
     overlay.show_line("smug", "Nine minutes in the menu, sweetie? Pick a game before I pick one for you.", None, "none", "Mika")
+    for i, (_, mood) in overlay.later.items():  # the one listening reacts a beat later: let that beat pass
+        overlay.chars[i].set_mood(mood)
     for c in overlay.chars:
         c.step(1.0, 0.0)
     overlay.shown = float(len(overlay.text))

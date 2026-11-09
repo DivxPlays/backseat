@@ -210,25 +210,25 @@ class Vorn:
         self.outfit = outfit if outfit in self.OUTFITS else random.choice(self.wardrobe())  # "random": a new look each launch
         self.mood = "idle"
         self.p = dict(MOODS["idle"])
-        self.t = 0.0
+        t = self.t = random.uniform(0, 100)  # each one on their own clock: two on screen never breathe, sway or blink in step
         self.talk = 0.0
         self.say = (0.0, 0.0, 0.0)  # the mouth shape the voice asks for right now: open, wide (- round), teeth
         self.lips = [0.0, 0.0, 0.0]  # where the mouth is, easing toward that
         self.blink = 0.0
-        self.blink_at = 1.5
+        self.blink_at = t + random.uniform(0.5, 4)
         self.glance = 0.0
         self.glance_to = 0.0
-        self.glance_at = 3.0
+        self.glance_at = t + random.uniform(1, 4)
         self.pop = 0.0
         self.afk = False  # set by the overlay: you've stopped touching keyboard and mouse
         self.toward = -1.0  # which way the rest of your screen is (-1 left, 1 right)
-        self.yawn_t0, self.yawn_at = -10.0, 6.0
-        self.turn, self.turn_at, self.turn_until = 0.0, 15.0, 0.0
-        self.roll_t0 = -10.0
+        self.yawn_t0, self.yawn_at, self.was_afk = t - 10, t, False
+        self.turn, self.turn_at, self.turn_until = 0.0, t + random.uniform(8, 30), 0.0
+        self.roll_t0 = t - 10
         self.flare_amt = 0.0
         self.tier = 0  # set by the overlay from your respect score
-        self.slump_t0 = -100.0
-        self.blood, self.blood_until = 0.0, -1.0  # Bloodfire: current strength 0..1, and until when it burns
+        self.slump_t0 = t - 100
+        self.blood, self.blood_until = 0.0, t - 1  # Bloodfire: current strength 0..1, and until when it burns
         self.arms = {side: [*POSES["idle"][0][:2], POSES["idle"][0][3]] for side in (-1, 1)}  # current upper, forearm, length
         self.d = self._effective()
 
@@ -288,6 +288,9 @@ class Vorn:
             self.glance_at = self.t + random.uniform(1.5, 4.0)
         self.glance += (self.glance_to - self.glance) * (1 - math.exp(-dt * 14))
         self.pop = max(0.0, self.pop - dt * 4)
+        if self.afk and not self.was_afk:  # you just went AFK: the first yawn comes in its own time
+            self.yawn_at = self.t + random.uniform(1.5, 10)
+        self.was_afk = self.afk
         if self.afk and self.t >= self.yawn_at:
             self.yawn_t0, self.yawn_at = self.t, self.t + random.uniform(12, 20)
         if self.t >= self.turn_at:  # now and then he glances over at the rest of your screen
@@ -661,7 +664,7 @@ class Vorn:
         for side in (-1, 1):
             upper, fore, length = self.arms[side]
             if side == near and self.mood == "angry":
-                fore += math.sin(self.t * 32) * 4  # shaking fist
+                fore += (math.sin(self.t * 32) + 1) * 2  # shaking fist (only inward: outward it left his window)
             sx, sy = self.SHOULDER if side < 0 else (BUST_W - self.SHOULDER[0], self.SHOULDER[1])
             a1, a2 = math.radians(upper), math.radians(fore)
             elbow = (sx + side * math.sin(a1) * self.UPPER * length, sy + math.cos(a1) * self.UPPER * length)
@@ -1044,6 +1047,4 @@ def character_class(name):
 
 def make_character(name):
     """The drawing for a preset's CHARACTER: "vorn" or "mika"."""
-    char = character_class(name)()
-    char.step(random.uniform(5, 60), 0.0)  # a random head start: two on screen don't breathe, sway and blink in lockstep
-    return char
+    return character_class(name)()

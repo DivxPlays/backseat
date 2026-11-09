@@ -196,6 +196,7 @@ class Overlay(QWidget):
         self.chars = [self.char] + ([make_character(other["CHARACTER"])] if other else [])  # duo mode: both on screen
         self.names = [config.NAME] + ([other["NAME"]] if other else [])
         self.speaking = 0  # which of them is talking (their mouth follows the voice)
+        self.later = {}  # {character index: (when, mood)}: duo mode, each one changes face in their own time
         self.span = CW * config.SCALE * len(self.chars)  # how wide the characters are together
         self.resize(int(BUBBLE_W + self.span), int(CH * config.SCALE) + 26)  # + a strip under their feet for the cost tag
         geo = QApplication.primaryScreen().availableGeometry()
@@ -237,9 +238,10 @@ class Overlay(QWidget):
         self.speaking = self.names.index(who) if who in self.names else 0
         char = self.chars[self.speaking]
         char.set_mood(mood)
-        for i, other in enumerate(self.chars):
-            if i != self.speaking:
-                other.set_mood(REACT.get(mood, "idle"))  # duo mode: the other one reacts to what's said
+        self.later.pop(self.speaking, None)
+        for i in range(len(self.chars)):
+            if i != self.speaking:  # duo mode: the other one reacts to what's said, a beat later
+                self.later[i] = (time.monotonic() + random.uniform(0.3, 0.8), REACT.get(mood, "idle"))
         if event in BLOODFIRE:
             for c in self.chars:  # both power up
                 c.bloodfire(BLOODFIRE[event])
@@ -280,8 +282,12 @@ class Overlay(QWidget):
             self.shown += dt * self.cps
         if self.text and now > self.hide_at:
             self.text = ""
-            for char in self.chars:
-                char.set_mood("idle")
+            for i in range(len(self.chars)):  # back to idle, each at their own moment
+                self.later[i] = (now + random.uniform(0, 1.5) * (len(self.chars) > 1), "idle")
+        for i, (when, mood) in list(self.later.items()):
+            if now >= when:
+                self.chars[i].set_mood(mood)
+                del self.later[i]
         self.update()
 
     def paintEvent(self, _):
