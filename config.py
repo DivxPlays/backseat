@@ -106,6 +106,8 @@ BIRTHDAY = ""  # yours, as month-day ("02-10"): they celebrate it, with confetti
 NAG_EVERY = 45  # minimum minutes between nags
 WHISPER_MODEL = "base.en"  # speech-to-text model; "small.en" is more accurate but slower
 
+STEAM_KEY = ""  # accurate stats: your Steam Web API key (steamcommunity.com/dev/apikey) for real kills and deaths in
+# games with Steam stats (CS2, TF2, Left 4 Dead 2...); "" = off. Needs Steam > Profile > Privacy > Game details: Public
 AUTO_UPDATE = True  # once a day, check GitHub for a newer version and offer it (tray > Update); never on a git clone
 MONTHLY_BUDGET = 100  # dollars of API use per month: cheap mode at 80%, only answers when asked at 100% (0 = no limit)
 DUCK_TO = 0.35  # while he talks, other apps' volume drops to this fraction (1 = don't lower it)

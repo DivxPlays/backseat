@@ -57,6 +57,7 @@ import unlocks  # noqa: E402
 import updater  # noqa: E402
 from camera import BACKGROUNDS, REACT, Camera  # noqa: E402
 import sfx  # noqa: E402
+import steamstats  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
@@ -109,6 +110,7 @@ GAME_GAP, ANSWER_TIME = 480, 20
 BOUNTIES = {"easy": (5, 2, "a decent match does it"), "hard": (8, 4, "it takes a good match"),  # challenges: respect won
             "brutal": (12, 6, "only their best match does it")}  # if done, lost if failed or dodged; how hard
 CHALLENGE_TIME = 1800  # s: a challenge not done by then was dodged
+STATS_GAP = 120  # s between readings of a game's Steam stats (Steam updates them when a match or round ends)
 TRIVIA_TOPICS = ("map", "mode", "campaign level or mission", "class or character", "weapon", "map", "fact")  # (picked at random)  # mini-games: at most every 8 minutes; how long the mic takes your trivia answer
 MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
@@ -162,6 +164,14 @@ def fresh_turns(turns, recent):
             break
         kept.append(t)
     return kept
+
+
+def steam_line(got):
+    """What they know from Steam's real stats for this session, or "" before anything changed."""
+    if not got or not (got["kills"] or got["deaths"] or got["wins"]):
+        return ""
+    return (f"\nReal stats from Steam, this session in {got['name']}: {got['kills']} kills, {got['deaths']} deaths, "
+            f"{got['wins']} wins (exact: trust these over what you guess from the screen).")
 
 
 def addressed(text, wake_of):
@@ -726,6 +736,8 @@ class Companion:
         self.trivia = self.dare = None  # the trivia question waiting for your answer; the challenge for your next match
         self.dodged = ""  # a challenge that ran out, for their next line
         self.videos, self.clip_warned = {}, False  # auto-clips: {Hall of Shame moment: its video}; told you clips are off
+        self.steam_id, self.steam = steamstats.steam_id(), {}  # accurate stats: you on Steam; {appid: this session's real stats}
+        self.no_stats, self.stats_at, self.stats_warned = set(), 0.0, False  # games without stats; last reading; told you
         self.profiling = set()  # games already queued for a lookup this session
         self.last_game_seen = None  # (key, name): for tray > Look up this game again (the tray itself takes the front)
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
@@ -832,6 +844,39 @@ class Companion:
             return False
         logging.info("frame-rate guard: the GPU is at %d%% in a game, so Claude takes this comment", load)
         return True
+
+    def poll_stats(self, appid, name):
+        """Accurate stats: read a game's stats from Steam; what rose since the last reading is real kills, deaths and wins
+        this session (the first reading is where the session starts)."""
+        try:
+            stats = steamstats.fetch(config.STEAM_KEY, self.steam_id, appid)
+        except PermissionError:
+            self.no_stats.add(appid)
+            if not self.stats_warned:
+                self.stats_warned = True
+                self.bridge.note.emit("(Steam stats: check your key, and set Steam > Profile > Privacy > Game details to Public)")
+            return logging.warning("Steam stats refused: wrong key or private game details")
+        except OSError:
+            return  # offline: next time
+        if not stats:
+            self.no_stats.add(appid)
+            return logging.info("Steam stats: %s doesn't publish any", name)
+        got = self.steam.setdefault(appid, {"name": name, "base": stats, "kills": 0, "deaths": 0, "wins": 0})
+        rise, got["base"] = steamstats.change(got["base"], stats), stats
+        if any(rise.values()):
+            for kind, n in rise.items():
+                got[kind] += n
+            with self.mem.lock:
+                self.mem.session.setdefault("steam", {})[name] = {k: got[k] for k in ("kills", "deaths", "wins")}
+            logging.info("Steam stats for %s: +%s (this session %s)", name, rise, {k: got[k] for k in rise})
+
+    def stats_due(self, now):
+        """(appid, name) of a Steam game in front whose stats are due another reading, or None."""
+        game = self.current_game()
+        steam = steam_app(self.app[0]) if game else None
+        if not (config.STEAM_KEY and self.steam_id and steam) or steam[0] in self.no_stats or now - self.stats_at < STATS_GAP:
+            return None
+        return steam[0], game[1]
 
     def current_game(self):
         """(key, name) of the game in front (a Steam game by its Steam name), or None when it isn't a game."""
@@ -1393,6 +1438,8 @@ class Companion:
             top = self.mem.top_artists(3)
             if top:
                 text += " Their most-played artists: " + ", ".join(f"{a} ({fmt(s)})" for a, s in top) + "."
+        steam = steam_app(exe)
+        text += steam_line(self.steam.get(steam[0]) if steam else None)  # accurate stats
         known = self.mem.game_profile(app_name(exe, title))
         if known:  # what they looked up about the game in front
             text += f"\nAbout {known['name']} (the game on screen): {known['profile']}"
@@ -1596,6 +1643,10 @@ class Companion:
                 self.mem.tick(app_name(*self.app[:2]), dt, self.on_screen)
             if now - last_save > 30:
                 self.check_season()  # (midnight may have brought a holiday)
+                due = self.stats_due(now)
+                if due:  # accurate stats (a web request: not in this loop)
+                    self.stats_at = now
+                    threading.Thread(target=self.poll_stats, args=due, daemon=True).start()
                 if self.dare and now - self.dare["at"] > CHALLENGE_TIME:
                     self.settle_challenge(False, dodged=True)
                 game = self.current_game()

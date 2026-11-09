@@ -1660,6 +1660,87 @@ finally:
 assert "AUTO_UPDATE" in config._DEFAULTS and "presets /XC" not in Path("install.ps1").read_text(encoding="utf-8")
 assert "/XD .venv .git __pycache__ \"Hall of Shame\" presets" in Path("install.ps1").read_text(encoding="utf-8")  # your characters stay
 
+# accurate stats: your SteamID from Steam's files, a game's stats from Steam (a wrong key or private profile is told
+# apart from a game without stats), and this session's real kills, deaths and wins as the rise in the running totals
+import urllib.error  # noqa: E402
+
+import steamstats  # noqa: E402
+
+with tempfile.TemporaryDirectory() as steam_root:
+    (Path(steam_root) / "userdata" / "12345" / "config").mkdir(parents=True)
+    (Path(steam_root) / "userdata" / "12345" / "config" / "localconfig.vdf").write_text("x", encoding="utf-8")
+    assert steamstats.steam_id(steam_root) == str(steamstats.BASE + 12345) and steamstats.steam_id(Path(steam_root) / "nope") is None
+cs = {"total_kills": 100, "total_kills_ak47": 40, "total_kills_headshot": 30, "total_deaths": 80, "total_wins": 10,
+      "total_wins_pistolround": 3, "last_match_kills": 9, "total_mvps": 5}
+cs_after = {**cs, "total_kills": 112, "total_kills_ak47": 48, "total_kills_headshot": 35, "total_deaths": 84, "total_wins": 11,
+            "last_match_kills": 12}
+assert steamstats.change(cs, cs_after) == {"kills": 12, "deaths": 4, "wins": 1}  # the totals, not per-weapon subsets
+tf2 = {"Scout.accum.iNumberOfKills": 50, "Scout.max.iNumberOfKills": 9, "Soldier.accum.iNumberOfKills": 20}
+assert steamstats.change(tf2, {**tf2, "Soldier.accum.iNumberOfKills": 26, "Scout.max.iNumberOfKills": 12})["kills"] == 6
+l4d = {"Stat.KilledBy.Tank": 3, "Stat.Kills.Total": 900}
+assert steamstats.change(l4d, {"Stat.KilledBy.Tank": 4, "Stat.Kills.Total": 950}) == {"kills": 50, "deaths": 1, "wins": 0}
+assert steamstats.change(cs, cs) == {"kills": 0, "deaths": 0, "wins": 0}
+real_urlopen = steamstats.urllib.request.urlopen
+asked_urls = []
+try:
+    steamstats.urllib.request.urlopen = lambda url, timeout=0: (asked_urls.append(url), FakeResponse(json.dumps(
+        {"playerstats": {"stats": [{"name": "total_kills", "value": 7}, {"name": "odd", "value": "x"}]}}).encode()))[1]
+    assert steamstats.fetch("KEY", "765", 730) == {"total_kills": 7} and "appid=730" in asked_urls[0] and "key=KEY" in asked_urls[0]
+
+    def refuse(code):
+        def opener(url, timeout=0):
+            raise urllib.error.HTTPError(url, code, "nope", {}, None)
+        return opener
+    steamstats.urllib.request.urlopen = refuse(403)
+    try:
+        steamstats.fetch("KEY", "765", 730)
+        raise AssertionError("a refused key passed")
+    except PermissionError:
+        pass
+    steamstats.urllib.request.urlopen = refuse(400)
+    assert steamstats.fetch("KEY", "765", 12345) == {}  # a game without stats
+finally:
+    steamstats.urllib.request.urlopen = real_urlopen
+readings, notes = [cs, cs_after], []
+real_fetch = steamstats.fetch
+steamstats.fetch = lambda key, steamid, appid: readings.pop(0)
+try:
+    with tempfile.TemporaryDirectory() as d:
+        stat_comp = SimpleNamespace(steam_id="765", steam={}, no_stats=set(), stats_warned=False, mem=Memory(Path(d, "m.json")),
+                                    bridge=SimpleNamespace(note=SimpleNamespace(emit=notes.append)))
+        main.Companion.poll_stats(stat_comp, 730, "Counter-Strike 2")  # where the session starts
+        assert main.steam_line(stat_comp.steam[730]) == ""
+        main.Companion.poll_stats(stat_comp, 730, "Counter-Strike 2")
+        assert "12 kills, 4 deaths, 1 wins" in main.steam_line(stat_comp.steam[730])
+        assert stat_comp.mem.session["steam"]["Counter-Strike 2"] == {"kills": 12, "deaths": 4, "wins": 1}
+        steamstats.fetch = lambda key, steamid, appid: {}
+        main.Companion.poll_stats(stat_comp, 4000, "Garry's Mod")
+        assert 4000 in stat_comp.no_stats  # no stats: not asked again
+
+        def private(*a):
+            raise PermissionError("403")
+        steamstats.fetch = private
+        main.Companion.poll_stats(stat_comp, 440, "Team Fortress 2")
+        main.Companion.poll_stats(stat_comp, 550, "Left 4 Dead 2")
+        assert len(notes) == 1 and "Game details" in notes[0] and {440, 550} <= stat_comp.no_stats
+finally:
+    steamstats.fetch = real_fetch
+saved_key = config.STEAM_KEY
+try:
+    due_comp = SimpleNamespace(steam_id="765", no_stats=set(), stats_at=0.0, app=("C:/steamapps/common/cs2/cs2.exe", "CS2", 1),
+                               current_game=lambda: ("cs2.exe", "Counter-Strike 2"))
+    real_steam_app, main.steam_app = main.steam_app, (lambda exe: ("730", "Counter-Strike 2"))
+    config.STEAM_KEY = ""
+    assert main.Companion.stats_due(due_comp, 500.0) is None  # no key: off
+    config.STEAM_KEY = "KEY"
+    assert main.Companion.stats_due(due_comp, 500.0) == ("730", "Counter-Strike 2")
+    due_comp.stats_at = 450.0
+    assert main.Companion.stats_due(due_comp, 500.0) is None  # read less than 2 minutes ago
+    due_comp.stats_at, due_comp.no_stats = 0.0, {"730"}
+    assert main.Companion.stats_due(due_comp, 500.0) is None  # no stats for this game
+finally:
+    config.STEAM_KEY, main.steam_app = saved_key, real_steam_app
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
