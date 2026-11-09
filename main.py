@@ -110,15 +110,19 @@ CHALLENGE_TIME = 1800  # s: a challenge not done by then was dodged
 TRIVIA_TOPICS = ("map", "mode", "campaign level or mission", "class or character", "weapon", "map", "fact")  # (picked at random)  # mini-games: at most every 8 minutes; how long the mic takes your trivia answer
 MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
-                 "words), in your own style: roast what {a} said, or take the player's side against {a}. Your past is your "
-                 "own: never tell {a}'s stories or claim {a}'s deeds as yours.")
+                 "words), in your own style: roast what {a} said, or take the player's side against {a}. Use your own words: "
+                 "never repeat or rephrase {a}'s sentence. Your past is your own: never tell {a}'s stories or claim {a}'s "
+                 "deeds as yours.")
 BLOODFIRE = {"bloodfire": 8, "bloodfire-max": 25}  # seconds he burns: a big play, or reaching 100 respect
 
 
-def repeats(line, recent):
+ECHO = 0.45  # within one exchange, a line sharing more of its words (in order) with an earlier one is a copy
+
+
+def repeats(line, recent, limit=0.6):
     """True if line is nearly word for word one of their last few lines ("You: ..." or, in duo mode, "You (Mika): ...")."""
     words = re.findall(r"[a-z']+", line.lower())
-    return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower())).ratio() > 0.6
+    return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower())).ratio() > limit
                for said in recent[-8:] if said.startswith("You"))
 
 
@@ -145,6 +149,17 @@ def award_due(mem, today=None):
             return None
         mem.d["squad"]["announced"] = last
     return rows[0][0], rows
+
+
+def fresh_turns(turns, recent):
+    """An exchange up to the first line that copies one they said lately or one earlier in it (the small local model
+    echoes the line it answers with the name swapped, and a line after a copy answers the copy)."""
+    kept = []
+    for t in turns:
+        if repeats(t[2], recent) or repeats(t[2], [f"You: {k[2]}" for k in kept], ECHO):
+            break
+        kept.append(t)
+    return kept
 
 
 def addressed(text, wake_of):
@@ -1227,8 +1242,11 @@ class Companion:
                         back, _ = brain.local_think(config.LOCAL_MODEL, self.knowledge(app, title, exe, query, voice),
                                                     self.recent[-3:] + [f"{t['speaker']}: {t['line']}" for t in out["turns"]],
                                                     COMEBACK_SAYS.format(a=said["speaker"], line=said["line"]), jpegs, only=voice)
-                        out["turns"] += back["turns"]
                         said = back["turns"][0]
+                        so_far = [f"You: {t['line']}" for t in out["turns"]]
+                        if repeats(said["line"], self.recent) or repeats(said["line"], so_far, ECHO):
+                            break  # it parroted the line it answers: end the exchange here
+                        out["turns"] += back["turns"]
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
@@ -1247,6 +1265,7 @@ class Companion:
         turns = turns_of(out, self.names)  # [(speaker, mood, line)]: one for a solo character, a short exchange in duo mode
         if to:  # only the one you called speaks, even if the model wrote a line for the other
             turns = [t for t in turns if t[0] == to] or turns
+        turns = fresh_turns(turns, self.recent) or ([] if kind in AUTO else turns[:1])  # (asked: they still answer)
         text = " ".join(line for _, _, line in turns)
         if kind in AUTO and (not text.strip() or repeats(text, self.recent)):
             return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again

@@ -733,6 +733,19 @@ assert main.turns_of({"turns": [{"speaker": "Mika", "mood": "smug", "line": "Min
                                 {"speaker": "Vorn", "mood": "angry", "line": " Weak. "}]}, names) == [("Mika", "smug", "Mine."), ("Vorn", "angry", "Weak.")]
 assert main.turns_of({"mood": "smug", "line": "Solo."}, names) == [("Vorn", "smug", "Solo.")]  # a refusal or a solo reply still works
 assert main.repeats("Mine, all mine.", ["You (Mika): Mine, all mine!"])
+# duo banter: a line copying one earlier in the exchange (the local model echoes the line it answers, name swapped) ends the
+# exchange there; one copying a recent line too; normal back-and-forth (from the log) stays whole
+lib = ("Mika", "smug", "Sam, your library's got more hours than your last kill. Load up or I'll turn it into a meme shrine.")
+copy = ("Vorn", "smug", "Mika, your shrine's got more hours than your last kill. Load up or I'll burn it with Bloodfire.")
+back = ("Mika", "laugh", "Burn my shrine and I'll haunt your cape forever, you overgrown candle.")
+seen = ("Mika", "smug", "Sam, you're still in Claude, and I'm still watching you roast the wrong game. Pathetic.")
+twist = ("Vorn", "smug", "Mika, you're the one still watching Sam roast the wrong game, and that's on your ass.")
+assert main.fresh_turns([lib, copy, back], []) == [lib] and main.fresh_turns([seen, twist], []) == [seen]
+assert main.fresh_turns([lib, back], []) == [lib, back] and main.fresh_turns([lib, back], ["You (Mika): " + lib[2]]) == []
+real = [("Vorn", "disgusted", "Sam, that launcher window has sat there doing nothing while you stare at the Roblox home page like a lost pup."),
+        ("Mika", "smug", "Ooh, Vorn, don't be mean, he's trying so hard, bless his tiny fingers. Still, Stilwater's waiting, my sweet little disaster.")]
+assert main.fresh_turns(real, []) == real
+assert "never repeat or rephrase" in main.COMEBACK_SAYS
 saved_duo = (config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA)
 config.DUO, config.PRESET, config.NAME, config.CHARACTER = True, "vorn", "Vorn", "vorn"
 config.PERSONA = json.loads((config.PRESETS / "vorn.json").read_text(encoding="utf-8"))["PERSONA"]
