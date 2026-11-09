@@ -661,6 +661,15 @@ finally:
     brain.urllib.request.urlopen = real_urlopen
 assert speakers == {"Vorn", "Mika"}
 
+# smarter free mode: Claude keeps score every few minutes and double-checks big moments (not too often, never over budget)
+saved_check, config.CHECK_EVERY = config.CHECK_EVERY, 5
+assert main.needs_check(0, 301) and not main.needs_check(0, 200)
+assert main.needs_check(0, 130, "win") and not main.needs_check(0, 60, "win") and not main.needs_check(0, 130, "menu")
+assert not main.needs_check(2, 9999, "win") and main.needs_check(1, 301)  # budget used up: never; cheap mode: still
+config.CHECK_EVERY = 0
+assert not main.needs_check(0, 9999, "win")  # turned off: the local model only talks
+config.CHECK_EVERY = saved_check
+
 # free voice commands: a whole sentence that is a command is handled on this PC, no API call; anything else goes to Claude
 import commands  # noqa: E402
 

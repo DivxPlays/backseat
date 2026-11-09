@@ -12,7 +12,6 @@
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
 - **Challenges and bounties:** "Get 3 headshots this match": tracked, rewarded with respect or affection, roasted when failed.
 - **Accurate stats from the game itself:** kills and deaths from game logs or Steam where possible, instead of guessing from screenshots.
-- **Smarter free mode:** the local model talks, and every few minutes Haiku double-checks what's actually happening (a few cents a day).
 - **Coaching reports:** a weekly breakdown of your play, with real tips and progress charts.
 - **Game profiles:** per-game knowledge (maps, weapons, perks) for sharper hints.
 
@@ -33,6 +32,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Smarter free mode: with the local model, Haiku takes a comment every 5 minutes and double-checks wins, deaths and losses (at most every 2 minutes), so score, respect, Bloodfire and the Hall of Shame keep working (about 10 cents a day).
 - Outfits to earn: four each (10 hours, 100 talks, 7 days in a row, 100 respect), plus six free anime-inspired outfits for Mika (maid, shrine maiden, magical girl, yukata, netrunner, track suit).
 - Interrupting: talk over them and they pause to listen; they stop for good if you called them, and carry on if you didn't.
 - Free voice commands: shut up (for a while), talk again, stop looking / look again, change or name an outfit, switch character or duo mode, and "how much have you cost me", handled on your PC with in-character replies.

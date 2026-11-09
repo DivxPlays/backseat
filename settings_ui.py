@@ -110,8 +110,10 @@ class SettingsWindow(QDialog):
         w["SMART_MODEL"] = _combo(MODELS, config.SMART_MODEL)
         w["MONTHLY_BUDGET"] = _spin(config.MONTHLY_BUDGET, 0, 100000, " $")
         w["LOCAL_MODEL"] = _combo(["", "qwen3-vl:8b-instruct", "qwen3-vl:4b-instruct"], config.LOCAL_MODEL, editable=True)
+        w["CHECK_EVERY"] = _spin(config.CHECK_EVERY, 0, 120, " min")
         brain = self._page([("Model for his automatic comments", w["MODEL"]), ("Model when you talk to him", w["SMART_MODEL"]),
                             ("Free local model for automatic comments\n(Ollama; blank = use Claude)", w["LOCAL_MODEL"]),
+                            ("With the local model, Claude keeps score every\n(and on wins and deaths; 0 = never)", w["CHECK_EVERY"]),
                             ("Monthly budget (0 = no limit)", w["MONTHLY_BUDGET"])])
 
         w["LOOK_COOLDOWN"] = _spin(config.LOOK_COOLDOWN, 5, 600, " s")

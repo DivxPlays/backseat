@@ -83,6 +83,8 @@ SITUATIONS = {
 }
 AUTO = {"change", "quiet", "lore", "nag", "breakdown"}  # jobs he starts himself; they stop when the budget runs out
 COMEBACK = 0.6  # duo mode, local model: how often the other one fires back at a comment
+CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one of these gets Claude to double-check
+CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
                  "words), in your own style: roast what {a} said, or take the player's side against {a}. Your past is your "
                  "own: never tell {a}'s stories or claim {a}'s deeds as yours.")
@@ -101,6 +103,14 @@ def addressed(text, wake_of):
     hits = [(m.start(), name) for name, names in wake_of.items()
             if (m := re.search(r"\b(?:" + "|".join(map(re.escape, names)) + r")\b", text, re.I))]
     return min(hits)[1] if hits else None
+
+
+def needs_check(level, since, event=None):
+    """Free mode: should Claude take this comment and keep score? Every CHECK_EVERY minutes, or (at most every CHECK_GAP s)
+    when the local model thinks something big happened. Never once the month's budget is used up (level 2)."""
+    if level >= 2 or not config.CHECK_EVERY:
+        return False
+    return since > config.CHECK_EVERY * 60 or (event in CHECKED and since > CHECK_GAP)
 
 
 def turns_of(out, names):
@@ -398,6 +408,7 @@ class Companion:
         self.history = deque(maxlen=3)  # the game's display from the last few looks, for post-match breakdowns
         self.streak = 0  # wins and epic plays in a row, for Bloodfire
         self.local_down_until = 0.0  # after the local model fails, use Claude until then
+        self.last_check = time.monotonic()  # free mode: when Claude last took a comment to keep score
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
         self.partner = brain.partner()  # duo mode: the other character, on screen too
@@ -666,8 +677,13 @@ class Companion:
             situation += f" (This was said to {to}: only {to} speaks, in one turn. {other} stays silent.)"
         if crossed:
             situation += " " + BUDGET_NEWS[level]
+        # smarter free mode: the local model only talks, so every CHECK_EVERY minutes Claude (Haiku) takes the comment and
+        # keeps score, and it double-checks at once (at most every CHECK_GAP s) when the local model thinks something big happened
+        now = time.monotonic()
+        check = bool(local and needs_check(level, now - self.last_check))
+        local = local and not check
         # duo mode: the small local model voices one of them per comment and sees only that one's own past (shown both,
-        # it tells the other's stories). shortcut: if it fails, Claude's fallback reply also misses the other's past (rare)
+        # it tells the other's stories)
         alone = random.choice([brain.me(), self.partner]) if local and self.partner else None
         query = arg if kind in ("ask", "friend") else ""  # picks the facts relevant to what was said
         context = self.knowledge(app, title, exe, query, alone)
@@ -679,24 +695,32 @@ class Companion:
             try:
                 out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent[-4:], situation, jpegs,
                                                only=alone)  # less old talk to mix up
-                # the small local model only talks: it calls kills "wins" and misreads screens, so it doesn't keep score,
-                # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
-                # (it reads your memory, it doesn't write it); Claude does those
-                out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="")
-                said = out["turns"][0] if alone else None
-                if said and said["line"].strip() and random.random() < COMEBACK:  # duo mode: the other one fires back
-                    other = brain.me() if alone is self.partner else self.partner  # from their own head: own past only
-                    back, _ = brain.local_think(config.LOCAL_MODEL, self.knowledge(app, title, exe, query, other),
-                                                self.recent[-3:] + [f"{said['speaker']}: {said['line']}"],
-                                                COMEBACK_SAYS.format(a=said["speaker"], line=said["line"]), jpegs, only=other)
-                    out["turns"] += back["turns"]
+                if needs_check(level, now - self.last_check, out.get("event")):
+                    logging.info("local model saw a %s: Claude double-checks", out["event"])  # (it calls every kill a win)
+                    out, check = None, True
+                else:
+                    # the small local model only talks: it calls kills "wins" and misreads screens, so it doesn't keep score,
+                    # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
+                    # (it reads your memory, it doesn't write it); Claude does those
+                    out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="")
+                    said = out["turns"][0] if alone else None
+                    if said and said["line"].strip() and random.random() < COMEBACK:  # duo mode: the other one fires back
+                        other = brain.me() if alone is self.partner else self.partner  # from their own head: own past only
+                        back, _ = brain.local_think(config.LOCAL_MODEL, self.knowledge(app, title, exe, query, other),
+                                                    self.recent[-3:] + [f"{said['speaker']}: {said['line']}"],
+                                                    COMEBACK_SAYS.format(a=said["speaker"], line=said["line"]), jpegs, only=other)
+                        out["turns"] += back["turns"]
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
         if out is None:
+            if alone:  # Claude writes for both of them, so it sees both their pasts
+                context = self.knowledge(app, title, exe, query)
+            if check:
+                self.last_check = now
             out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
-        logging.info("%s%s ($%.4f) -> %s", kind, " (local)" if spent == 0 and local else "", spent, out)
+        logging.info("%s%s ($%.4f) -> %s", kind, " (check)" if check else " (local)" if spent == 0 and local else "", spent, out)
         turns = turns_of(out, self.names)  # [(speaker, mood, line)]: one for a solo character, a short exchange in duo mode
         if to:  # only the one you called speaks, even if the model wrote a line for the other
             turns = [t for t in turns if t[0] == to] or turns
