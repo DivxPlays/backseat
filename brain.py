@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 import urllib.request
 from pathlib import Path
 
@@ -49,7 +50,7 @@ SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the play
             "Never slurs, and never mock real-world identity.")
 
 
-DUO_RULES = """Duo mode: you write both characters. Instead of a single line and mood, fill "turns": 2 or 3 short lines (each under 20 words) alternating between {a} and {b}, as one quick exchange. They react to each other: when one is hard on the player, the other takes the player's side in their own way, and they snipe at each other. Each stays fully in character. If the player names one of them, that one speaks first. "remember" is a fact either of them learned. The line rules above apply to every turn."""
+DUO_RULES = """Duo mode: you write both characters. Instead of a single line and mood, fill "turns": 1 to 3 short lines (each under 20 words) between {a} and {b}, as one quick exchange. When someone talks to one of them by name, only that one answers; the other was not asked and must never answer it as if they were (no "my day?" when only the other was asked about theirs): they add at most one short reaction to the answer, or stay out. Otherwise they react to each other: when one is hard on the player, the other takes the player's side in their own way, and they snipe at each other. Each stays fully in character, and each one's past, powers and story are theirs alone: {a} never claims {b}'s, and {b} never claims {a}'s. "remember" is a fact either of them learned; a turn's "lore" is a new fact from that speaker's own past, usually empty. The line rules above apply to every turn."""
 
 
 def partner():
@@ -63,11 +64,18 @@ def partner():
         return None
 
 
-def system():
+def me():
+    """The current character, in the shape of a preset."""
+    return {"NAME": config.NAME, "PERSONA": config.PERSONA, "POWER": config.POWER}
+
+
+def system(only=None):
+    """The system prompt; `only` (a preset) voices just that character, even in duo mode."""
     # replace, not format: an edited persona may contain braces
-    other = partner()
+    other = None if only else partner()
     if not other:
-        text = (config.PERSONA + "\n\n" + config.RULES).replace("{name}", config.NAME).replace("{power}", config.POWER)
+        c = only or me()
+        text = (c["PERSONA"] + "\n\n" + config.RULES).replace("{name}", c["NAME"]).replace("{power}", c["POWER"])
     else:
         a, b = config.NAME, other["NAME"]
         text = (f"You voice two characters who share a small window in the corner of the player's screen: {a} and {b}.\n\n"
@@ -82,10 +90,11 @@ def schema():
     other = partner()
     if not other:
         return SCHEMA
-    rest = {k: v for k, v in SCHEMA["properties"].items() if k not in ("line", "mood")}
+    rest = {k: v for k, v in SCHEMA["properties"].items() if k not in ("line", "mood", "lore")}
     turn = {"type": "object", "properties": {"speaker": {"type": "string", "enum": [config.NAME, other["NAME"]]},
-                                             "mood": SCHEMA["properties"]["mood"], "line": {"type": "string"}},
-            "required": ["speaker", "mood", "line"], "additionalProperties": False}
+                                             "mood": SCHEMA["properties"]["mood"], "line": {"type": "string"},
+                                             "lore": {"type": "string"}},  # per turn: a story belongs to whoever told it
+            "required": ["speaker", "mood", "line", "lore"], "additionalProperties": False}
     return {"type": "object", "properties": {"turns": {"type": "array", "items": turn}, **rest},
             "required": ["turns"] + [k for k in SCHEMA["required"] if k in rest], "additionalProperties": False}
 
@@ -124,15 +133,22 @@ def prompt(context, recent, situation, jpegs):
     return text
 
 
-def local_think(model, context, recent, situation, jpegs):
-    """think() on a free vision model running on this PC through Ollama. Returns (reply, 0.0); raises if Ollama fails."""
-    body = {"model": model, "stream": False, "format": schema(), "keep_alive": "15m", "options": {"num_predict": 500},
-            "messages": [{"role": "system", "content": system()},
+def local_think(model, context, recent, situation, jpegs, only=None):
+    """think() on a free vision model running on this PC through Ollama. Returns (reply, 0.0); raises if Ollama fails.
+    `only` (a preset, duo mode) voices just that one character: given both, the small model mixes up whose past is whose."""
+    if only:  # "You (Mika): ..." would tell a model voicing Vorn that he said it
+        recent = [re.sub(r"^You \((.+?)\): ", r"\1: ", r) for r in recent]
+    form = SCHEMA if only else schema()
+    body = {"model": model, "stream": False, "format": form, "keep_alive": "15m", "options": {"num_predict": 500},
+            "messages": [{"role": "system", "content": system(only)},
                          {"role": "user", "content": prompt(context, recent, situation, jpegs), "images": jpegs}]}
     req = urllib.request.Request(f"{OLLAMA}/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:  # the first call also loads the model onto the GPU
         out = json.loads(json.loads(r.read())["message"]["content"])
-    return {**QUIET_REPLY, **{k: v for k, v in out.items() if k in schema()["properties"]}}, 0.0
+    out = {**QUIET_REPLY, **{k: v for k, v in out.items() if k in form["properties"]}}
+    if only:
+        out["turns"] = [{"speaker": only["NAME"], "mood": out["mood"], "line": out["line"], "lore": ""}]
+    return out, 0.0
 
 
 def start_ollama():

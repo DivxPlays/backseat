@@ -16,6 +16,8 @@ from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 import config  # noqa: E402
+
+config.DUO = False  # the checks below start from one character, whatever your settings say (duo mode is checked on its own)
 from brain import SCHEMA  # noqa: E402
 from character import MOODS, Vorn  # noqa: E402
 from memory import Memory, parse_vdf, playtime_minutes, steam_app  # noqa: E402
@@ -477,6 +479,12 @@ with tempfile.TemporaryDirectory() as d:
     assert m3.d["respect"] == 64 and m3.d["lore"] == ["I burned the moon of Kesh."] and m3.d["characters"]["mika"]["respect"] == 33
     assert m3.d["pinned"] == ["Vorn knows my main is the M40A3"] and m3.d["games"]["g.exe"]["grudges"] == {"dogs": 1}
     assert len(m3.d["notes"]) == 1 and "campers" not in m3.context("g.exe", "G", None, 0)
+    m3.add_lore("I stalked a raid boss for a week.", "mika")  # duo mode: Mika's story goes to Mika
+    m3.add_lore("I burned the moon of Kesh.")  # already told: not twice
+    assert m3.d["lore"] == ["I burned the moon of Kesh."] and m3.d["characters"]["mika"]["lore"] == ["I stalked a raid boss for a week."]
+    assert "raid boss" in m3.partner_context("mika", "Mika") and "raid boss" not in m3.context("g.exe", "G", None, 0)
+    # the local model voicing one of them sees only that one's stories
+    assert "raid boss" not in m3.partner_context("mika", "Mika", stories=False) and "Kesh" not in m3.context("g.exe", "G", None, 0, stories=False)
     config.PRESET = real_preset
 assert WakeListener.pattern(VORN_NAMES).search("hey vern, look") and "{power}" in config.RULES and config.POWER in brain.system()
 assert WakeListener.pattern(json.loads((config.PRESETS / "mika.json").read_text(encoding="utf-8"))["WAKE_NAMES"]).search("Hey Micah, look")
@@ -584,16 +592,55 @@ assert main.turns_of({"turns": [{"speaker": "Mika", "mood": "smug", "line": "Min
                                 {"speaker": "Vorn", "mood": "angry", "line": " Weak. "}]}, names) == [("Mika", "smug", "Mine."), ("Vorn", "angry", "Weak.")]
 assert main.turns_of({"mood": "smug", "line": "Solo."}, names) == [("Vorn", "smug", "Solo.")]  # a refusal or a solo reply still works
 assert main.repeats("Mine, all mine.", ["You (Mika): Mine, all mine!"])
-saved_duo = (config.DUO, config.PRESET, config.NAME, config.CHARACTER)
+saved_duo = (config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA)
 config.DUO, config.PRESET, config.NAME, config.CHARACTER = True, "vorn", "Vorn", "vorn"
+config.PERSONA = json.loads((config.PRESETS / "vorn.json").read_text(encoding="utf-8"))["PERSONA"]
 assert brain.partner()["NAME"] == "Mika" and "turns" in brain.schema()["properties"] and "line" not in brain.schema()["properties"]
 assert brain.schema()["properties"]["turns"]["items"]["properties"]["speaker"]["enum"] == ["Vorn", "Mika"]
 assert "=== Vorn ===" in brain.system() and "=== Mika ===" in brain.system() and "Duo mode" in brain.system()
+# a story belongs to whoever told it; the one you called answers alone; nobody's past leaks into the other's
+assert "lore" not in brain.schema()["properties"] and "lore" in brain.schema()["properties"]["turns"]["items"]["required"]
+assert "conquests" not in main.SITUATIONS["lore"]  # Vorn's word, and every character tells stories
+wake_of = {"Vorn": VORN_NAMES, "Mika": brain.partner()["WAKE_NAMES"]}
+assert main.addressed("Hey Mika, how was your day?", wake_of) == "Mika"
+assert main.addressed("hey vern, ask mika what she thinks", wake_of) == "Vorn"  # the first one called
+assert main.addressed("how was everyone's day?", wake_of) is None
+sent = []
+
+
+class FakeOllama:  # answers local_think's HTTP call here
+    def __init__(self, req, timeout=None):
+        sent.append(json.loads(req.data))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return json.dumps({"message": {"content": json.dumps({"mood": "smug", "line": "Mine.", "lore": "a tale"})}}).encode()
+
+
+real_urlopen, brain.urllib.request.urlopen = brain.urllib.request.urlopen, FakeOllama
+try:
+    speakers = set()
+    for alone in (brain.me(), brain.partner()):  # the small local model voices one of them per comment, with only that one's persona
+        out, _ = brain.local_think("m", "ctx", ["You (Mika): Mine."], "now", [], only=alone)
+        who = out["turns"][0]["speaker"]
+        speakers.add(who)
+        system_text, user_text = sent[-1]["messages"][0]["content"], sent[-1]["messages"][1]["content"]
+        assert len(out["turns"]) == 1 and out["turns"][0]["lore"] == "" and f"You are {who}," in system_text
+        assert "Duo mode" not in system_text and ("warlord" in system_text) == (who == "Vorn")
+        assert "Mika: Mine." in user_text and "You (Mika)" not in user_text
+finally:
+    brain.urllib.request.urlopen = real_urlopen
+assert speakers == {"Vorn", "Mika"}
 duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
 assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
 duo.show_line("angry", "Hands off my player.", None, "none", "Mika")
 assert duo.speaking == 1 and duo.text.startswith("Mika: ") and duo.chars[1].mood == "angry" and duo.chars[0].mood == "surprised"
-config.DUO, config.PRESET, config.NAME, config.CHARACTER = saved_duo
+config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA = saved_duo
 assert brain.partner() is None or config.DUO
 heard_duo = []
 wl = WakeListener(None, None, lambda text, audio: heard_duo.append(text))

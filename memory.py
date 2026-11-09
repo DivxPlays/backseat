@@ -158,9 +158,6 @@ class Memory:
             if killer and out.get("event") in ("death", "loss"):
                 grudges = g.setdefault("grudges", {})
                 grudges[killer] = grudges.get(killer, 0) + 1
-            lore = out.get("lore", "").strip()
-            if lore and lore not in self.d["lore"]:
-                self.d["lore"] = (self.d["lore"] + [lore])[-MAX_NOTES:]
             note = out.get("remember", "").strip()
             if friend and note:
                 f = self.d.setdefault("friends", {}).setdefault(friend, {"notes": []})
@@ -168,6 +165,16 @@ class Memory:
                     f["notes"] = (f["notes"] + [note])[-MAX_GAME_NOTES:]
         if not friend:
             self.remember(out.get("remember", ""))
+        self.add_lore(out.get("lore", ""))
+
+    def add_lore(self, text, preset=None):
+        """A new fact from a character's own past: the current one's, or (duo mode) the partner's, by preset name."""
+        text = text.strip()
+        with self.lock:
+            d = self.d if preset is None else self.d.setdefault("characters", {}).setdefault(preset, fresh_mind())
+            lore = d.setdefault("lore", [])
+            if text and text not in lore:
+                d["lore"] = (lore + [text])[-MAX_NOTES:]
 
     def spend(self, dollars, kind="other"):
         with self.lock:
@@ -224,8 +231,9 @@ class Memory:
             tmp.write_text(json.dumps(self.d, indent=1), encoding="utf-8")
             os.replace(tmp, self.path)  # atomic: a crash mid-save can't wipe your history
 
-    def partner_context(self, preset, name, query=""):
-        """Duo mode: what the other character remembers about the player (theirs to read, not to change)."""
+    def partner_context(self, preset, name, query="", stories=True):
+        """Duo mode: what the other character remembers about the player (theirs to read, not to change);
+        stories=False leaves out their own past."""
         with self.lock:
             mind = {**fresh_mind(), **self.d.get("characters", {}).get(preset, {})}
         pinned = pick_pinned(mind["pinned"], query)
@@ -233,12 +241,16 @@ class Memory:
         if mind["profile"]:
             lines.append(f"- Long-term picture: {mind['profile']}")
         lines += [f"- Always remember: {p}" for p in pinned] + [f"- {n}" for n in mind["notes"][-10:]]
-        return "\n".join(lines) if len(lines) > 1 else f"{name} doesn't know much about the player yet."
+        text = "\n".join(lines) if len(lines) > 1 else f"{name} doesn't know much about the player yet."
+        if stories:
+            text += f"\n{name}'s own past (theirs alone):" + ("".join(f"\n- {n}" for n in mind["lore"]) or " nothing told yet.")
+        return text
 
     def relevant_pinned(self, query):
         return pick_pinned(self.d["pinned"], query)
 
-    def context(self, app, title, steam, streak, query=""):
+    def context(self, app, title, steam, streak, query="", stories=True):
+        """What the current character knows; stories=False leaves out their own past (duo mode, the other one is talking)."""
         with self.lock:
             d, s = self.d, self.session
             g = d["games"].get(app, {"events": {}, "notes": []})
@@ -267,7 +279,9 @@ class Memory:
             report = next((x["report"] for x in reversed(past) if x.get("report")), None)
             if report:
                 lines.append(f'Your battle report on their last session: "{report}"')
-            lines.append("Your own past (stay consistent with it):" + ("".join(f"\n- {n}" for n in d["lore"]) or " nothing told yet."))
+            if stories:
+                lines.append(f"{config.NAME}'s own past (stay consistent with it):"  # named: in duo mode "your" could be either
+                             + ("".join(f"\n- {n}" for n in d["lore"]) or " nothing told yet."))
             lines.append("Notes about the player in this game:" + ("".join(f"\n- {n}" for n in g["notes"]) or " nothing yet."))
             if d["profile"]:
                 lines.append(f"Your long-term picture of the player: {d['profile']}")

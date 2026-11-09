@@ -69,7 +69,7 @@ SITUATIONS = {
               "else you see, or return an empty line to stay quiet.",
     "quiet": "You've been quiet a while. Look at the screen and trash-talk the player in one short sentence (under 15 words): "
              "their play, their hours, or their idling. Don't repeat a point from your recent lines.",
-    "lore": "You've been quiet a while. Tell a very short story from your own conquests (stay consistent with your past), "
+    "lore": "You've been quiet a while. Tell a very short story from your own past (stay consistent with it), "
             "then turn it into a jab at the player. Under 25 words.",
     "look": "The player pressed the look hotkey. Comment on what they're looking at, or give a hint about it.",
     "nag": "It's late, or the player has gone a long time without a break (see the local time and break time in the stats). "
@@ -86,6 +86,13 @@ def repeats(line, recent):
     words = re.findall(r"[a-z']+", line.lower())
     return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower())).ratio() > 0.6
                for said in recent[-8:] if said.startswith("You"))
+
+
+def addressed(text, wake_of):
+    """Duo mode: which character the speaker called by name first ({name: their wake names}), or None."""
+    hits = [(m.start(), name) for name, names in wake_of.items()
+            if (m := re.search(r"\b(?:" + "|".join(map(re.escape, names)) + r")\b", text, re.I))]
+    return min(hits)[1] if hits else None
 
 
 def turns_of(out, names):
@@ -382,8 +389,10 @@ class Companion:
         self.names = [config.NAME] + ([self.partner["NAME"]] if self.partner else [])
         self.voices_of = {config.NAME: {"VOICE": config.VOICE, "VOICE_RATE": config.VOICE_RATE, "VOICE_PITCH": config.VOICE_PITCH,
                                         "POWER": config.POWER}}
+        self.wake_of = {config.NAME: config.WAKE_NAMES}
         if self.partner:
             self.voices_of[self.partner["NAME"]] = {k: self.partner[k] for k in ("VOICE", "VOICE_RATE", "VOICE_PITCH", "POWER")}
+            self.wake_of[self.partner["NAME"]] = self.partner["WAKE_NAMES"]
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
 
@@ -531,13 +540,22 @@ class Companion:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
         if kind == "ask":
             situation += self.memory_command(arg)
+        to = addressed(arg, self.wake_of) if self.partner and kind in ("ask", "friend") else None
+        if to:  # duo mode: without this the other one answers too ("My day?") when only one was asked
+            other = next(n for n in self.names if n != to)
+            situation += (f" (This was said to {to}, so only {to} answers it. {other} wasn't asked: at most one short "
+                          f"reaction to {to}'s answer, or nothing.)")
         if crossed:
             situation += " " + BUDGET_NEWS[level]
-        context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start,
-                                   query=arg if kind in ("ask", "friend") else "")  # picks the facts relevant to what was said
+        # duo mode: the small local model voices one of them per comment and sees only that one's own past (shown both,
+        # it tells the other's stories). shortcut: if it fails, Claude's fallback reply also misses the other's past (rare)
+        alone = random.choice([brain.me(), self.partner]) if local and self.partner else None
+        query = arg if kind in ("ask", "friend") else ""  # picks the facts relevant to what was said
+        context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start, query=query,
+                                   stories=alone is None or alone["NAME"] == config.NAME)
         if self.partner:  # duo mode: they also know what the other one remembers about you
-            context += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"],
-                                                       query=arg if kind in ("ask", "friend") else "")
+            context += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"], query=query,
+                                                       stories=alone is None or alone is self.partner)
         context += ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
                     if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
@@ -546,11 +564,12 @@ class Companion:
         out = None
         if local:
             try:
-                out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent[-4:], situation, jpegs)  # less old talk to mix up
+                out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent[-4:], situation, jpegs,
+                                               only=alone)  # less old talk to mix up
                 # the small local model only talks: it calls kills "wins" and misreads screens, so it doesn't keep score,
-                # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes about you
+                # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
                 # (it reads your memory, it doesn't write it); Claude does those
-                out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="")
+                out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="")
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
@@ -564,6 +583,9 @@ class Companion:
             return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again
         before = self.mem.d["respect"]
         self.mem.record(app, out, friend=speaker)
+        for t in out.get("turns", []):  # duo mode: a story goes to whoever told it (the local model's turns have none)
+            if t.get("speaker") in self.names:
+                self.mem.add_lore(t.get("lore", ""), None if t["speaker"] == config.NAME else self.partner["PRESET"])
         event = "epic" if tier_for(self.mem.d["respect"]) > tier_for(before) else out.get("event", "none")  # new gear: aura flare
         self.streak, fire = bloodfire(self.streak, out.get("event"), before, self.mem.d["respect"])
         event = fire or event
