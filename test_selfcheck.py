@@ -458,16 +458,25 @@ assert not main.repeats("Finally, the soundboard monk dares to kill someone.", [
 with tempfile.TemporaryDirectory() as d:
     real_preset, config.PRESET = config.PRESET, "vorn"  # start as Vorn, whichever character you have active
     m = Memory(Path(d, "memory.json"))
-    m.d["respect"], m.d["lore"] = 64, ["I burned the moon of Kesh."]
+    m.d["respect"], m.d["lore"], m.d["total_seconds"] = 64, ["I burned the moon of Kesh."], 3600
+    m.pin("Vorn knows my main is the M40A3")
+    m.remember("Vorn's note")
+    m.record("g.exe", {"event": "death", "killer": "dogs"})
+    m.spend(0.25, "ask")
     m.save()
     config.PRESET = "mika"
     m2 = Memory(Path(d, "memory.json"))
-    assert m2.d["respect"] == 10 and m2.d["lore"] == [] and m2.d["characters"]["vorn"]["respect"] == 64
+    assert m2.d["respect"] == 10 and m2.d["lore"] == [] and m2.d["pinned"] == [] and m2.d["notes"] == [] and m2.d["games"] == {}
+    assert m2.d["characters"]["vorn"]["respect"] == 64 and m2.d["total_seconds"] == 3600 and m2.spent() == 0.25  # shared
+    assert "M40A3" not in m2.context("g.exe", "G", None, 0, query="main")  # Mika doesn't know what Vorn was told
     m2.d["respect"] = 33
+    m2.pin("Mika knows I hate campers")
     m2.save()
     config.PRESET = "vorn"
     m3 = Memory(Path(d, "memory.json"))
     assert m3.d["respect"] == 64 and m3.d["lore"] == ["I burned the moon of Kesh."] and m3.d["characters"]["mika"]["respect"] == 33
+    assert m3.d["pinned"] == ["Vorn knows my main is the M40A3"] and m3.d["games"]["g.exe"]["grudges"] == {"dogs": 1}
+    assert len(m3.d["notes"]) == 1 and "campers" not in m3.context("g.exe", "G", None, 0)
     config.PRESET = real_preset
 assert WakeListener.pattern(VORN_NAMES).search("hey vern, look") and "{power}" in config.RULES and config.POWER in brain.system()
 assert WakeListener.pattern(json.loads((config.PRESETS / "mika.json").read_text(encoding="utf-8"))["WAKE_NAMES"]).search("Hey Micah, look")
@@ -542,11 +551,13 @@ with tempfile.TemporaryDirectory() as d:
     win.save()
     assert m.d["pinned"] == ["I hate snipers", "Birthday is in March"] and json.loads(Path(d, "memory.json").read_text(encoding="utf-8"))["pinned"][-1] == "Birthday is in March"
 
-# 500 pinned facts: the cap holds without dropping any, only relevant ones are sent, and Vorn and Mika see the same memory
+# 500 pinned facts: the cap holds without dropping any, only relevant ones are sent, and they're Vorn's alone
 import memory as memory_mod  # noqa: E402
 
 with tempfile.TemporaryDirectory() as d:
+    real_preset, config.PRESET = config.PRESET, "vorn"
     m = Memory(Path(d, "memory.json"))
+    config.PRESET = real_preset
     for i in range(memory_mod.MAX_PINNED - 1):
         assert m.pin(f"Fact number {i} about crate {i}")
     assert m.pin("My favorite sniper rifle is the M40A3")  # the 500th fits
@@ -556,12 +567,16 @@ with tempfile.TemporaryDirectory() as d:
     assert "My favorite sniper rifle is the M40A3" in shown and len(shown) <= memory_mod.SHOW_PINNED, len(shown)
     assert m.d["pinned"][-1] in shown  # the newest always come along
     m.save()
-    for preset in ("vorn", "mika"):
+    contexts = {}
+    for preset in ("vorn", "mika", "vorn"):
         real_preset, config.PRESET = config.PRESET, preset
-        ctx = Memory(Path(d, "memory.json")).context("iw3mp.exe", "Call of Duty 4", None, 0, query="what's my favorite sniper rifle")
+        mem = Memory(Path(d, "memory.json"))
+        contexts[preset] = mem.context("iw3mp.exe", "Call of Duty 4", None, 0, query="what's my favorite sniper rifle")
+        mem.save()
         config.PRESET = real_preset
-        assert "My favorite sniper rifle is the M40A3" in ctx and "more facts are stored" in ctx, preset
-        assert ctx.count("\n- Fact number") < 45, preset  # not all 500 in one message
+    assert "My favorite sniper rifle is the M40A3" in contexts["vorn"] and "more facts are stored" in contexts["vorn"]
+    assert contexts["vorn"].count("\n- Fact number") < 45  # not all 500 in one message
+    assert "M40A3" not in contexts["mika"]  # Mika has her own memory
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

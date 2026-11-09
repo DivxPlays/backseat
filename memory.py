@@ -40,6 +40,14 @@ def month():
     return date.today().strftime("%Y-%m")
 
 
+MINE = ("respect", "lore", "notes", "pinned", "profile", "games", "friends", "sessions", "hall")  # per character; time and spend are shared
+
+
+def fresh_mind():
+    """What a character remembers before meeting you."""
+    return {"respect": 10, "lore": [], "notes": [], "pinned": [], "profile": "", "games": {}, "friends": {}, "sessions": [], "hall": []}
+
+
 def app_name(exe, title):
     return Path(exe).name.lower() if exe else (title or "unknown")
 
@@ -58,15 +66,15 @@ class Memory:
             self.d = {}
         for key, empty in (("total_seconds", 0), ("session_count", 0), ("apps", {}), ("games", {}), ("notes", []),
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
-                           ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", "")):
+                           ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {})):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
-        active = self.d.get("character", "vorn")  # each character keeps their own respect meter and past
+        active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
         if active != config.PRESET:
             saved = self.d.setdefault("characters", {})
-            saved[active] = {"respect": self.d["respect"], "lore": self.d["lore"]}
-            mine = saved.pop(config.PRESET, {"respect": 10, "lore": []})
-            self.d["respect"], self.d["lore"], self.d["character"] = mine["respect"], mine["lore"], config.PRESET
+            saved[active] = {k: self.d[k] for k in MINE}
+            mine = {**fresh_mind(), **saved.pop(config.PRESET, {})}
+            self.d.update({k: mine[k] for k in MINE}, character=config.PRESET)
         self.session = {"start": datetime.now().isoformat(timespec="minutes"), "seconds": 0, "apps": {}, "events": {}, "lines": []}
         self.d["sessions"] = self.d["sessions"][-(MAX_SESSIONS - 1):] + [self.session]
 
