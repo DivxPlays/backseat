@@ -4,6 +4,26 @@
 
 Nothing yet: 2.0.0 shipped everything that was planned (see Done).
 
+## Known issues (next hotfix, 2.0.3)
+
+Found in companion.log on 2026-11-09. No GitHub issues yet.
+
+- **Crash when the audio device is busy or gone for a moment.** Playing a line raised "Device unavailable" (twice on
+  2026-11-08: a headset reconnecting or the default device switching) and took the whole app down. It should skip the
+  sound (or retry the default device) and keep the subtitles.
+- **Mini-games outside games.** The free local model calls the desktop a "menu", so trivia was asked while you were in
+  Claude ("Which company created the Claude AI assistant?", Mario, the Windows tray icon), each about 0.8 cents. They
+  should only start when a game is in front.
+
+## Not yet tested in real use
+
+Built and self-checked, but not yet seen working on a real day:
+- Start with Windows after a real restart (2.0.1's task ran by hand, not at a log-in yet).
+- Auto-update on an installed copy (a friend's PC on 2.0.0 being offered 2.0.2).
+- Auto-clips in a real game (the Game Bar key, the clip on the highlights page).
+- Steam stats with a real Steam Web API key.
+- The squad leaderboard with friends on a real Discord call.
+
 ## Ideas for 2.1.0 (not decided: pick the ones you want)
 
 GitHub issues land in Planned with their number. No issues yet (checked 2026-11-09).
@@ -22,7 +42,9 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 
 ### Quality
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
-- **Fresher greetings:** most greetings open the same way ("X minutes idling in Claude..."); vary what they open with.
+- **Fresher lines:** in the log, 46 automatic lines open with "[your name], still idling..." and 46 with "Ah, the tinkerer...",
+  34% mention the time ("at 3 AM") and 11% say "Pathetic". Vary their openings and topics (tell the model what they said
+  lately and what not to start with), and mention the hour now and then rather than every few lines.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
 
 ## Not planned
