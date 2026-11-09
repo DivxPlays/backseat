@@ -63,6 +63,12 @@ def presets():
     return sorted(p.stem for p in config.PRESETS.glob("*.json")) or [config.PRESET]
 
 
+def webcams():
+    """Real webcams (not virtual ones), for the camera background."""
+    from PySide6.QtMultimedia import QMediaDevices
+    return [d.description() for d in QMediaDevices.videoInputs() if not any(w in d.description().lower() for w in ("virtual", "obs"))]
+
+
 def set_setting(key, value):
     """Save one setting into settings.json (the tray menu's character and outfit pickers)."""
     saved = json.loads(FILE.read_text(encoding="utf-8")) if FILE.exists() else {}
@@ -142,9 +148,15 @@ class SettingsWindow(QDialog):
         w["FRIENDS_DEVICE"] = _combo([""] + device_names("input"), config.FRIENDS_DEVICE, editable=True)
         route = QPushButton("Set up VoiceMeeter for Discord")
         route.clicked.connect(lambda: self.setup_voicemeeter(w))
+        w["CAMERA"] = _combo(["off", "current", "both"], config.CAMERA)
+        w["CAMERA_BACKGROUND"] = _combo(["dark", "green", "game", "webcam"], config.CAMERA_BACKGROUND)
+        w["CAMERA_WEBCAM"] = _combo([""] + webcams(), config.CAMERA_WEBCAM, editable=True)
         audio = self._page([("", route), ("Your mic (blank = default)", w["MIC_DEVICE"]),
                             ("His voice (blank = default)", w["VOICE_DEVICE"]),
-                            ("Friends' voices (blank = off)", w["FRIENDS_DEVICE"])])
+                            ("Friends' voices (blank = off)", w["FRIENDS_DEVICE"]),
+                            ("Discord camera (\"OBS Virtual Camera\")", w["CAMERA"]),
+                            ("Camera background", w["CAMERA_BACKGROUND"]),
+                            ("Your real webcam (blank = first one)", w["CAMERA_WEBCAM"])])
 
         tabs = QTabWidget()
         for page, title in ((him, "Character"), (brain, "Brain && budget"), (behave, "Behavior"), (displays, "Keys && displays"),

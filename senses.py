@@ -234,7 +234,12 @@ class WakeListener:
     """Always-on mic that waits for "Hey Vorn". Everything is transcribed on this PC; nothing is sent until he's called."""
 
     # Whisper often mishears an invented name, so accept the usual near-misses
-    WAKE = re.compile(r"\b(?:hey|hay|hi|a|okay|ok)[\s,.!]+(?:" + "|".join(map(re.escape, config.WAKE_NAMES)) + r")\b[\s,.!?]*", re.I)
+    @staticmethod
+    def pattern(names):
+        """ "Hey <name>" for any of the ways the speech recognizer may hear the name."""
+        return re.compile(r"\b(?:hey|hay|hi|a|okay|ok)[\s,.!]+(?:" + "|".join(map(re.escape, names)) + r")\b[\s,.!?]*", re.I)
+
+    WAKE = pattern(config.WAKE_NAMES)
 
     DONE = 1.2  # after "Hey Vorn", the question is sent once you've been quiet this long (on top of the 0.7 s pause)
     WAIT = 6.0  # after a bare "Hey Vorn", how long he waits for you to start the question

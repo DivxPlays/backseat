@@ -41,6 +41,7 @@ import brain  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
 import transfer  # noqa: E402
+from camera import BACKGROUNDS, Camera  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, make_character, tier_for  # noqa: E402
@@ -752,6 +753,29 @@ def main():
         pick.setCheckable(True)
         pick.setChecked(preset == config.PRESET)
         pick.triggered.connect(lambda _=False, p=preset: (set_setting("PRESET", p), restart()) if p != config.PRESET else None)
+    camera = Camera(overlay, lambda: comp.focus)  # the Discord camera
+    cam_menu = menu.addMenu("Discord camera")
+    cam_picks = {}
+
+    def set_camera(key, value):
+        set_setting(key, value)
+        setattr(config, key, value)
+        for (k, v), action in cam_picks.items():
+            action.setChecked(getattr(config, k) == v)
+        camera.stop()
+        camera.start()
+        QTimer.singleShot(3000, lambda: camera.error and overlay.note(f"(Discord camera: {camera.error})"))
+
+    for key, values in (("CAMERA", ("off", "current", "both")), ("CAMERA_BACKGROUND", BACKGROUNDS)):
+        for value in values:
+            label = {"off": "Off", "current": f"On: {config.NAME}", "both": "On: Vorn and Mika", "dark": "Background: dark",
+                     "green": "Background: green screen", "game": "Background: your game", "webcam": "Background: your webcam"}[value]
+            cam_picks[key, value] = cam_menu.addAction(label)
+            cam_picks[key, value].setCheckable(True)
+            cam_picks[key, value].setChecked(getattr(config, key) == value)
+            cam_picks[key, value].triggered.connect(lambda _=False, k=key, v=value: set_camera(k, v))
+        cam_menu.addSeparator()
+    camera.start()
     if hasattr(overlay.char, "outfit"):  # characters with outfits (Mika): switch live
         from mika import OUTFITS
         outfits = menu.addMenu("Outfit")
@@ -794,6 +818,7 @@ def main():
     keyboard.add_hotkey(config.KEY_MOVE, bridge.move.emit)
     keyboard.add_hotkey(config.KEY_MUTE, comp.toggle_mute)
     app.aboutToQuit.connect(comp.mem.save)
+    app.aboutToQuit.connect(camera.stop)
     app.aboutToQuit.connect(overlay.ducker.restore)
     app.aboutToQuit.connect(keyboard.unhook_all)
     comp.start()

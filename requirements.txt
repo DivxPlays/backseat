@@ -15,3 +15,4 @@ sherpa-onnx==2.0.1
 kokoro-onnx==0.6.1
 espeakng-loader==0.2.4
 phonemizer==3.6.0
+pyvirtualcam==0.15.0

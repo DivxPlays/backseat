@@ -10,9 +10,6 @@
 - **Holiday outfits and events:** Halloween, Christmas and your birthday change their look and lines automatically.
 - **Grudges that stick:** rage-quit or ignore them for days and they hold it against you next session.
 
-### Discord camera
-- **Be the camera:** Vorn, Mika, or both (duo) as a virtual webcam you pick in Discord's video settings, lip-synced to their voice. Backgrounds: plain/green, your game screen, or your real webcam with them beside you. Needs a virtual camera driver (for example OBS's virtual camera), downloaded with your OK first.
-
 ### Gameplay
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
 - **Challenges and bounties:** "Get 3 headshots this match": tracked, rewarded with respect or affection, roasted when failed.
@@ -40,6 +37,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Discord camera: the current character or both as "OBS Virtual Camera", lip-synced with subtitles; backgrounds dark, green, game screen or real webcam. (Both talking to each other comes with duo mode.)
 - Mika (1.2.0): original yandere gamer girl, four outfits, Lovesick power-up, Alpha voice; characters as presets (1.1.0); About and version number (1.0.0).
 - Local Kokoro voices (Michael for Vorn), snappier and fresher automatic comments, questions no longer cut off by pauses.
 - Discord calls through VoiceMeeter: his voice in the call, a second ear for friends, voice fingerprints to tell them apart, running jokes per friend, one-click VoiceMeeter routing, optional swearing.

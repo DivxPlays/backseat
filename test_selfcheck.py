@@ -11,6 +11,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
+from PySide6.QtGui import QImage  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -141,6 +142,8 @@ with tempfile.TemporaryDirectory() as d:
 # wake word: tolerant of Whisper's mishearings, ignores everything else
 heard = []
 w = WakeListener(None, None, lambda text, audio: heard.append(text))
+VORN_NAMES = json.loads((config.PRESETS / "vorn.json").read_text(encoding="utf-8"))["WAKE_NAMES"]
+w.WAKE = WakeListener.pattern(VORN_NAMES)  # the tests speak to Vorn, whichever character you have active
 
 
 def say(*stretches):  # stretches of talking with short pauses between, then silence
@@ -457,10 +460,11 @@ assert not main.repeats("Finally, the soundboard monk dares to kill someone.", [
 
 # characters: each keeps their own respect and past; the wake word follows the name
 with tempfile.TemporaryDirectory() as d:
+    real_preset, config.PRESET = config.PRESET, "vorn"  # start as Vorn, whichever character you have active
     m = Memory(Path(d, "memory.json"))
     m.d["respect"], m.d["lore"] = 64, ["I burned the moon of Kesh."]
     m.save()
-    real_preset, config.PRESET = config.PRESET, "mika"
+    config.PRESET = "mika"
     m2 = Memory(Path(d, "memory.json"))
     assert m2.d["respect"] == 10 and m2.d["lore"] == [] and m2.d["characters"]["vorn"]["respect"] == 64
     m2.d["respect"] = 33
@@ -469,7 +473,8 @@ with tempfile.TemporaryDirectory() as d:
     m3 = Memory(Path(d, "memory.json"))
     assert m3.d["respect"] == 64 and m3.d["lore"] == ["I burned the moon of Kesh."] and m3.d["characters"]["mika"]["respect"] == 33
     config.PRESET = real_preset
-assert WakeListener.WAKE.search("hey vern, look") and "{power}" in config.RULES and config.POWER in brain.system()
+assert WakeListener.pattern(VORN_NAMES).search("hey vern, look") and "{power}" in config.RULES and config.POWER in brain.system()
+assert WakeListener.pattern(json.loads((config.PRESETS / "mika.json").read_text(encoding="utf-8"))["WAKE_NAMES"]).search("Hey Micah, look")
 assert type(main.make_character("vorn")).__name__ == "Vorn"
 
 # Mika: her preset loads, every outfit and mood renders inside her window, Lovesick takes the light from her eyes
@@ -495,6 +500,21 @@ v.bloodfire(8)
 for _ in range(60):
     v.step(1 / 30, 0.0)
 assert v.blood > 0.95 and not v.render().isNull() and not v.render(0.3, bust=True).isNull()
+
+# Discord camera: frames for one character or both, every background, subtitles; an ultrawide game screen is cropped, not squashed
+import camera as cam_mod  # noqa: E402
+
+assert cam_mod.fit(Image.new("RGB", (5120, 1440)), 1280, 720).size == (1280, 720)
+stub = SimpleNamespace(char=Vorn(), text="Pathetic aim, again.", shown=8.0)
+for mode in ("current", "both"):
+    for bg in cam_mod.BACKGROUNDS:
+        config.CAMERA, config.CAMERA_BACKGROUND = mode, bg
+        c = cam_mod.Camera(stub, lambda: (0, 0))
+        c.other = main.make_character("mika") if mode == "both" else None
+        c.background = QImage(1280, 720, QImage.Format_RGB888) if bg in ("game", "webcam") else None
+        frame = c.frame()
+        assert frame.shape == (720, 1280, 3) and frame.std() > 5, (mode, bg)
+config.CAMERA, config.CAMERA_BACKGROUND = "off", "dark"
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

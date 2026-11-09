@@ -61,6 +61,11 @@ MIC_DEVICE = ""  # the mic he listens to for you
 VOICE_DEVICE = ""  # where his voice plays ("Voicemeeter AUX Input" puts him in your call)
 FRIENDS_DEVICE = ""  # where your friends' voices come from ("Voicemeeter Out B2"); "" = he doesn't listen to them
 
+# Discord camera (pick "OBS Virtual Camera" in Discord; needs OBS Studio installed, not running)
+CAMERA = "off"  # "off", "current" (the current character) or "both" (Vorn and Mika)
+CAMERA_BACKGROUND = "dark"  # "dark", "green" (green screen), "game" (your game's display) or "webcam" (your real webcam)
+CAMERA_WEBCAM = ""  # which real webcam (part of its name); "" = the first one that isn't a virtual camera
+
 VOICE = "en-US-ChristopherNeural"  # an online voice (edge-tts --list-voices), or "kokoro:am_michael" etc. to run on this PC (faster)
 VOICE_RATE = "+6%"
 VOICE_PITCH = "-8Hz"

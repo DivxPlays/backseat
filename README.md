@@ -98,7 +98,16 @@ Put him in your Discord calls: everyone hears him, your friends can say "Hey Vor
 
 He keeps running jokes on each friend (in `memory.json`, exported with your memory) and pits you all against each other. Friends' questions use Haiku (about 0.05 cents each) and count toward your budget. Voice fingerprints are made and stored on your PC only. VoiceMeeter has to be running during calls; without it, clear "His voice" in Settings or you won't hear him.
 
-**Let him swear:** Settings > Him > Language. He swears freely, but never uses slurs.
+**Let him swear:** Settings > Character > Language. They swear freely, but never use slurs.
+
+### Discord camera
+
+Show Vorn, Mika, or both as your camera in Discord. Needs OBS Studio installed (free, from obsproject.com; only its virtual camera is used, OBS doesn't have to run).
+
+1. Tray > **Discord camera** > **On: <character>** (or **On: Vorn and Mika**).
+2. In Discord > User Settings > Voice & Video > Camera, pick **OBS Virtual Camera**.
+
+They move and lip-sync live at 1280x720, 24 fps, with their lines as subtitles. Backgrounds (same menu): dark, green screen (for keying), your game's display, or your real webcam with them beside you. With both, the one talking is on the left and the other reacts; real back-and-forth comes with duo mode. If the camera can't start (no OBS), he tells you in his bubble.
 
 ## Privacy
 
