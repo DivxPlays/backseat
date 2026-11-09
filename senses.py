@@ -301,6 +301,7 @@ KOKORO = Path(__file__).with_name("models") / "kokoro"
 KOKORO_FILES = {"kokoro-v1.0.fp16-gpu.onnx": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/",
                 "voices-v1.0.bin": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"}
 ONLINE = "en-US-ChristopherNeural"  # backup voice if the local one fails
+logging.getLogger("phonemizer").setLevel(logging.ERROR)  # Kokoro's pronouncer warns about harmless word-count mismatches
 
 
 def speed_of(rate):

@@ -61,6 +61,7 @@ SITUATIONS = {
     "start": "The player just started you up. Greet them with a roast. If your stats include a battle report on their last session, "
              "open with its highlights; otherwise use their time stats or notes.",
     "change": "The player's screen changed. React to what is happening right now, in one short sentence (under 15 words). "
+              "Only talk about what you can actually see in the screenshots; if you can't tell what's on screen, don't guess. "
               "Never bring up a moment you already reacted to in your recent lines; if nothing new happened, jab at something "
               "else you see, or return an empty line to stay quiet.",
     "quiet": "You've been quiet a while. Look at the screen and trash-talk the player in one short sentence (under 15 words): "
@@ -498,7 +499,10 @@ class Companion:
         out = None
         if local:
             try:
-                out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent, situation, jpegs)
+                out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent[-4:], situation, jpegs)  # less old talk to mix up
+                # the small local model only talks: it calls kills "wins" and misreads screens, so it doesn't keep score,
+                # move respect, set off Bloodfire, frame the Hall of Shame or trigger breakdowns; Claude does those
+                out.update(event="none", respect="same", save_moment=False, killer="")
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
