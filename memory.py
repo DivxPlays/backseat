@@ -13,7 +13,8 @@ import config
 
 FILE = Path(__file__).with_name("memory.json")
 MAX_NOTES, MAX_GAME_NOTES, MAX_SESSIONS, MAX_DAYS, MAX_LINES = 40, 20, 20, 30, 30
-MAX_PINNED, CONDENSE = 100, 20  # facts you asked them to remember; how many old notes fold into the profile at once
+MAX_PINNED, SHOW_PINNED, CONDENSE = 500, 40, 20  # pinned facts kept / sent per message; old notes folded into the profile at once
+STOP = {"the", "a", "an", "my", "i", "is", "it", "to", "of", "and", "in", "on", "what", "you", "me", "do", "that", "how", "for"}
 COUNTED = {"death": "deaths", "win": "wins", "loss": "losses", "fail": "fails", "epic": "epic plays"}  # events he keeps score of
 
 
@@ -82,11 +83,16 @@ class Memory:
                 del d["days"][old]
 
     def pin(self, fact):
-        """Something the player asked to be remembered: kept for good (not pushed out like notes)."""
+        """Something the player asked to be remembered: kept for good (never pushed out like notes).
+        Returns False when all MAX_PINNED slots are taken: nothing old is dropped to make room."""
         fact = fact.strip().rstrip(".")
         with self.lock:
-            if fact and fact.lower() not in (p.lower() for p in self.d["pinned"]):
-                self.d["pinned"] = (self.d["pinned"] + [fact])[-MAX_PINNED:]
+            if not fact or fact.lower() in (p.lower() for p in self.d["pinned"]):
+                return True  # nothing new to add
+            if len(self.d["pinned"]) >= MAX_PINNED:
+                return False
+            self.d["pinned"].append(fact)  # context() sends only the relevant ones, so the cost stays flat
+            return True
 
     def unpin(self, words):
         """Forget pinned facts and notes that mention all of `words`; returns what was forgotten."""
@@ -199,7 +205,18 @@ class Memory:
             tmp.write_text(json.dumps(self.d, indent=1), encoding="utf-8")
             os.replace(tmp, self.path)  # atomic: a crash mid-save can't wipe your history
 
-    def context(self, app, title, steam, streak):
+    def relevant_pinned(self, query):
+        """The pinned facts for one message: all of them while there are few, otherwise the ones sharing words with
+        `query` (what was said, the game) plus the most recent, so any number can be stored without every call costing more."""
+        pinned = self.d["pinned"]
+        if len(pinned) <= SHOW_PINNED:
+            return pinned
+        words = set(re.findall(r"[a-z0-9']+", query.lower())) - STOP
+        hits = sorted(((len(words & set(re.findall(r"[a-z0-9']+", p.lower()))), i) for i, p in enumerate(pinned)), reverse=True)
+        pick = {i for n, i in hits[:SHOW_PINNED - 10] if n} | set(range(len(pinned) - 10, len(pinned)))
+        return [pinned[i] for i in sorted(pick)]
+
+    def context(self, app, title, steam, streak, query=""):
         with self.lock:
             d, s = self.d, self.session
             g = d["games"].get(app, {"events": {}, "notes": []})
@@ -233,7 +250,10 @@ class Memory:
             if d["profile"]:
                 lines.append(f"Your long-term picture of the player: {d['profile']}")
             if d["pinned"]:
-                lines.append("The player asked you to always remember:" + "".join(f"\n- {p}" for p in d["pinned"]))
+                shown = self.relevant_pinned(f"{query} {title} {app}")
+                more = len(d["pinned"]) - len(shown)
+                lines.append("The player asked you to always remember:" + "".join(f"\n- {p}" for p in shown)
+                             + (f"\n({more} more facts are stored; the ones relevant to this moment are above.)" if more else ""))
             lines.append("Things you remember about the player (recent):" + ("".join(f"\n- {n}" for n in d["notes"]) or " nothing yet."))
             friends = d.get("friends", {})
             if friends:

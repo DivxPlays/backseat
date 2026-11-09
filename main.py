@@ -498,7 +498,8 @@ class Companion:
             situation += self.memory_command(arg)
         if crossed:
             situation += " " + BUDGET_NEWS[level]
-        context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start)
+        context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start,
+                                   query=arg if kind in ("ask", "friend") else "")  # picks the facts relevant to what was said
         context += ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
                     if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
@@ -509,8 +510,9 @@ class Companion:
             try:
                 out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent[-4:], situation, jpegs)  # less old talk to mix up
                 # the small local model only talks: it calls kills "wins" and misreads screens, so it doesn't keep score,
-                # move respect, set off Bloodfire, frame the Hall of Shame or trigger breakdowns; Claude does those
-                out.update(event="none", respect="same", save_moment=False, killer="")
+                # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes about you
+                # (it reads your memory, it doesn't write it); Claude does those
+                out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="")
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
@@ -552,7 +554,9 @@ class Companion:
         """ "Remember that ..." pins a fact for good, "forget ..." removes it; returns a note for the reply."""
         m = REMEMBER.match(said)
         if m:
-            self.mem.pin(m.group(1))
+            if not self.mem.pin(m.group(1)):
+                return (" (Your memory for pinned facts is full: 500. Tell them, in character, to make room in the tray menu "
+                        "under Memories.)")
             return f' (You have now pinned this in your memory for good: "{m.group(1)}". Confirm it briefly, in character.)'
         m = FORGET.match(said)
         if m:

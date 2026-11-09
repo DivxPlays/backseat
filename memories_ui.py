@@ -2,6 +2,8 @@
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QPlainTextEdit,
                                QPushButton, QVBoxLayout, QWidget)
 
+from memory import MAX_PINNED
+
 
 def _list_box(items, title, add=False):
     """A titled list with Remove (and an Add field); returns (widget, the list)."""
@@ -20,7 +22,14 @@ def _list_box(items, title, add=False):
         field = QLineEdit()
         field.setPlaceholderText("Something they should always remember...")
         plus = QPushButton("Add")
-        plus.clicked.connect(lambda: (field.text().strip() and lst.addItem(field.text().strip()), field.clear()))
+        def add_fact():
+            if lst.count() >= MAX_PINNED:
+                return field.setPlaceholderText(f"Full ({MAX_PINNED}): remove some first")
+            if field.text().strip():
+                lst.addItem(field.text().strip())
+            field.clear()
+
+        plus.clicked.connect(add_fact)
         field.returnPressed.connect(plus.click)
         buttons.addWidget(field)
         buttons.addWidget(plus)
@@ -44,7 +53,8 @@ class MemoriesWindow(QDialog):
         self.profile = QPlainTextEdit(profile)
         self.profile.setMaximumHeight(130)
         lay.addWidget(self.profile)
-        box, self.pinned = _list_box(pinned, 'Always remembered (also: "Hey Vorn, remember that ..." / "forget ..."):', add=True)
+        title = f'Always remembered, {len(pinned)} of {MAX_PINNED} (also: "Hey {name}, remember that ..." / "forget ..."):'
+        box, self.pinned = _list_box(pinned, title, add=True)
         lay.addWidget(box)
         box, self.notes = _list_box(notes, "Recent notes they took on their own:")
         lay.addWidget(box)

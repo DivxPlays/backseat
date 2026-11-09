@@ -542,6 +542,27 @@ with tempfile.TemporaryDirectory() as d:
     win.save()
     assert m.d["pinned"] == ["I hate snipers", "Birthday is in March"] and json.loads(Path(d, "memory.json").read_text(encoding="utf-8"))["pinned"][-1] == "Birthday is in March"
 
+# 500 pinned facts: the cap holds without dropping any, only relevant ones are sent, and Vorn and Mika see the same memory
+import memory as memory_mod  # noqa: E402
+
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    for i in range(memory_mod.MAX_PINNED - 1):
+        assert m.pin(f"Fact number {i} about crate {i}")
+    assert m.pin("My favorite sniper rifle is the M40A3")  # the 500th fits
+    assert not m.pin("One fact too many") and len(m.d["pinned"]) == 500 and m.d["pinned"][0] == "Fact number 0 about crate 0"
+    m.d["pinned"].insert(3, m.d["pinned"].pop())  # bury the rifle fact among the old ones
+    shown = m.relevant_pinned("what's my favorite sniper rifle again")
+    assert "My favorite sniper rifle is the M40A3" in shown and len(shown) <= memory_mod.SHOW_PINNED, len(shown)
+    assert m.d["pinned"][-1] in shown  # the newest always come along
+    m.save()
+    for preset in ("vorn", "mika"):
+        real_preset, config.PRESET = config.PRESET, preset
+        ctx = Memory(Path(d, "memory.json")).context("iw3mp.exe", "Call of Duty 4", None, 0, query="what's my favorite sniper rifle")
+        config.PRESET = real_preset
+        assert "My favorite sniper rifle is the M40A3" in ctx and "more facts are stored" in ctx, preset
+        assert ctx.count("\n- Fact number") < 45, preset  # not all 500 in one message
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
