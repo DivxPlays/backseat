@@ -375,7 +375,6 @@ server.shutdown()
 
 # Discord calls: devices by name, "remember my voice", voice matching, friend notes, VoiceMeeter routes, swearing
 import senses  # noqa: E402
-import voicemeeter  # noqa: E402
 import voices  # noqa: E402
 
 fake_devices = [{"name": "Microphone (HyperX Cloud Alpha ", "hostapi": 0, "max_input_channels": 1, "max_output_channels": 0},
@@ -418,9 +417,6 @@ clip = np.zeros(16000 * 2, np.float32)
 assert main.Companion.who(comp, "remember my voice, I'm Mike", clip) == ("mike", True)
 assert main.Companion.who(comp, "roast him, he's trash", clip) == ("mike", False)  # known by his voice now
 assert main.Companion.who(comp, "short", np.zeros(100, np.float32)) == (None, False)  # too short to tell
-assert voicemeeter.routes(2) == {"Strip[0].A1": 0, "Strip[0].B1": 1, "Strip[0].B2": 0, "Strip[3].A1": 1, "Strip[3].B1": 0,
-                                 "Strip[3].B2": 1, "Strip[4].A1": 1, "Strip[4].B1": 1, "Strip[4].B2": 0}
-assert set(voicemeeter.routes(3)) == {k.replace("[3]", "[5]").replace("[4]", "[6]") for k in voicemeeter.routes(2)}
 swear = config.SWEAR
 config.SWEAR = True
 assert "swear freely" in brain.system() and "Never slurs" in brain.system()

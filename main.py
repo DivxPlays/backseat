@@ -46,7 +46,7 @@ import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, make_character, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
-from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, save_clip, save_moment  # noqa: E402
+from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, find_device, game_display, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
 user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
@@ -366,7 +366,8 @@ class Companion:
         self.started = self.awake = True
         if config.WAKE_WORD:  # the mic only opens once he's awake
             self.listeners.append(WakeListener(self.ears, self.voice, self.wake_heard, config.MIC_DEVICE))
-        if config.FRIENDS_DEVICE:  # his second ear, on your friends' voices from Discord
+        if config.FRIENDS_DEVICE and find_device(config.FRIENDS_DEVICE, "input") is not None:  # his ear on your friends' voices
+            # (never on a missing device: the fallback would be your own mic, and he'd hear you twice)
             self.listeners.append(WakeListener(self.ears, self.voice, self.friend_heard, config.FRIENDS_DEVICE))
         for listener in self.listeners:
             threading.Thread(target=listener.run, daemon=True).start()

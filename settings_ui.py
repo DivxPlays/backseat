@@ -5,12 +5,10 @@ import threading
 from pathlib import Path
 
 import keyboard
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QHBoxLayout,
                                QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 import config
-import voicemeeter
 from senses import device_names
 
 FILE = Path(__file__).with_name("settings.json")
@@ -146,14 +144,12 @@ class SettingsWindow(QDialog):
         w["MIC_DEVICE"] = _combo([""] + device_names("input"), config.MIC_DEVICE, editable=True)
         w["VOICE_DEVICE"] = _combo([""] + device_names("output"), config.VOICE_DEVICE, editable=True)
         w["FRIENDS_DEVICE"] = _combo([""] + device_names("input"), config.FRIENDS_DEVICE, editable=True)
-        route = QPushButton("Set up VoiceMeeter for Discord")
-        route.clicked.connect(lambda: self.setup_voicemeeter(w))
         w["CAMERA"] = _combo(["off", "current", "both"], config.CAMERA)
         w["CAMERA_BACKGROUND"] = _combo(["dark", "green", "game", "webcam"], config.CAMERA_BACKGROUND)
         w["CAMERA_WEBCAM"] = _combo([""] + webcams(), config.CAMERA_WEBCAM, editable=True)
-        audio = self._page([("", route), ("Your mic (blank = default)", w["MIC_DEVICE"]),
-                            ("His voice (blank = default)", w["VOICE_DEVICE"]),
-                            ("Friends' voices (blank = off)", w["FRIENDS_DEVICE"]),
+        audio = self._page([("Your mic (blank = default)", w["MIC_DEVICE"]),
+                            ("Their voice (blank = default)", w["VOICE_DEVICE"]),
+                            ("Friends' voices from a call (blank = off)", w["FRIENDS_DEVICE"]),
                             ("Discord camera (\"OBS Virtual Camera\")", w["CAMERA"]),
                             ("Camera background", w["CAMERA_BACKGROUND"]),
                             ("Your real webcam (blank = first one)", w["CAMERA_WEBCAM"])])
@@ -198,30 +194,11 @@ class SettingsWindow(QDialog):
     def test_voice(self, voice, rate, pitch):
         def run():
             try:
-                self.voice.play(self.voice.synth("So this is how I'll sound. Pathetic, grunt.", voice, f"{rate:+d}%", f"{pitch:+d}Hz"))
+                self.voice.play(self.voice.synth("So this is how I sound. Try to keep up.", voice, f"{rate:+d}%", f"{pitch:+d}Hz"))
             except Exception as e:  # unknown voice name or no internet
                 print("voice test failed:", e)
 
         threading.Thread(target=run, daemon=True).start()
-
-    def setup_voicemeeter(self, w):
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        try:
-            voicemeeter.setup()
-        except RuntimeError as e:
-            QApplication.restoreOverrideCursor()
-            QMessageBox.warning(self, "VoiceMeeter", str(e))
-            return
-        QApplication.restoreOverrideCursor()
-        w["VOICE_DEVICE"].setCurrentText(voicemeeter.VOICE)
-        w["FRIENDS_DEVICE"].setCurrentText(voicemeeter.FRIENDS)
-        QMessageBox.information(self, "VoiceMeeter is routed", (
-            "Three things left:\n\n"
-            "1. In the VoiceMeeter window: click HARDWARE INPUT 1 and pick your mic, then click A1 (top right) and pick your headset.\n\n"
-            f"2. In Discord > User Settings > Voice & Video: Input Device = {voicemeeter.DISCORD_MIC}, "
-            f"Output Device = {voicemeeter.DISCORD_OUT}.\n\n"
-            "3. Below, set \"Your mic\" to your real microphone, then Save & restart.\n\n"
-            f"VoiceMeeter has to be running during calls. Each friend says \"Hey {config.NAME}, remember my voice, I'm <name>\" once."))
 
     def values(self):
         return {name: get() for name, get in self.get.items()}

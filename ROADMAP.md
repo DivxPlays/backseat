@@ -40,7 +40,7 @@
 - Discord camera: the current character or both as "OBS Virtual Camera", lip-synced with subtitles; backgrounds dark, green, game screen or real webcam. (Both talking to each other comes with duo mode.)
 - Mika (1.2.0): original yandere gamer girl, four outfits, Lovesick power-up, Alpha voice; characters as presets (1.1.0); About and version number (1.0.0).
 - Local Kokoro voices (Michael for Vorn), snappier and fresher automatic comments, questions no longer cut off by pauses.
-- Discord calls through VoiceMeeter: his voice in the call, a second ear for friends, voice fingerprints to tell them apart, running jokes per friend, one-click VoiceMeeter routing, optional swearing.
+- Discord: friends see and hear him through your whole-screen stream; a second ear for friends with voice fingerprints and running jokes per friend; optional swearing. (VoiceMeeter routing was removed in favour of this.)
 - Free local model (qwen3-vl 8B through Ollama) for automatic comments, with Claude when you talk to him; it only comments, Claude keeps score.
 - Bloodfire: flaming hair, white-hot eyes, molten armor cracks, crimson aura; on epic plays, two wins in a row, and reaching 100 respect.
 - Full body with poses by mood (crossed arms, fist, hands on hips, hands up, lecturing finger) and a slump when you lose.
