@@ -1,6 +1,7 @@
 """Weekly highlights page: the last 7 days of the Hall of Shame, with his captions, voice clips and your stats."""
 import html
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import quote
 
 import config
@@ -20,13 +21,30 @@ h1 span { color:var(--gold); }
 .stat small { color:var(--dim); }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:18px; }
 figure { margin:0; background:var(--card); border:1px solid #3a2e33; border-radius:14px; overflow:hidden; }
-figure img { display:block; width:100%; height:auto; }
+figure img, figure video { display:block; width:100%; height:auto; background:#000; }
 figcaption { padding:12px 16px 4px; }
 figcaption q { display:block; font-weight:600; quotes:"\\201C" "\\201D"; }
 .when { display:block; color:var(--dim); font-size:13px; margin-bottom:4px; }
 audio { width:calc(100% - 32px); margin:8px 16px 16px; }
 .empty { color:var(--dim); font-style:italic; }
 """
+
+
+SYNC = """<script>
+// a clip plays with the roast laid over its end: the roast starts so it finishes with the clip
+document.querySelectorAll("figure video").forEach(v => {
+  const a = v.parentElement.querySelector("audio");
+  if (!a) return;
+  a.preload = "auto";
+  const start = () => Math.max(0, v.duration - (a.duration || 4) - 1);
+  v.addEventListener("timeupdate", () => {
+    const t = v.currentTime - start();
+    if (!v.paused && a.paused && t >= 0 && t < (a.duration || 4) - 0.2) { a.currentTime = t; a.play(); }
+  });
+  v.addEventListener("pause", () => a.pause());
+  v.addEventListener("seeked", () => a.pause());
+});
+</script>"""
 
 
 def build(d, folder):
@@ -48,7 +66,10 @@ def build(d, folder):
     for e in entries:
         when = datetime.fromisoformat(e["when"]).strftime("%a %b %d, %I:%M %p")
         audio = f'<audio controls preload="none" src="{quote(e["clip"])}"></audio>' if e.get("clip") and (folder / e["clip"]).exists() else ""
-        cards.append(f'<figure><img src="{quote(e["file"])}" alt="" loading="lazy"><figcaption>'
+        video = e.get("video") and Path(e["video"]).exists()  # auto-clips: the moment itself, with the roast over its end
+        shot = (f'<video controls preload="metadata" poster="{quote(e["file"])}" src="{Path(e["video"]).as_uri()}"></video>' if video
+                else f'<img src="{quote(e["file"])}" alt="" loading="lazy">')
+        cards.append(f'<figure>{shot}<figcaption>'
                      f'<span class="when">{html.escape(when)} &middot; {html.escape(e.get("game", ""))}</span>'
                      f'<q>{html.escape(e["caption"])}</q></figcaption>{audio}</figure>')
     body = "".join(cards) or '<p class="empty">Nothing worth framing this week. Either you played flawlessly, or you barely played at all.</p>'
@@ -57,7 +78,7 @@ def build(d, folder):
             f'<h1><span>{html.escape(config.NAME)}\'s</span> Hall of Shame</h1>'
             f'<p class="sub">{week_ago:%b %d} to {now:%b %d}. Score this week: {html.escape(tally(events))}.</p>'
             '<div class="stats">' + "".join(f"<div class=\"stat\"><b>{html.escape(v)}</b><small>{html.escape(k)}</small></div>" for v, k in stats)
-            + f'</div><div class="grid">{body}</div></main></body></html>')
+            + f'</div><div class="grid">{body}</div></main>{SYNC}</body></html>')
     folder.mkdir(exist_ok=True)
     path = folder / "this week.html"
     path.write_text(page, encoding="utf-8")

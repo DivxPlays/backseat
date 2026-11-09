@@ -170,6 +170,34 @@ def save_moment(pairs, point, caption, folder):
     return path
 
 
+def videos_folder():
+    """Your Windows Videos folder (where Game Bar and NVIDIA save clips by default), even when it's been moved."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as k:
+            return Path(os.path.expandvars(winreg.QueryValueEx(k, "My Video")[0]))
+    except OSError:
+        return Path.home() / "Videos"
+
+
+def new_clip(folder, since, timeout=25.0, step=1.0):
+    """The video a capture tool saves after `since` (time.time()) in `folder` or up to two folders down (Game Bar's
+    Captures, NVIDIA's per-game folders), once it's done writing; None if none comes within `timeout` s."""
+    sizes, end = {}, time.time() + timeout
+    while time.time() < end:
+        for p in [p for pattern in ("*.mp4", "*/*.mp4", "*/*/*.mp4") for p in folder.glob(pattern)]:
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            if st.st_mtime >= since - 1:
+                if st.st_size and sizes.get(p) == st.st_size:  # (the same size twice: written)
+                    return p
+                sizes[p] = st.st_size
+        time.sleep(step)
+    return None
+
+
 def find_device(name, kind):
     """Index of the input or output device whose name contains `name` (any case); None = the Windows default.
     Only MME devices: they accept any sample rate. MME cuts names at 31 characters, so a cut name also matches."""

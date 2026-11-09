@@ -61,7 +61,8 @@ from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
 from memory import (SHAME, Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen,  # noqa: E402
                     gpu_load, idle_seconds, is_game, steam_app, steam_hours, week as memory_week)
-from senses import SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
+from senses import (SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, new_clip,  # noqa: E402
+                    save_clip, save_moment, videos_folder)
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
 user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
@@ -676,6 +677,7 @@ class Companion:
         self.menu_at, self.last_game = -999.0, time.monotonic()  # mini-games: when they last saw a menu, and last played
         self.trivia = self.dare = None  # the trivia question waiting for your answer; the challenge for your next match
         self.dodged = ""  # a challenge that ran out, for their next line
+        self.videos, self.clip_warned = {}, False  # auto-clips: {Hall of Shame moment: its video}; told you clips are off
         self.profiling = set()  # games already queued for a lookup this session
         self.last_game_seen = None  # (key, name): for tray > Look up this game again (the tray itself takes the front)
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
@@ -1270,6 +1272,8 @@ class Companion:
         if out.get("save_moment") and shot and time.monotonic() - self.last_shame > 60:
             self.last_shame = time.monotonic()
             shame = save_moment(shot[2], self.focus, turns[0][2], HALL)
+            if config.CLIP_KEY and self.current_game():  # auto-clips: the last 30 seconds of the game, too
+                threading.Thread(target=self.capture_clip, args=(shame.name,), daemon=True).start()
         if out.get("event") == "loss" and kind != "breakdown" and not self.muted and time.monotonic() - self.last_breakdown > 180:
             self.last_breakdown = time.monotonic()
             self.jobs.put(("breakdown", None))
@@ -1389,12 +1393,33 @@ class Companion:
         self.mem.save()
         logging.info("folded %d old notes into the long-term profile ($%.4f)", len(old), spent)
 
+    def capture_clip(self, moment):
+        """Auto-clips: press the capture tool's "save what just happened" key (CLIP_KEY) and give the video it saves to this
+        Hall of Shame moment (a screenshot's name). The video stays where the tool put it (your Videos folder)."""
+        since = time.time()
+        try:
+            keyboard.send(config.CLIP_KEY)
+        except ValueError:
+            return logging.warning("auto-clips: %r isn't a key", config.CLIP_KEY)
+        video = new_clip(videos_folder(), since)
+        if video is None:
+            logging.info("auto-clips: no clip was saved for %s", moment)
+            if not self.clip_warned:  # (once a session)
+                self.clip_warned = True
+                self.bridge.note.emit("(no clip saved: turn on Windows Settings > Gaming > Captures > Record what happened)"
+                                      if "windows" in config.CLIP_KEY else "(no clip saved: turn on NVIDIA Instant Replay, Alt+Z)")
+            return
+        self.videos[moment] = str(video)  # (in case its Hall of Shame entry isn't written yet)
+        if self.mem.hall_video(moment, str(video)):
+            self.mem.save()
+        logging.info("auto-clips: %s", video)
+
     def hall_entry(self, path, line, game, audio):
         clip = path.with_suffix(".wav") if audio is not None else None
         if clip:
             save_clip(clip, audio)
         self.mem.add_hall({"file": path.name, "clip": clip.name if clip else None, "caption": line, "game": game,
-                           "when": datetime.now().isoformat(timespec="minutes")})
+                           "when": datetime.now().isoformat(timespec="minutes"), "video": self.videos.pop(path.name, None)})
         self.mem.save()
         logging.info("hall of shame: %s", path)
 

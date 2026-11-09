@@ -254,6 +254,44 @@ with tempfile.TemporaryDirectory() as d:
                 "when": __import__("datetime").datetime.now().isoformat(timespec="minutes")})
     page = highlights.build(m.d, hall).read_text(encoding="utf-8")
     assert "Grenade, meet feet." in page and "a%20b.wav" in page and "ladder" not in page and "2 deaths" in page
+    assert "<video" not in page  # no clip: the screenshot
+
+    # auto-clips: the capture tool's save key, the video it writes (once it's done writing), given to the moment; the
+    # highlights page plays it with the roast over its end (a clip that's gone: the screenshot again)
+    import senses as senses_mod  # noqa: E402
+    import threading  # noqa: E402
+    import time  # noqa: E402
+
+    videos = Path(d, "Videos")
+    (videos / "Captures").mkdir(parents=True)
+    (videos / "old.mp4").write_bytes(b"x" * 10)
+    os.utime(videos / "old.mp4", (0, 0))  # from long ago
+    since = time.time()
+    assert senses_mod.new_clip(videos, since, timeout=0.2, step=0.05) is None  # nothing new
+    threading.Timer(0.1, lambda: (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").write_bytes(b"v" * 500)).start()
+    assert senses_mod.new_clip(videos, since, timeout=3, step=0.05).name == "CoD4 2026-11-09 01-30-00.mp4"
+    assert isinstance(senses_mod.videos_folder(), Path)
+    pressed, real_send, real_new, real_folder = [], main.keyboard.send, main.new_clip, main.videos_folder
+    main.keyboard.send, main.videos_folder = pressed.append, (lambda: videos)
+    try:
+        notes = []
+        clipper = SimpleNamespace(videos={}, clip_warned=False, mem=m, bridge=SimpleNamespace(note=SimpleNamespace(emit=notes.append)))
+        main.new_clip = lambda folder, since: videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4"
+        main.Companion.capture_clip(clipper, "a b.jpg")  # its Hall of Shame entry is already there
+        assert pressed == [config.CLIP_KEY] and m.d["hall"][-1]["video"].endswith("01-30-00.mp4")
+        main.Companion.capture_clip(clipper, "later.jpg")  # its entry comes after: hall_entry picks the video up
+        assert clipper.videos["later.jpg"].endswith("01-30-00.mp4")
+        main.new_clip = lambda folder, since: None  # the capture tool is off: told once
+        main.Companion.capture_clip(clipper, "x.jpg")
+        main.Companion.capture_clip(clipper, "y.jpg")
+        assert len(notes) == 1 and "Record what happened" in notes[0] and clipper.clip_warned
+    finally:
+        main.keyboard.send, main.new_clip, main.videos_folder = real_send, real_new, real_folder
+    page = highlights.build(m.d, hall).read_text(encoding="utf-8")
+    assert "<video" in page and (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").as_uri() in page
+    assert 'poster="a%20b.jpg"' in page and "a.play()" in page
+    (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").unlink()
+    assert "<video" not in highlights.build(m.d, hall).read_text(encoding="utf-8")
 
 assert time_mood(__import__("datetime").datetime(2026, 11, 8, 3)).startswith("unhinged")
 assert [tier_for(r) for r in (0, 24, 25, 50, 75, 100)] == [0, 0, 1, 2, 3, 3]

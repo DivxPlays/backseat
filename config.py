@@ -107,6 +107,8 @@ WHISPER_MODEL = "base.en"  # speech-to-text model; "small.en" is more accurate b
 
 MONTHLY_BUDGET = 100  # dollars of API use per month: cheap mode at 80%, only answers when asked at 100% (0 = no limit)
 DUCK_TO = 0.35  # while he talks, other apps' volume drops to this fraction (1 = don't lower it)
+CLIP_KEY = "windows+alt+g"  # auto-clips: the key that saves "what just happened" in a game: Windows Game Bar's (needs
+# Settings > Gaming > Captures > Record what happened) or "alt+f10" for NVIDIA Instant Replay; "" = no clips
 GAMES = []  # exe names of games they can't spot by themselves (Steam, Game Bar, launcher folders and fullscreen they do), e.g. ["valorant.exe"]
 
 # Anything saved from the Settings window overrides the defaults above (unknown or broken entries are ignored), then the

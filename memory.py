@@ -327,6 +327,15 @@ class Memory:
                 self.d["spend_level"][month()] = level
         return level, new
 
+    def hall_video(self, file, video):
+        """The clip saved for the Hall of Shame moment `file` (a screenshot's name)."""
+        with self.lock:
+            for e in reversed(self.d["hall"]):
+                if e.get("file") == file:
+                    e["video"] = video
+                    return True
+        return False
+
     def add_hall(self, entry):
         with self.lock:
             self.d["hall"] = (self.d["hall"] + [entry])[-500:]

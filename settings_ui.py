@@ -353,9 +353,12 @@ class SettingsWindow(QDialog):
             keys.append((label, w[name]))
         w["MONITOR"] = _combo(["all", "1", "2", "3"], str(config.MONITOR), editable=True)
         skip, games = QLineEdit(", ".join(config.SKIP_DISPLAYS)), QLineEdit(", ".join(config.GAMES))
+        w["CLIP_KEY"] = QLineEdit(config.CLIP_KEY)
         displays = self._page(keys + [("Displays to watch (all, or a number)", w["MONITOR"]),
                                       ("Displays to never look at (comma separated)", skip),
-                                      ("Games they miss (exe names)", games)])
+                                      ("Games they miss (exe names)", games),
+                                      ("Auto-clips: the key that saves what just happened\n(Game Bar windows+alt+g, NVIDIA alt+f10; "
+                                       "blank = off)", w["CLIP_KEY"])])
 
         w["MIC_DEVICE"] = _combo([""] + device_names("input"), config.MIC_DEVICE, editable=True)
         w["VOICE_DEVICE"] = _combo([""] + device_names("output"), config.VOICE_DEVICE, editable=True)
@@ -433,6 +436,11 @@ class SettingsWindow(QDialog):
                 keyboard.parse_hotkey(v[name])
             except ValueError:
                 bad.append(f'"{v[name]}" isn\'t a key I recognize ({label}).')
+        if v["CLIP_KEY"].strip():
+            try:
+                keyboard.parse_hotkey(v["CLIP_KEY"])
+            except ValueError:
+                bad.append(f'"{v["CLIP_KEY"]}" isn\'t a key I recognize (auto-clips).')
         if v["MONITOR"] != "all" and not v["MONITOR"].isdigit():
             bad.append('Displays to watch must be "all" or a number.')
         if v["BIRTHDAY"].strip() and not holidays.birthday_of(v["BIRTHDAY"]):
