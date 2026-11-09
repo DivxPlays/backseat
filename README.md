@@ -51,8 +51,8 @@ Backseat drivers, but for your gaming: an animated, full-body character in the c
 ## Setup
 
 1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
-2. Get the code: on the repo page (https://github.com/DivxPlays/backseat, public, no account needed) click **Code > Download ZIP** and extract it, or `git clone` it.
-3. Double-click **Install Backseat.bat**. It:
+2. Get it from the [latest release](https://github.com/DivxPlays/backseat/releases/latest) (no account needed): either download **Install-Backseat.bat** alone and double-click it (it downloads the rest itself), or download **Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. Developers can `git clone` the repo instead.
+3. The installer:
    - installs Python 3.12 if it's missing (through winget),
    - puts it in `%LOCALAPPDATA%\Programs\Backseat` (an older install in `Programs\Vorn` is moved there, memory and all),
    - installs everything he needs (a few minutes the first time),
