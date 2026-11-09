@@ -235,5 +235,43 @@ except SystemExit:
 time.sleep, _ = real_sleep, logging.disable(logging.NOTSET)
 assert len(watch_calls) == 2, watch_calls  # the watcher came back after the failed screenshot
 
+# moving his memory to another PC: export, import (with a backup first), and nothing escapes his folder
+import zipfile  # noqa: E402
+
+import transfer  # noqa: E402
+
+with tempfile.TemporaryDirectory() as old_pc, tempfile.TemporaryDirectory() as new_pc:
+    old, new = Path(old_pc), Path(new_pc)
+    (old / "memory.json").write_text('{"respect": 77}', encoding="utf-8")
+    (old / "battle reports.txt").write_text("report", encoding="utf-8")
+    (old / "Hall of Shame").mkdir()
+    (old / "Hall of Shame" / "fail.jpg").write_bytes(b"jpg")
+    export = transfer.export_memory(old, old / "export.zip")
+    (new / "memory.json").write_text('{"respect": 3}', encoding="utf-8")
+    backup = transfer.import_memory(new, export)
+    assert json.loads((new / "memory.json").read_text(encoding="utf-8")) == {"respect": 77}
+    assert (new / "Hall of Shame" / "fail.jpg").read_bytes() == b"jpg" and (new / "battle reports.txt").exists()
+    assert json.loads(zipfile.ZipFile(backup).read("memory.json")) == {"respect": 3}  # the memory it replaced
+    with zipfile.ZipFile(new / "evil.zip", "w") as z:
+        z.writestr("memory.json", "{}")
+        z.writestr("Hall of Shame/../../escaped.txt", "x")
+        z.writestr("Hall of Shame\\..\\..\\escaped2.txt", "x")
+        z.writestr("api_key.txt", "x")
+    (new / "sub").mkdir()
+    transfer.import_memory(new / "sub", new / "evil.zip")
+    assert not any((new / n).exists() for n in ("escaped.txt", "escaped2.txt", "sub/api_key.txt"))
+    with zipfile.ZipFile(new / "notvorn.zip", "w") as z:
+        z.writestr("photo.jpg", "x")
+    try:
+        transfer.import_memory(new, new / "notvorn.zip")
+        raise AssertionError("imported a zip with no memory.json")
+    except ValueError:
+        pass
+    frozen = Memory(new / "memory.json")
+    frozen.frozen = True
+    frozen.d["respect"] = 1
+    frozen.save()
+    assert json.loads((new / "memory.json").read_text(encoding="utf-8")) == {"respect": 77}  # no save over an import
+
 print("all self-checks passed", flush=True)
 os._exit(0)  # same exit as main.py: skip Qt's teardown order

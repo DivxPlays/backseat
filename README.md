@@ -21,7 +21,7 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 | F7 | pause / resume watching (falling chime = stopped, rising = watching). Use it before opening anything private |
 | F4 | shut-up mode: he keeps watching and keeping score, but only talks when you talk to him |
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
-| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, open Settings, turn on Start with Windows, or quit |
+| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, open Settings, turn on Start with Windows, or quit |
 
 ## How it behaves
 
@@ -75,5 +75,12 @@ Right-click the tray icon > **Settings...** to change his name, voice (with a Te
 ## What's on GitHub
 
 The code, this README and [ROADMAP.md](ROADMAP.md) (planned features). Your API key, his memory of you, your settings, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
+
+## Moving him to another PC
+
+1. On the old PC: tray > **Export memory...** saves one `.zip` with his memory, battle reports and the Hall of Shame.
+2. Set him up on the new PC (see Setup), then tray > **Import memory...** and pick the `.zip`. He backs up the memory he had there (`memory backup <date>.zip` in his folder) and restarts with yours.
+
+Your settings and API key aren't in the export; set those up on the new PC.
 
 If something breaks, look at `companion.log`. Run `.venv\Scripts\python test_selfcheck.py` to check the parts that work without the internet.

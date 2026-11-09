@@ -46,6 +46,7 @@ class Memory:
     def __init__(self, path=FILE):
         self.path = Path(path)
         self.lock = threading.Lock()
+        self.frozen = False  # True after importing another PC's memory: nothing may save over it before the restart
         try:
             self.d = json.loads(self.path.read_text(encoding="utf-8"))
         except FileNotFoundError:
@@ -147,11 +148,12 @@ class Memory:
                 f"Score: {tally(s.get('events', {}))}.\nWhat was said:\n" + ("\n".join(s.get("lines", [])) or "(nothing)"))
 
     def save(self):
-        with self.lock:
-            text = json.dumps(self.d, indent=1)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, self.path)  # atomic: a crash mid-save can't wipe your history
+        with self.lock:  # held while writing, so a save already under way can't overwrite an imported memory
+            if self.frozen:
+                return
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self.d, indent=1), encoding="utf-8")
+            os.replace(tmp, self.path)  # atomic: a crash mid-save can't wipe your history
 
     def context(self, app, title, steam, streak):
         with self.lock:

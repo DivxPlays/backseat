@@ -33,11 +33,12 @@ import anthropic  # noqa: E402
 import keyboard  # noqa: E402
 from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, Signal  # noqa: E402
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLineEdit, QMenu, QSystemTrayIcon, QWidget  # noqa: E402
+from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMenu, QMessageBox, QSystemTrayIcon, QWidget  # noqa: E402
 
 import brain  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
+import transfer  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from character import H as CH, W as CW, Vorn, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
@@ -572,6 +573,30 @@ def main():
             page = highlights.build(comp.mem.d, HALL)
         os.startfile(page)
 
+    def export_memory():
+        path, _ = QFileDialog.getSaveFileName(None, f"Export {config.NAME}'s memory",
+                                              str(Path.home() / f"{config.NAME} memory {datetime.now():%Y-%m-%d}.zip"), "Zip (*.zip)")
+        if path:
+            comp.mem.save()
+            transfer.export_memory(HERE, path)
+            overlay.note("(memory exported: copy the .zip to your other PC and import it there)")
+
+    def import_memory():
+        path, _ = QFileDialog.getOpenFileName(None, f"Import {config.NAME}'s memory", str(Path.home()), "Zip (*.zip)")
+        if not path or QMessageBox.question(None, "Import memory", f"Replace {config.NAME}'s memory with this one? Your current memory "
+                                            "is backed up in his folder first, then he restarts.") != QMessageBox.Yes:
+            return
+        comp.mem.save()  # the backup gets everything up to now
+        with comp.mem.lock:
+            comp.mem.frozen = True  # from here until the restart, nothing may save over the imported memory
+        try:
+            transfer.import_memory(HERE, path)
+        except Exception as e:  # not a zip, not his, unreadable
+            comp.mem.frozen = False
+            QMessageBox.warning(None, "Import memory", f"That file isn't a memory export from {config.NAME}.\n\n{e}")
+            return
+        restart()
+
     settings = SettingsWindow(restart, comp.voice)
     windows = {}
 
@@ -607,6 +632,8 @@ def main():
     menu.addAction("Open this week's highlights").triggered.connect(weekly)
     menu.addAction("Open battle reports").triggered.connect(lambda: REPORTS.exists() and os.startfile(REPORTS))
     menu.addSeparator()
+    menu.addAction("Export memory (to move him to another PC)...").triggered.connect(export_memory)
+    menu.addAction("Import memory...").triggered.connect(import_memory)
     menu.addAction("Settings...").triggered.connect(lambda: (settings.show(), settings.raise_(), settings.activateWindow()))
     boot = menu.addAction("Start with Windows (wakes up when a game starts)")
     boot.setCheckable(True)

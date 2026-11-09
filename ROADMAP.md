@@ -12,9 +12,6 @@ Planned, not built yet.
 ## Installer
 One setup file that installs him on another PC: Python, everything he needs, a Start menu shortcut, and a prompt for the API key.
 
-## Move his memory between PCs
-Export and import his memory (stats, respect, grudges, lore, notes, optionally the Hall of Shame) from the tray menu.
-
 ## Full body
 A full-body character instead of the bust, with more animations: idle stance, arms crossed, pointing at you, laughing, slumping when you lose.
 
