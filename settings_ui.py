@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, 
                                QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 import config
+import holidays
 from senses import device_names
 
 FILE = Path(__file__).with_name("settings.json")
@@ -127,6 +128,8 @@ class SettingsWindow(QDialog):
         w["WAKE_WORD"] = QCheckBox(f'Listen for "Hey {config.NAME}"')
         w["WAKE_WORD"].setChecked(config.WAKE_WORD)
         w["WAKE_LEVEL"] = _real(config.WAKE_LEVEL, 0.001, 0.5, 0.005, 3)
+        w["BIRTHDAY"] = QLineEdit(config.BIRTHDAY)
+        w["BIRTHDAY"].setPlaceholderText("month-day, like 02-10")
         w["INTERRUPT"] = QCheckBox("Talk over them and they pause to listen (needs a headset)")
         w["INTERRUPT"].setChecked(config.INTERRUPT)
         behave = self._page([("Seconds between comments", w["LOOK_COOLDOWN"]), ("Roast after this much silence", w["QUIET_ROAST"]),
@@ -134,7 +137,7 @@ class SettingsWindow(QDialog):
                              ("You're AFK after", w["AFK_AFTER"]), ("Nag to take a break after", w["BREAK_AFTER"]),
                              ("Bedtime nags from / until", bed_row), ("Minimum time between nags", w["NAG_EVERY"]),
                              ("Wake word", w["WAKE_WORD"]), ("Mic loudness that counts as speech", w["WAKE_LEVEL"]),
-                             ("Interrupting", w["INTERRUPT"])])
+                             ("Interrupting", w["INTERRUPT"]), ("Your birthday (they celebrate it)", w["BIRTHDAY"])])
 
         keys = []
         for name, label in KEYS:
@@ -220,6 +223,8 @@ class SettingsWindow(QDialog):
                 bad.append(f'"{v[name]}" isn\'t a key I recognize ({label}).')
         if v["MONITOR"] != "all" and not v["MONITOR"].isdigit():
             bad.append('Displays to watch must be "all" or a number.')
+        if v["BIRTHDAY"].strip() and not holidays.birthday_of(v["BIRTHDAY"]):
+            bad.append('Your birthday must look like 02-10 (month-day), or be blank.')
         return bad
 
     def save(self):

@@ -40,8 +40,10 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMenu, QMess
 
 import brain  # noqa: E402
 import commands  # noqa: E402
+import character  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
+import holidays  # noqa: E402
 import transfer  # noqa: E402
 import unlocks  # noqa: E402
 from camera import BACKGROUNDS, REACT, Camera  # noqa: E402
@@ -426,6 +428,7 @@ class Companion:
         if self.partner:
             self.voices_of[self.partner["NAME"]] = {k: self.partner[k] for k in ("VOICE", "VOICE_RATE", "VOICE_PITCH", "POWER")}
             self.wake_of[self.partner["NAME"]] = self.partner["WAKE_NAMES"]
+        self.check_season()  # before anyone gets dressed: in season, "Surprise me" is the holiday's look
         for p in presets():  # the outfits you've earned, before anyone gets dressed ("random" only picks from those)
             try:
                 cls = character_class(json.loads((config.PRESETS / f"{p}.json").read_text(encoding="utf-8"))["CHARACTER"])
@@ -434,6 +437,11 @@ class Companion:
             cls.earned |= set(self.mem.mind(p).get("unlocked", []))
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
+
+    def check_season(self):
+        """Today's holiday or your birthday (holidays.py): their lines, and what falls around them."""
+        self.season = holidays.today(config.BIRTHDAY)
+        character.SEASON, character.WEATHER = (self.season[0], self.season[2]) if self.season else (None, None)
 
     def preset_of(self, i):
         """The preset of the character at position i on screen (0: the current one, 1: duo mode's partner)."""
@@ -789,6 +797,8 @@ class Companion:
         if self.partner:  # duo mode: they also know what the other one remembers about you
             text += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"], query=query,
                                                     stories=alone is None or alone is self.partner)
+        if self.season:  # a holiday or your birthday
+            text += "\n" + self.season[1]
         return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
                        if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
 
@@ -894,6 +904,7 @@ class Companion:
             else:
                 self.mem.tick(app_name(*self.app[:2]), dt)
             if now - last_save > 30:
+                self.check_season()  # (midnight may have brought a holiday)
                 self.check_unlocks()
                 self.mem.save()
                 last_save = now
@@ -1099,7 +1110,7 @@ def main():
         def wear(name, dresser=dresser, choices=choices):
             set_setting(dresser.OUTFIT_SETTING, name)
             setattr(config, dresser.OUTFIT_SETTING, name)
-            dresser.outfit = name if name in dresser.OUTFITS else random.choice(dresser.wardrobe())  # "random": one now too
+            dresser.outfit = name if name in dresser.OUTFITS else dresser.surprise()  # "random": one now too (in season: the holiday look)
             for n, action in choices.items():
                 action.setChecked(n == name)
 

@@ -238,12 +238,12 @@ for v in looks.values():
     v.glance_at = v.turn_at = v.blink_at = 1e9
     v.step(1.0, 0.0)
 renders = {o: bytes(v.render().constBits()) for o, v in looks.items()}
-assert len(set(renders.values())) == len(renders) == len(Vorn.OUTFITS) == 9 and Vorn("nope").outfit in Vorn.OUTFITS
+assert len(set(renders.values())) == len(renders) == len(Vorn.OUTFITS) == 11 and Vorn("nope").outfit in Vorn.OUTFITS
 # unlockable outfits: "random" only picks what you've earned; an explicit choice still works
 saved_outfit, config.VORN_OUTFIT, saved_earned = config.VORN_OUTFIT, "random", set(Vorn.earned)
 Vorn.earned.clear()
 assert not any(Vorn().outfit in Vorn.UNLOCKS for _ in range(60)) and Vorn("gilded").outfit == "gilded"
-assert "gilded" not in Vorn.wardrobe() and len(Vorn.wardrobe()) == 5
+assert "gilded" not in Vorn.wardrobe() and len(Vorn.wardrobe()) == 7  # 5, and the 2 holiday looks
 Vorn.earned.add("gilded")
 assert "gilded" in Vorn.wardrobe() and "gilded" not in __import__("mika").Mika.earned  # each keeps their own
 Vorn.earned.clear()
@@ -722,6 +722,33 @@ main.Companion.command(fake, "Hey Vorn, wear the gold armor.")
 assert ("wear", 0, "gilded") in done
 Vorn.earned.clear()
 Vorn.earned |= saved_earned
+
+# holidays: the calendar (New Year's runs over the year's end), your birthday first, and the season's look for "Surprise me"
+import character  # noqa: E402
+import holidays  # noqa: E402
+from datetime import date as D  # noqa: E402
+
+assert holidays.today("", D(2026, 10, 31))[0] == "halloween" and "Halloween itself" in holidays.today("", D(2026, 10, 31))[1]
+assert holidays.today("", D(2026, 12, 10))[:3:2] == ("christmas", "snow") and "season" in holidays.today("", D(2026, 12, 10))[1]
+assert holidays.today("", D(2026, 12, 31))[0] == holidays.today("", D(2027, 1, 1))[0] == "new year"
+assert holidays.today("", D(2027, 2, 14))[0] == "valentine" and holidays.today("", D(2027, 3, 3)) is None
+assert holidays.today("02-10", D(2027, 2, 10))[0] == "birthday" and holidays.today("12-25", D(2026, 12, 25))[0] == "birthday"
+assert holidays.birthday_of("02-29") == (2, 29) and holidays.birthday_of("13-01") is None and holidays.birthday_of("feb 10") is None
+saved_season, saved_outfit, config.VORN_OUTFIT = (character.SEASON, character.WEATHER), config.VORN_OUTFIT, "random"
+character.SEASON = "christmas"
+assert Vorn().outfit == "yule king" and Mika("random").outfit == "holly" and Vorn("obsidian").outfit == "obsidian"  # a pick stays
+character.SEASON = None
+assert not any(Vorn().outfit in Vorn.HOLIDAY.values() for _ in range(40))  # out of season: never the holiday looks
+for weather in ("bats", "snow", "confetti", "hearts"):
+    character.WEATHER = weather
+    assert not Vorn("warlord").render().isNull() and not Mika("jacket").render().isNull()
+character.SEASON, character.WEATHER = saved_season
+config.VORN_OUTFIT = saved_outfit
+from settings_ui import SettingsWindow  # noqa: E402
+
+birthday_check = SettingsWindow(lambda: None, None)
+assert not birthday_check.problems({**birthday_check.values(), "BIRTHDAY": "02-10"})
+assert birthday_check.problems({**birthday_check.values(), "BIRTHDAY": "Feb 10"})
 
 # unlocks: what counts, the streak, and handing each one out once (announced as a job)
 import queue  # noqa: E402

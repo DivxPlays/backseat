@@ -92,6 +92,7 @@ INTERRUPT = True  # talk over him and he pauses to listen (stops if you say his 
 
 BREAK_AFTER = 90  # minutes of play without a 5-minute break before he nags you to take one
 BEDTIME = (1, 6)  # between these hours (24-hour clock) he nags you to go to sleep
+BIRTHDAY = ""  # yours, as month-day ("02-10"): they celebrate it, with confetti. Blank = they don't know it
 NAG_EVERY = 45  # minimum minutes between nags
 WHISPER_MODEL = "base.en"  # speech-to-text model; "small.en" is more accurate but slower
 

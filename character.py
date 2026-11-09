@@ -10,7 +10,7 @@ canvas the overlay sees.
 import math
 import random
 
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 
 import config
@@ -58,6 +58,15 @@ VORN_LOOKS = {
                      legs=("#3b3f36", "#1e201b"), shin=("#3b3f36", "#1e201b", "#5a5f52"), trim=("#b3202a", "#5a0c12"),
                      hem=None, tabard=None, collar="hood", collar_c=("#24222a", "#0c0b0f", "#3e3b48"),
                      gloves=("#d9a27c", "#a8694c"), boots=("#2a2420", "#120e0c")),  # a hoodie, combat trousers, bare hands
+    # holidays (worn by themselves in season when the outfit is on "Surprise me"; see holidays.py)
+    "dread king": dict(steel=("#d9d2c0", "#8a8270", "#f2ecdc"), polish="#fffaf0", trim=("#ff7a1a", "#9a3a06"),
+                       suit=("#1a1420", "#0a070c"), cape=("#2a0f3a", "#100418"), lining="#ff7a1a", tabard=("#2a0f3a", "#100418"),
+                       collar="gorget", collar_c=("#d9d2c0", "#8a8270", "#f2ecdc"), gloves=("#1a1420", "#3a3040"),
+                       boots=("#1a1420", "#0a070c")),  # Halloween: bone-white armour, pumpkin trim
+    "yule king": dict(steel=("#8e1b22", "#4a0a0f", "#c8424a"), polish="#e06a70", trim=("#f2c64d", "#9a6b12"),
+                      suit=("#1e3a26", "#0e1e12"), cape=("#1e5a32", "#0c2a16"), lining="#f4f1ea", tabard=("#f4f1ea", "#b9b2a4"),
+                      collar_c=("#f4f1ea", "#b9b2a4", "#ffffff"), gloves=("#4a0a0f", "#8e1b22"),
+                      boots=("#2a1a12", "#120a06")),  # Christmas: crimson and gold, a green cape lined in white
     # earned (see VORN_UNLOCKS)
     "shadow marshal": dict(steel=("#2f3340", "#14161d", "#5a6072"), polish="#9aa3b8", trim=("#c9ced8", "#7d8494"),
                            suit=("#1d1a24", "#0c0a10"), cape=("#3a1f5c", "#1a0c2c"), lining="#c9ced8", tabard=("#3a1f5c", "#1a0c2c"),
@@ -75,6 +84,7 @@ VORN_LOOKS = {
                    gloves=("#8a6a2a", "#c9a050"), boots=("#e8e2d4", "#9a927f")),
 }
 # outfits you earn: (what counts, how much) -- see unlocks.py
+VORN_HOLIDAY = {"halloween": "dread king", "christmas": "yule king"}  # the season's look
 VORN_UNLOCKS = {"shadow marshal": ("hours", 10), "battle-scarred": ("talks", 100), "bloodforged": ("streak", 7), "gilded": ("respect", 100)}
 
 
@@ -180,6 +190,13 @@ CHEST_CRACKS = [[(150, 326), (142, 346), (148, 362), (134, 392), (140, 414)], [(
 PAULDRON_CRACKS = [[(30, 280), (50, 272), (60, 284), (80, 276), (96, 292)], [(70, 304), (78, 290)]]
 
 
+def heart(cx, cy, s):
+    h = QPainterPath(P(cx, cy + s * 0.9))
+    h.cubicTo(P(cx - s * 1.6, cy - s * 0.1), P(cx - s * 0.8, cy - s * 1.3), P(cx, cy - s * 0.45))
+    h.cubicTo(P(cx + s * 0.8, cy - s * 1.3), P(cx + s * 1.6, cy - s * 0.1), P(cx, cy + s * 0.9))
+    return h
+
+
 def face_path():
     f = QPainterPath(P(100, 96))
     f.cubicTo(P(98, 130), P(100, 150), P(104, 162))
@@ -200,14 +217,19 @@ FUR_EDGE = [(62, 270), (70, 250), (80, 258), (88, 238), (100, 250), (108, 230), 
             (230, 250), (238, 270)]
 
 
+SEASON = None  # the holiday on today (holidays.py), set at startup: "Surprise me" picks its outfit
+WEATHER = None  # and what falls around them: "bats", "snow", "confetti" or "hearts"
+
+
 class Vorn:
     OUTFITS, OUTFIT_SETTING = VORN_OUTFITS, "VORN_OUTFIT"  # his wardrobe and the setting that picks from it
     UNLOCKS = VORN_UNLOCKS  # the ones you have to earn
+    HOLIDAY = VORN_HOLIDAY  # the ones for a holiday
     earned = set()  # which of those you've earned (set from memory at startup; "random" only picks from what you have)
 
     def __init__(self, outfit=None):
         outfit = outfit or getattr(config, self.OUTFIT_SETTING)
-        self.outfit = outfit if outfit in self.OUTFITS else random.choice(self.wardrobe())  # "random": a new look each launch
+        self.outfit = outfit if outfit in self.OUTFITS else self.surprise()  # "random": a new look each launch
         self.mood = "idle"
         self.p = dict(MOODS["idle"])
         t = self.t = random.uniform(0, 100)  # each one on their own clock: two on screen never breathe, sway or blink in step
@@ -236,6 +258,13 @@ class Vorn:
     def wardrobe(cls):
         """The outfits you can pick: the free ones and the ones you've earned."""
         return sorted(o for o in cls.OUTFITS if o not in cls.UNLOCKS or o in cls.earned)
+
+    @classmethod
+    def surprise(cls):
+        """"Surprise me": the holiday's look in season, otherwise any you have (holiday looks wait for their season)."""
+        if cls.HOLIDAY.get(SEASON):
+            return cls.HOLIDAY[SEASON]
+        return random.choice([o for o in cls.wardrobe() if o not in cls.HOLIDAY.values()])
 
     def bloodfire(self, seconds):
         """Power up into Bloodfire for a while; it ignites fast and cools down slowly."""
@@ -372,6 +401,7 @@ class Vorn:
             g.setBrush(QBrush(glow))
             g.drawEllipse(P(0, 0), 520, 520)
             g.restore()
+        self._weather(g)
         self._aura(g, p["aura"])
         self._cape(g)
         self._legs(g)
@@ -439,6 +469,46 @@ class Vorn:
     def kit(self):
         """The current outfit: colours and pieces (see VORN_LOOKS)."""
         return self.OUTFITS[self.outfit]
+
+    def _weather(self, g):
+        """Holidays: bats (Halloween), snow (Christmas), confetti (New Year's, your birthday) or hearts (Valentine's),
+        drifting around them. Each character's own, from their own clock."""
+        kind, t = WEATHER, self.t
+        if not kind:
+            return
+        g.save()
+        g.setPen(Qt.NoPen)
+        for i in range({"snow": 30, "confetti": 34, "bats": 6, "hearts": 12}[kind]):
+            if kind == "bats":  # flapping across, with orange eyes
+                x = (t * (38 + i * 7) + i * 131) % 470 - 85
+                y = 90 + (i * 157) % 520 + math.sin(t * 2.6 + i) * 22
+                flap = math.sin(t * 13 + i * 2) * 13
+                g.setPen(pen(QColor("#b48ad8"), 1.6))  # a light rim: they show on a dark game too
+                g.setBrush(QBrush(QColor("#3a1a52")))
+                for side in (-1, 1):
+                    g.drawPath(poly((x, y), (x + side * 34, y - 9 - flap), (x + side * 20, y + 3), (x + side * 40, y + 6 - flap * 0.6)))
+                g.drawEllipse(P(x, y + 1), 9, 12)
+                g.setPen(Qt.NoPen)
+                g.setBrush(QBrush(QColor("#ff8a1f")))
+                for side in (-1, 1):
+                    g.drawEllipse(P(x + side * 3.5, y - 2), 2, 2)
+                continue
+            fall = {"snow": 42, "confetti": 95, "hearts": 55}[kind] * (0.8 + (i * 37 % 10) / 25)
+            x = (i * 53) % 380 - 40 + math.sin(t * 0.9 + i * 1.7) * (14 if kind == "snow" else 8)
+            y = (t * fall + i * 97) % 1040 - 30
+            if kind == "snow":
+                g.setBrush(QBrush(QColor(255, 255, 255, 200)))
+                g.drawEllipse(P(x, y), 2.5 + i % 3, 2.5 + i % 3)
+            elif kind == "hearts":
+                fill(g, heart(x, y, 7 + i % 3), alpha(QColor("#ff4f8b"), 0.8), 0)
+            else:
+                g.save()
+                g.translate(x, y)
+                g.rotate(t * 220 + i * 40)
+                g.setBrush(QBrush(QColor(("#ff4f8b", "#3ee6ff", "#ffd34d", "#7bff6a", "#9b4dff")[i % 5])))
+                g.drawRect(QRectF(-5, -2.5, 10, 5))
+                g.restore()
+        g.restore()
 
     def _cape(self, g):
         """Cape behind him (floor-length, or shorter in some outfits), with a ragged hem that sways."""

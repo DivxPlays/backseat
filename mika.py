@@ -9,7 +9,7 @@ import math
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QRadialGradient
 
-from character import FULL_H, GOLD, INK, P, Vorn, alpha, fill, mirror, mix, pen, poly, stroke, vgrad
+from character import FULL_H, GOLD, INK, P, Vorn, alpha, fill, heart, mirror, mix, pen, poly, stroke, vgrad
 
 SKIN, SKIN_SH, BLUSH = QColor("#ffe3d3"), QColor("#f0b49c"), QColor("#ff8fb1")
 HAIR, HAIR_SH, HAIR_HI, HAIR_DEEP = QColor("#ff8cc6"), QColor("#e0559c"), QColor("#ffd0e8"), QColor("#b8327a")
@@ -45,6 +45,11 @@ OUTFITS = {
                       socks="#141119", stripe="#2ef2ff", sock_top=500, shoes="#1a1720", shoe_trim="#2ef2ff"),
     "track suit": dict(top="jacket", main="#22305e", trim="#ffffff", accent="#ff4fa3", bottom="none", low="#22305e",
                        socks="#22305e", stripe=None, sock_top=428, shoes="#ffffff", shoe_trim="#ff4fa3"),  # trousers from the jacket hem
+    # holidays (see HOLIDAY)
+    "pumpkin": dict(top="dress", main="#2a1a33", trim="#ff8a1f", accent="#9b4dff", bottom="none", low="#2a1a33", socks="#1a0f22",
+                    stripe="#ff8a1f", sock_top=600, shoes="#1a0f22", shoe_trim="#ff8a1f", head="bow"),  # Halloween
+    "holly": dict(top="dress", main="#c8102e", trim="#ffffff", accent="#1f7a3a", bottom="none", low="#c8102e", socks="#ffffff",
+                  stripe="#c8102e", sock_top=640, shoes="#1a1720", shoe_trim="#ffffff", sleeves="puff", head="bow"),  # Christmas
     # earned (see UNLOCKS)
     "night owl": dict(top="hoodie", main="#1f2a4a", trim="#8fb4ff", accent="#ffe28a", bottom="shorts", low="#141b30",
                       socks="#2a355a", stripe="#ffe28a", sock_top=700, shoes="#f5f3f7", shoe_trim="#8fb4ff"),
@@ -55,21 +60,15 @@ OUTFITS = {
     "sweetheart": dict(top="dress", main="#ffd6e6", trim="#ffffff", accent="#ff4f8b", bottom="none", low="#ffd6e6", socks="#ffffff",
                        stripe="#ff8fb1", sock_top=680, shoes="#ff8fb1", shoe_trim="#ffffff", chest_bow=True, pattern="#ff8fb1"),
 }
+HOLIDAY = {"halloween": "pumpkin", "christmas": "holly"}
 UNLOCKS = {"night owl": ("hours", 10), "idol": ("talks", 100), "crimson": ("streak", 7), "sweetheart": ("respect", 100)}
-
-
-def heart(cx, cy, s):
-    h = QPainterPath(P(cx, cy + s * 0.9))
-    h.cubicTo(P(cx - s * 1.6, cy - s * 0.1), P(cx - s * 0.8, cy - s * 1.3), P(cx, cy - s * 0.45))
-    h.cubicTo(P(cx + s * 0.8, cy - s * 1.3), P(cx + s * 1.6, cy - s * 0.1), P(cx, cy + s * 0.9))
-    return h
 
 
 class Mika(Vorn):
     SHOULDER, UPPER, FORE = (92, 248), 112, 100
 
     OUTFITS, OUTFIT_SETTING = OUTFITS, "OUTFIT"  # her wardrobe and the setting that picks from it (Vorn.__init__ chooses)
-    UNLOCKS = UNLOCKS
+    UNLOCKS, HOLIDAY = UNLOCKS, HOLIDAY
     earned = set()  # her own (not Vorn's)
 
     # ---------------------------------------------------------------- drawing
@@ -95,6 +94,7 @@ class Mika(Vorn):
             g.setBrush(QBrush(glow))
             g.drawEllipse(P(0, 0), 520, 520)
             g.restore()
+        self._weather(g)
         self._aura(g, p["aura"])
         self._back_hair(g)
         self._legs(g, o)

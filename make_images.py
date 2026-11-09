@@ -20,7 +20,8 @@ for key, value in config._DEFAULTS.items():
     setattr(config, key, value)
 config.DUO, config.CAMERA_BACKGROUND = True, "dark"
 import main  # noqa: E402
-from character import VORN_LOOKS, VORN_UNLOCKS, Vorn  # noqa: E402
+import character  # noqa: E402
+from character import VORN_HOLIDAY, VORN_LOOKS, VORN_UNLOCKS, Vorn  # noqa: E402
 from mika import UNLOCKS as MIKA_UNLOCKS, Mika  # noqa: E402
 from senses import Voice  # noqa: E402
 
@@ -67,12 +68,18 @@ def main_images():
     pose(Mika("jacket"), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-mika.png"))
     lineup([pose(Vorn("warlord"), m) for m in ("idle", "smug", "angry", "laugh")] + [pose(Vorn("warlord"), "angry", power=True)],
            "vorn.png")
-    free = [o for o in VORN_LOOKS if o not in VORN_UNLOCKS]
+    free = [o for o in VORN_LOOKS if o not in VORN_UNLOCKS and o not in VORN_HOLIDAY.values()]
     lineup([pose(Vorn(o), m) for o, m in zip(free, ("idle", "smug", "angry", "disgusted", "laugh"))], "vorn-outfits.png")
     lineup([pose(Vorn(o), m) for o, m in zip(VORN_UNLOCKS, ("smug", "angry", "disgusted", "idle"))], "vorn-unlockables.png")
     anime = ("maid", "shrine maiden", "magical girl", "yukata", "netrunner", "track suit")
     lineup([pose(Mika(o), m) for o, m in zip(anime, ("smug", "laugh", "idle", "smug", "angry", "laugh"))], "mika-anime.png")
     lineup([pose(Mika(o), m) for o, m in zip(MIKA_UNLOCKS, ("idle", "laugh", "smug", "laugh"))], "mika-unlockables.png")
+    seasons = []
+    for holiday, weather in (("halloween", "bats"), ("christmas", "snow")):  # each pair in their holiday's weather
+        character.WEATHER = weather
+        seasons += [pose(Vorn(VORN_HOLIDAY[holiday]), "smug").render(1.2), pose(Mika(Mika.HOLIDAY[holiday]), "laugh").render(1.2)]
+    character.WEATHER = None
+    backdrop(seasons, "holidays.png")
     first = ("gothic", "hoodie", "jacket", "jersey")  # her original four, then Lovesick
     lineup([pose(Mika(o), m) for o, m in zip(first, ("smug", "laugh", "idle", "angry"))] + [pose(Mika("jacket"), "smug", power=True)],
            "mika.png")
