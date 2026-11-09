@@ -43,6 +43,7 @@ import brain  # noqa: E402
 import commands  # noqa: E402
 import character  # noqa: E402
 import config  # noqa: E402
+import grudges  # noqa: E402
 import highlights  # noqa: E402
 import holidays  # noqa: E402
 import transfer  # noqa: E402
@@ -148,6 +149,7 @@ REMEMBER = re.compile(r"^(?:please\s+)?(?:remember|don'?t forget)\s+(?:that\s+|t
 FORGET = re.compile(r"^(?:please\s+)?forget\s+(?:that\s+|about\s+|this:?\s+)?(.{2,})", re.I)
 ENROLL = re.compile(r"\b(?:remember|learn|save)\s+my\s+voice\W+(?:please\W+)?(?:(?:i'?m|i am|my name is|it'?s|this is|call me)\s+)?"
                     r"(?!please\b)([a-z][a-z'-]{1,20})", re.I)
+APOLOGY = re.compile(r"\b(sorry|apologi[sz]e|my bad|forgive me)\b", re.I)  # ends a grudge
 SEARCH_ASKED = re.compile(r"\b(search|look (it |that |this )?up|google|wiki|guide|walkthrough)", re.I)
 BUDGET_NEWS = {1: "Also tell them they've burned through 80% of this month's budget on you, so you're switching to cheap mode.",
                2: "Also tell them this month's budget is gone, so from now on you only speak when they talk to you."}
@@ -440,6 +442,7 @@ class Companion:
             self.wake_of[self.partner["NAME"]] = self.partner["WAKE_NAMES"]
         self.on_screen = [config.PRESET] + ([self.partner["PRESET"]] if self.partner else [])
         self.jealous = self.jealousy()  # for the greeting: who was left out, and for whom
+        self.fresh_grudges = self.grudges_from_last_time()  # and what they're holding against you
         self.check_season()  # before anyone gets dressed: in season, "Surprise me" is the holiday's look
         for p in presets():  # the outfits you've earned, before anyone gets dressed ("random" only picks from those)
             try:
@@ -459,6 +462,30 @@ class Companion:
                 spent = " and ".join(f"{fmt(s)} alone with {preset_name(o)}" for o, s in missed.items())
                 lines.append(f"While {preset_name(p)} was away, the player spent {spent} instead.")
         return " ".join(lines)
+
+    def grudges_from_last_time(self):
+        """New grudges from how you left things with each one on screen (grudges.py); each costs respect once."""
+        now, notes = datetime.now(), []
+        with self.mem.lock:
+            for p in self.on_screen:
+                mind = self.mem.mind(p)
+                prev = [x for x in mind["sessions"] if x is not self.mem.session][-1:] if p == config.PRESET else []
+                held = grudges.active(mind.setdefault("held", []), now)
+                fresh = [g for g in grudges.new(prev[0] if prev else None, self.mem.d["last_with"].get(p), now)
+                         if g["why"] not in {h["why"] for h in held}]
+                mind["held"] = held + fresh
+                if fresh:
+                    mind["respect"] = max(0, mind["respect"] - grudges.COST * len(fresh))
+                    notes.append(f"{preset_name(p)} has a new grudge against the player for {'; and '.join(g['why'] for g in fresh)}.")
+        return " ".join(notes)
+
+    def forgive(self, preset):
+        """You apologized: their grudges end. Returns what they were for."""
+        with self.mem.lock:
+            mind = self.mem.mind(preset)
+            gone = [g["why"] for g in grudges.active(mind.get("held", []), datetime.now())]
+            mind["held"] = []
+        return gone
 
     def check_season(self):
         """Today's holiday or your birthday (holidays.py): their lines, and what falls around them."""
@@ -571,6 +598,8 @@ class Companion:
 
     def set_mute(self, on, seconds=0):
         """Shut-up mode on or off; with seconds, it ends by itself (the watcher checks)."""
+        if on and not self.muted:
+            self.mem.shush()  # too many in one session and they hold a grudge
         self.muted = on
         self.unmute_at = time.monotonic() + seconds if on and seconds else 0.0
         cue("off" if self.muted else "on")
@@ -705,10 +734,21 @@ class Companion:
                          f'with the player, says to you: "{arg}". Answer them.')
         else:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
+        if kind == "start" and self.fresh_grudges:
+            situation += (f" {self.fresh_grudges} Open with it, cold and in character, and make them work for forgiveness "
+                          "(an apology ends it).")
+            self.fresh_grudges = ""
         if kind == "start" and self.jealous:
             situation += (f" {self.jealous} Bring it up in the greeting, in character: whoever was left out is jealous, "
                           "hurt or mocking about it.")
             self.jealous = ""
+        if kind == "ask" and APOLOGY.search(arg):  # "sorry": the one you're talking to lets their grudge go
+            to_whom = addressed(arg, self.wake_of) if self.partner else None
+            i = self.names.index(to_whom) if to_whom in self.names else 0
+            gone = self.forgive(self.preset_of(i))
+            if gone:
+                situation += (f" (They're apologizing to {self.names[i]} for {'; and '.join(gone)}. {self.names[i]} lets the "
+                              "grudge go, grudgingly and in character.)")
         if kind == "ask":  # duo mode keeps "Hey Mika, " in front: "remember that ..." comes after it
             m = WakeListener.pattern([n for names in self.wake_of.values() for n in names]).match(arg)
             situation += self.memory_command(arg[m.end():] if m else arg)
@@ -829,6 +869,11 @@ class Companion:
             if rivals:
                 text += (f"\nRivals for the player's attention (they can switch you for them): {', '.join(rivals)} alone with "
                          f"the player so far; you: {fmt(alone.get(config.PRESET, 0))}. Bring it up now and then, in character.")
+        for p in self.on_screen:  # grudges they're holding
+            held = grudges.active(self.mem.mind(p).get("held", []), datetime.now())
+            if held:
+                text += (f"\n{preset_name(p)} is holding a grudge against the player for {'; and '.join(g['why'] for g in held)}. "
+                         f"Stay cold about it and bring it up now and then, until they apologize.")
         if self.season:  # a holiday or your birthday
             text += "\n" + self.season[1]
         return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"

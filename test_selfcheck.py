@@ -769,6 +769,35 @@ with tempfile.TemporaryDirectory() as d:
     config.PRESET = real_preset
 assert main.preset_name("mika") == "Mika" and main.preset_name("nobody") == "Nobody"
 
+# grudges: rage-quit after a loss, days of being ignored, too many "shut up"s; a respect hit once; an apology ends it
+import grudges  # noqa: E402
+from datetime import datetime, timedelta  # noqa: E402
+
+now = datetime(2026, 11, 20, 18, 0)
+assert [g["why"] for g in grudges.new({"loss": "death", "loss_at": 600, "seconds": 700}, None, now)] == \
+    ["rage-quitting right after a death last time"]
+assert grudges.new({"loss": "death", "loss_at": 100, "seconds": 900}, None, now) == []  # played on for 13 minutes: fine
+assert [g["why"] for g in grudges.new({"shushed": 4, "seconds": 900}, "2026-11-14T10:00", now)] == \
+    ["being told to shut up 4 times last time", "being ignored for 6 days"]
+assert grudges.new({"shushed": 2}, "2026-11-19T10:00", now) == []
+assert grudges.active([{"why": "x", "until": "2026-11-21T09:00"}, {"why": "y", "until": "2026-11-20T17:00"}], now)[0]["why"] == "x"
+assert main.APOLOGY.search("Hey Mika, I'm sorry about yesterday") and not main.APOLOGY.search("what's the sorryest gun?")
+with tempfile.TemporaryDirectory() as d:
+    real_preset, config.PRESET = config.PRESET, "vorn"
+    m = Memory(Path(d, "memory.json"))
+    m.d["respect"] = 40
+    m.session.update(loss="loss", loss_at=1000, seconds=1060, shushed=3)  # last time: lost, quit a minute later, shushed thrice
+    m.d["last_with"]["vorn"] = (datetime.now() - timedelta(days=5)).isoformat(timespec="minutes")
+    m.save()
+    m = Memory(Path(d, "memory.json"))  # the next launch
+    comp = SimpleNamespace(mem=m, on_screen=["vorn"])
+    note = main.Companion.grudges_from_last_time(comp)
+    assert "rage-quitting right after a loss" in note and "shut up 3 times" in note and "ignored for 5 days" in note, note
+    assert m.d["respect"] == 40 - 3 * grudges.COST and len(m.d["held"]) == 3
+    assert main.Companion.grudges_from_last_time(comp) == "" and len(m.d["held"]) == 3  # the same grudges don't stack
+    assert len(main.Companion.forgive(comp, "vorn")) == 3 and m.d["held"] == []  # "sorry": all forgiven
+    config.PRESET = real_preset
+
 # unlocks: what counts, the streak, and handing each one out once (announced as a job)
 import queue  # noqa: E402
 import unlocks  # noqa: E402

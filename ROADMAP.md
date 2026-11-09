@@ -4,7 +4,6 @@
 
 ### Characters
 - **Character creator:** make your own character in Settings (name, personality, voice, hair, eye and outfit colours) without touching code.
-- **Grudges that stick:** rage-quit or ignore them for days and they hold it against you next session.
 
 ### Gameplay
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
@@ -29,6 +28,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Grudges that stick: rage-quits, days of being ignored and too many "shut up"s cost respect and get a cold greeting and digs, until you apologize (or 2 days pass).
 - Jealousy across characters: they track your time alone with each; whoever was left out opens with it, and the rivalry comes up now and then.
 - Holidays: Halloween and Christmas outfits for both that switch in by themselves, bats, snow, confetti (New Year's, your birthday) and hearts (Valentine's), festive lines, and a birthday setting.
 - Real lip-sync: mouth shapes for each sound (open, wide, round, teeth), read from the voice's sound, for both characters and the Discord camera.

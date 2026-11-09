@@ -40,13 +40,13 @@ def month():
     return date.today().strftime("%Y-%m")
 
 
-MINE = ("respect", "lore", "notes", "pinned", "profile", "games", "friends", "sessions", "hall", "unlocked", "talks")  # per character; time and spend are shared
+MINE = ("respect", "lore", "notes", "pinned", "profile", "games", "friends", "sessions", "hall", "unlocked", "talks", "held")  # per character; time and spend are shared
 
 
 def fresh_mind():
     """What a character remembers before meeting you."""
     return {"respect": 10, "lore": [], "notes": [], "pinned": [], "profile": "", "games": {}, "friends": {}, "sessions": [], "hall": [],
-            "unlocked": [], "talks": 0}
+            "unlocked": [], "talks": 0, "held": []}
 
 
 def pick_pinned(pinned, query):
@@ -79,7 +79,8 @@ class Memory:
         for key, empty in (("total_seconds", 0), ("session_count", 0), ("apps", {}), ("games", {}), ("notes", []),
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
                            ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {}),
-                           ("unlocked", []), ("talks", 0), ("alone", {}), ("seen", {})):
+                           ("unlocked", []), ("talks", 0), ("alone", {}), ("seen", {}), ("held", []),
+                           ("last_with", {})):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
@@ -117,6 +118,12 @@ class Memory:
         with self.lock:
             for p in presets:
                 self.d["seen"][p] = dict(self.d["alone"])
+                self.d["last_with"][p] = datetime.now().isoformat(timespec="minutes")  # (grudges: being ignored)
+
+    def shush(self):
+        """You told them to shut up (grudges: too many in one session)."""
+        with self.lock:
+            self.session["shushed"] = self.session.get("shushed", 0) + 1
 
     def pin(self, fact):
         """Something the player asked to be remembered: kept for good (never pushed out like notes).
@@ -164,6 +171,8 @@ class Memory:
         When a friend in a voice call was talking, his note goes on that friend instead of on you."""
         with self.lock:
             g = self.d["games"].setdefault(app, {"events": {}, "notes": []})
+            if out.get("event") in ("death", "loss"):  # grudges: quitting right after this is a rage-quit
+                self.session["loss"], self.session["loss_at"] = out["event"], self.session["seconds"]
             if out.get("event") in COUNTED:
                 for score in (g["events"], self.session["events"]):
                     score[out["event"]] = score.get(out["event"], 0) + 1
