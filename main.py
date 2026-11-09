@@ -1,5 +1,6 @@
 """Vorn: an AI gaming companion that watches your screen, talks, gives hints and trash-talks you."""
 import ctypes
+import difflib
 import logging
 import os
 import queue
@@ -59,10 +60,13 @@ RUN_KEY, RUN_NAME = r"Software\Microsoft\Windows\CurrentVersion\Run", "VornCompa
 SITUATIONS = {
     "start": "The player just started you up. Greet them with a roast. If your stats include a battle report on their last session, "
              "open with its highlights; otherwise use their time stats or notes.",
-    "change": "Something changed on the player's screen. React to what you see.",
-    "quiet": "You've been quiet a while. Look at the screen and trash-talk the player: their play, their hours, or their idling.",
+    "change": "The player's screen changed. React to what is happening right now, in one short sentence (under 15 words). "
+              "Never bring up a moment you already reacted to in your recent lines; if nothing new happened, jab at something "
+              "else you see, or return an empty line to stay quiet.",
+    "quiet": "You've been quiet a while. Look at the screen and trash-talk the player in one short sentence (under 15 words): "
+             "their play, their hours, or their idling. Don't repeat a point from your recent lines.",
     "lore": "You've been quiet a while. Tell a very short story from your own conquests (stay consistent with your past), "
-            "then turn it into a jab at the player.",
+            "then turn it into a jab at the player. Under 25 words.",
     "look": "The player pressed the look hotkey. Comment on what they're looking at, or give a hint about it.",
     "nag": "It's late, or the player has gone a long time without a break (see the local time and break time in the stats). "
            "Nag them to take a break or go to sleep, as a roast.",
@@ -71,6 +75,13 @@ SITUATIONS = {
 }
 AUTO = {"change", "quiet", "lore", "nag", "breakdown"}  # jobs he starts himself; they stop when the budget runs out
 BLOODFIRE = {"bloodfire": 8, "bloodfire-max": 25}  # seconds he burns: a big play, or reaching 100 respect
+
+
+def repeats(line, recent):
+    """True if line is nearly word for word one of his last few lines."""
+    words = re.findall(r"[a-z']+", line.lower())
+    return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said[5:].lower())).ratio() > 0.6
+               for said in recent[-8:] if said.startswith("You: "))
 
 
 def bloodfire(streak, event, before, after):
@@ -491,6 +502,8 @@ class Companion:
             out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
         logging.info("%s%s ($%.4f) -> %s", kind, " (local)" if spent == 0 and local else "", spent, out)
+        if kind in AUTO and (not out["line"].strip() or repeats(out["line"], self.recent)):
+            return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again
         before = self.mem.d["respect"]
         self.mem.record(app, out, friend=speaker)
         event = "epic" if tier_for(self.mem.d["respect"]) > tier_for(before) else out.get("event", "none")  # new gear: aura flare
