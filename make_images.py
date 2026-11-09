@@ -10,7 +10,8 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"))  # else text is boxes
 
 from PIL import Image  # noqa: E402
-from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPixmap  # noqa: E402
+from PySide6.QtCore import QRect, Qt  # noqa: E402
+from PySide6.QtGui import QColor, QFont, QImage, QLinearGradient, QPainter, QPixmap  # noqa: E402
 from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
 import config  # noqa: E402
@@ -89,6 +90,35 @@ def thrown(char, angle, rag, heap=False):
     return img.scaled(int(side * 0.8), int(side * 0.8))
 
 
+def social(duo, name="social-preview.png"):
+    """GitHub's link preview (1280x640, set by hand in the repo's Settings > Social preview): the two of them mid-roast,
+    the name and what it is."""
+    out = QImage(1280, 640, QImage.Format_RGB32)
+    grad = QLinearGradient(0, 0, 0, out.height())
+    grad.setColorAt(0, QColor("#24202c"))
+    grad.setColorAt(1, QColor("#0e0c12"))
+    g = QPainter(out)
+    g.setRenderHint(QPainter.Antialiasing)
+    g.setRenderHint(QPainter.TextAntialiasing)
+    g.fillRect(out.rect(), grad)
+    pic = duo.scaledToHeight(560, Qt.SmoothTransformation)
+    g.drawImage(30, (out.height() - pic.height()) // 2, pic)
+    x = 60 + pic.width()
+    for text, px, bold, colour, top, height in (
+            ("Backseat", 92, True, "#f4eef8", 140, 120),
+            ("Your trash-talking gaming companions", 38, True, "#e8c46a", 270, 100),
+            ("They watch your PC games and roast you out loud. Claude or a free local model. Windows, open source.",
+             25, False, "#b9aec6", 390, 130)):
+        font = QFont("Segoe UI")
+        font.setPixelSize(px)
+        font.setBold(bold)
+        g.setFont(font)
+        g.setPen(QColor(colour))
+        g.drawText(QRect(x, top, out.width() - x - 40, height), Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap, text)
+    g.end()
+    out.save(str(OUT / name))
+
+
 def lineup(chars, name, scale=1.2):
     backdrop([c.render(scale) for c in chars], name)
 
@@ -130,7 +160,10 @@ def main_images():
     for c in overlay.chars:
         c.step(1.0, 0.0)
     overlay.shown = float(len(overlay.text))
-    backdrop([QWidget.grab(overlay).toImage()], "duo.png")  # (overlay.grab is the character you hold)
+    shot = QWidget.grab(overlay).toImage()  # (overlay.grab is the character you hold)
+    backdrop([shot], "duo.png")
+    overlay.cost_tag = lambda g: None  # (the link preview leaves out the spend tag: "$0.00 / $100" reads like a price)
+    social(QWidget.grab(overlay).toImage())
     Image.fromarray(main.Camera(overlay, lambda: (0, 0)).frame()).save(OUT / "camera.png")  # what Discord sees
     import settings_ui  # the character creator, filled in, with its live preview
     creator = settings_ui.CreatorWindow(Voice(), lambda dollars: None, lambda preset, name: None)

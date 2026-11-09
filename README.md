@@ -4,11 +4,15 @@
 
 Version 2.1.0 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
+[![Latest release](https://img.shields.io/github/v/release/DivxPlays/backseat?label=download)](https://github.com/DivxPlays/backseat/releases/latest) [![Downloads](https://img.shields.io/github/downloads/DivxPlays/backseat/total)](https://github.com/DivxPlays/backseat/releases) [![License: GPL v3](https://img.shields.io/github/license/DivxPlays/backseat)](LICENSE) ![Windows](https://img.shields.io/badge/platform-Windows-blue) [![GitHub stars](https://img.shields.io/github/stars/DivxPlays/backseat?style=social)](https://github.com/DivxPlays/backseat/stargazers)
+
 **[Download](https://github.com/DivxPlays/backseat/releases/latest)** · [Trailer](https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4) · [Setup](#setup) · [Controls and hotkeys](#controls) · [Voice commands](#voice-commands-free) · [How it behaves](#how-it-behaves) · [Cost](#cost) · [Settings](#tweaking) · [Updates](#updates) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/DivxPlays/backseat/issues) · [License](#license)
 
 Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
 <p align="center"><a href="https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4"><img src="docs/images/trailer.gif" width="560" alt="Backseat trailer: Vorn and Mika roasting a Fortnite skydive, then Vorn thrown across the screen"></a><br><a href="https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4"><b>Watch the full trailer (81 s, with sound)</b></a></p>
+
+<p align="center">If they made you laugh, a ⭐ on GitHub helps other players find them.</p>
 
 <p align="center"><img src="docs/images/duo.png" width="520" alt="Vorn and Mika in duo mode, Mika talking"></p>
 
