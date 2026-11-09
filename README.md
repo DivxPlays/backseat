@@ -2,7 +2,7 @@
 
 Version 1.1.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
 
-An animated, full-body warlord in the corner of your screen. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
+An animated, full-body character in the corner of your screen: Vorn the warlord, or Mika the yandere gamer girl. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
 ## Setup
 
@@ -109,6 +109,9 @@ Screenshots go to Anthropic's API, which means whatever is on your screen, inclu
 **His voice:** the `kokoro:` voices (Michael, Onyx, Fenrir, Eric, Adam, George, Lewis, Daniel) run on your PC and are ready in about half a second; the first time you pick one, he downloads the Kokoro model (about 205 MB). They have no pitch control. The other voices are Microsoft's online voices (1.5-2.5 s before he speaks). If a local voice ever fails, he uses the online voice for that line.
 
 **Characters:** each character is a preset in `presets/` (name, personality, voice, look, wake word, power-up). Switch in tray > Character (he restarts). Each character keeps their own respect meter and past; your stats, notes and friends are shared. Settings > Character edits the current one.
+
+- **Vorn:** the warlord. Power-up: Bloodfire.
+- **Mika:** an original yandere gamer girl with long pink hair, pink eyes and a cat-ear gaming headset. Sweet and adoring on the surface, obsessively possessive underneath: jealous of your other games, apps and friends, and she takes your deaths personally. Her respect meter is her affection. Say "Hey Mika". Her power-up is **Lovesick**: the light leaves her eyes, a shadow falls over her face and dark hearts rise around her. Outfits (tray > Outfit, switches live): gamer jacket, cozy hoodie, gothic dress, esports jersey, or "Surprise me" for a new one each launch.
 
 Right-click the tray icon > **Settings...** to change his name, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Only the settings you changed are stored in `settings.json`, so improvements to the defaults in `config.py` still reach you; **Restore Defaults** deletes it.
 

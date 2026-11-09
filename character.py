@@ -511,21 +511,29 @@ class Vorn:
         return [(a[0] + dx * f + nx * r * o, a[1] + dy * f + ny * r * o)
                 for f, o in ((0.15, 0.0), (0.32, 0.35), (0.5, -0.2), (0.68, 0.3), (0.85, -0.1))]
 
-    def _arms(self, g):
-        pose = self.pose()
-        near = 1 if self.toward > 0 else -1  # the gesturing arm, on the side of his bubble
-        polished = STEEL_POLISH if self.tier >= 1 else STEEL_HI
-        trim = GOLD if self.tier >= 1 else BRONZE
+    SHOULDER, UPPER, FORE = SHOULDER, UPPER, FORE  # arm geometry (Mika has her own)
+
+    def arm_points(self):
+        """{side: (shoulder, elbow, wrist, forearm dx, forearm dy)} for the current pose; side -1 = left, 1 = right."""
+        near = 1 if self.toward > 0 else -1  # the gesturing arm, on the side of the bubble
         arm = {}
         for side in (-1, 1):
             upper, fore, length = self.arms[side]
             if side == near and self.mood == "angry":
                 fore += math.sin(self.t * 32) * 4  # shaking fist
-            sx, sy = SHOULDER if side < 0 else (BUST_W - SHOULDER[0], SHOULDER[1])
+            sx, sy = self.SHOULDER if side < 0 else (BUST_W - self.SHOULDER[0], self.SHOULDER[1])
             a1, a2 = math.radians(upper), math.radians(fore)
-            elbow = (sx + side * math.sin(a1) * UPPER * length, sy + math.cos(a1) * UPPER * length)
+            elbow = (sx + side * math.sin(a1) * self.UPPER * length, sy + math.cos(a1) * self.UPPER * length)
             dx, dy = side * math.sin(a2), math.cos(a2)
-            arm[side] = ((sx, sy - 24), elbow, (elbow[0] + dx * FORE, elbow[1] + dy * FORE), dx, dy)
+            arm[side] = ((sx, sy), elbow, (elbow[0] + dx * self.FORE, elbow[1] + dy * self.FORE), dx, dy)
+        return arm
+
+    def _arms(self, g):
+        pose = self.pose()
+        near = 1 if self.toward > 0 else -1  # the gesturing arm, on the side of his bubble
+        polished = STEEL_POLISH if self.tier >= 1 else STEEL_HI
+        trim = GOLD if self.tier >= 1 else BRONZE
+        arm = {side: ((s[0], s[1] - 24), *rest) for side, (s, *rest) in self.arm_points().items()}  # sleeves start under the pauldron
 
         def forearm(side):
             _, elbow, wrist, dx, dy = arm[side]

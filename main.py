@@ -752,6 +752,22 @@ def main():
         pick.setCheckable(True)
         pick.setChecked(preset == config.PRESET)
         pick.triggered.connect(lambda _=False, p=preset: (set_setting("PRESET", p), restart()) if p != config.PRESET else None)
+    if hasattr(overlay.char, "outfit"):  # characters with outfits (Mika): switch live
+        from mika import OUTFITS
+        outfits = menu.addMenu("Outfit")
+        choices = {}
+
+        def wear(name):
+            set_setting("OUTFIT", name)
+            overlay.char.outfit = name if name in OUTFITS else random.choice(sorted(OUTFITS))  # "random": pick one now too
+            for n, action in choices.items():
+                action.setChecked(n == name)
+
+        for name in sorted(OUTFITS) + ["random"]:
+            choices[name] = outfits.addAction("Surprise me (a new one each launch)" if name == "random" else name.title())
+            choices[name].setCheckable(True)
+            choices[name].setChecked(name == config.OUTFIT)
+            choices[name].triggered.connect(lambda _=False, n=name: wear(n))
     menu.addAction("Settings...").triggered.connect(lambda: (settings.show(), settings.raise_(), settings.activateWindow()))
     boot = menu.addAction("Start with Windows (wakes up when a game starts)")
     boot.setCheckable(True)

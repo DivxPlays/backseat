@@ -472,6 +472,30 @@ with tempfile.TemporaryDirectory() as d:
 assert WakeListener.WAKE.search("hey vern, look") and "{power}" in config.RULES and config.POWER in brain.system()
 assert type(main.make_character("vorn")).__name__ == "Vorn"
 
+# Mika: her preset loads, every outfit and mood renders inside her window, Lovesick takes the light from her eyes
+from mika import OUTFITS, Mika  # noqa: E402
+
+mika_preset = json.loads((config.PRESETS / "mika.json").read_text(encoding="utf-8"))
+assert mika_preset["CHARACTER"] == "mika" and set(mika_preset) == set(config.PRESET_KEYS)
+assert type(main.make_character("mika")).__name__ == "Mika" and Mika("nope").outfit in OUTFITS
+for outfit in OUTFITS:
+    for mood in MOODS:
+        for toward in (1.0, -1.0):
+            v = Mika(outfit)
+            v.toward = toward
+            v.set_mood(mood)
+            for _ in range(60):
+                v.step(1 / 30, 0.3)
+            v.p["aura"], v.flare_amt = 0.0, 0.0
+            img = v.render()
+            edges = [img.pixelColor(x, y).alpha() for x in (0, img.width() - 1) for y in range(0, img.height(), 3)]
+            assert max(edges + [img.pixelColor(x, 0).alpha() for x in range(img.width())]) == 0, (outfit, mood, toward)
+v = Mika("jacket")
+v.bloodfire(8)
+for _ in range(60):
+    v.step(1 / 30, 0.0)
+assert v.blood > 0.95 and not v.render().isNull() and not v.render(0.3, bust=True).isNull()
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
