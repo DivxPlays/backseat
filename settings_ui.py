@@ -366,7 +366,7 @@ class SettingsWindow(QDialog):
                                       ("Displays to never look at (comma separated)", skip),
                                       ("Games they miss (exe names)", games),
                                       ("Auto-clips: the key that saves what just happened\n(Game Bar windows+alt+g, NVIDIA alt+f10; "
-                                       "blank = off)", w["CLIP_KEY"])])
+                                       "Medal running: its own key; blank = off)", w["CLIP_KEY"])])
 
         w["MIC_DEVICE"] = _combo([""] + device_names("input"), config.MIC_DEVICE, editable=True)
         w["VOICE_DEVICE"] = _combo([""] + device_names("output"), config.VOICE_DEVICE, editable=True)

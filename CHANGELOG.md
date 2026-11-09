@@ -10,6 +10,12 @@ version's entry is also its release notes on GitHub.
   idling..."), a third brought up the hour and one in nine said "Pathetic". Now each one they start themselves is told
   how they opened lately and the words they keep leaning on (from this session and the last two), and they bring up the
   time only now and then. Tried on the free local model: "Pathetic" went from 4 of 6 lines to none.
+- **"Clip that!"** Say it while you're in a game, no "Hey Vorn" needed (friends in your Discord call can say it too),
+  and they frame the moment in the Hall of Shame with their verdict, a roast for a fail or grudging praise for a great
+  play, and save the clip with your capture tool. It only works while a game is in front. About 0.05 cents.
+- **Clips through Medal, with split audio.** With Medal running, clips use Medal's own clip key and clips folder instead
+  of Game Bar's. **For clips with split audio (the game and your Discord call on their own tracks), you need Medal**, with
+  its audio split by app: Game Bar and NVIDIA Instant Replay don't split it, and Game Bar records the game's sound only.
 - **Report a problem.** Tray > Report a problem... opens a new issue on GitHub in your browser, already filled in with
   your version, your Windows version and the last error in companion.log, with names, paths, keys, emails and Steam IDs
   taken out. Nothing is sent until you read it and press Submit (you need a GitHub account).

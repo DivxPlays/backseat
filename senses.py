@@ -23,6 +23,7 @@ import numpy as np
 import sounddevice as sd
 from PIL import Image, ImageDraw, ImageFont
 
+import commands
 import config
 
 SR = 24000  # voice sample rate
@@ -380,6 +381,8 @@ class WakeListener:
             self.pending = f"{self.pending} {text}".strip()
             if audio is not None:
                 self.clips.append(audio)
+        elif text and commands.clip_that(text):  # "Clip that!" needs no name: by the time you've said it, it's gone
+            self.on_heard(text, audio)
         self.last_end = time.monotonic()
 
     def expect(self, seconds, called=""):

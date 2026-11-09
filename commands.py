@@ -32,9 +32,12 @@ COMMANDS = [
              r"(?P<what>.+?)(?: outfit| look| one)?"),
     ("challenge", r"(?:(?:give|set|throw) me|i want|i need|(?:have |do )?you (?:have|got)|got) (?:a |an |another |a new )?"
                   r"(?:challenge|bounty|dare)(?: for (?:me|this|the next|my next) (?:match|game|round))?|(?:challenge|dare) me"),
+    ("clip", r"(?:clip|save|frame|record) (?:that|this|it)(?: one)?|(?:that'?s|that is|that was) (?:a clip|clip ?worthy)|"
+             r"(?:put|throw) (?:that|this|it) in the hall of shame|hall of shame (?:that|this|it)"),
     ("switch", r"(?:(?:switch|change|swap|go)(?: back)? to|let me talk to|i want) (?:just |only )?(?P<who>.+?)(?: mode| only)?"),
     ("switch", r"(?P<who>both of you|duo mode)"),
 ]
+CLIP_THAT = re.compile(r"(?:clip|frame) (?:that|this|it)(?: one)?")  # the one thing they take without their name
 BOTH = {"both", "both of you", "both of them", "the both of you", "you both", "you two", "the two of you", "duo", "duo mode", "everyone"}
 # outfit nicknames you might say (each character only matches their own outfits: "hoodie" is Mika's hoodie or Vorn's off-duty)
 ALIASES = {"off-duty": ("off duty", "offduty", "hoodie", "casual", "comfy"), "desert raider": ("desert", "raider"),
@@ -71,7 +74,7 @@ def parse(text, outfits=(), characters=None):
     """(command, value) if the whole of `text` is a voice command, else None.
     outfits: the outfit names of the one being talked to; characters: {preset: the names they answer to} for switching.
     Commands: ("mute", seconds or None), ("unmute", None), ("vision", True/False), ("cost", None),
-    ("outfit", a name or None for a different one), ("switch", a preset or "both"), ("challenge", None)."""
+    ("outfit", a name or None for a different one), ("switch", a preset or "both"), ("challenge", None), ("clip", None)."""
     t = clean(text)
     for kind, pattern in COMMANDS:
         m = re.fullmatch(pattern, t)
@@ -85,7 +88,7 @@ def parse(text, outfits=(), characters=None):
                 n = float(g["n"]) if g["n"][0].isdigit() else WORDS[g["n"]]
                 return "mute", int(n * UNIT[g["unit"][0]])
             return "mute", None
-        if kind in ("unmute", "cost", "challenge"):
+        if kind in ("unmute", "cost", "challenge", "clip"):
             return kind, None
         if kind.startswith("vision"):
             return "vision", kind == "vision on"
@@ -173,6 +176,11 @@ def lines_of(preset, key):
     data = _preset(preset)
     own = data.get("LINES", {}).get(key) if isinstance(data.get("LINES"), dict) else None
     return tuple(own) if own else LINES.get(data.get("CHARACTER"), LINES["vorn"])[key]
+
+
+def clip_that(text):
+    """True if `text` is just "Clip that!" (or "clip it", "frame that"): said without "Hey Vorn", they still take it."""
+    return bool(CLIP_THAT.fullmatch(clean(text)))
 
 
 def reply(preset, key, **values):

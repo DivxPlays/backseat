@@ -104,6 +104,9 @@ SITUATIONS = {
     "look": "The player pressed the look hotkey. Comment on what they're looking at, or give a hint about it.",
     "nag": "It's late, or the player has gone a long time without a break (see the local time and break time in the stats). "
            "Nag them to take a break or go to sleep, as a roast.",
+    "clip": 'The player just said "Clip that!": they want this moment saved to the Hall of Shame. Say what the screenshots '
+            "show in one short sentence (under 20 words): roast it if it's a fail, grudging praise if it's a great play. If "
+            "nothing happened, roast them for clipping nothing.",
     "breakdown": "The player just lost. These screenshots are from the last minute or so, oldest first. Break down what went "
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
 }
@@ -225,6 +228,28 @@ def report_url(log, names=(), about=""):
         if len(url) < 8000 or len(lines) < 3:
             return url
         lines = lines[:1] + lines[3:]
+
+
+MEDAL = Path(os.path.expandvars(r"%APPDATA%\Medal\store\settings.json"))
+
+
+def medal(settings=MEDAL, running=None, folder=None):
+    """(clip key, clips folder) when Medal is running and has a keyboard clip key: its clips keep the game's and the
+    Discord call's sound (its first track is "All Audio"), which Game Bar leaves out. Else None."""
+    if running is None:
+        import psutil
+        running = any((p.info["name"] or "").lower() == "medal.exe" for p in psutil.process_iter(["name"]))
+    folder = folder or Path(os.environ.get("SystemDrive", "C:") + "\\Medal\\Clips")  # (Medal's own default)
+    if not running or not folder.is_dir():
+        return None
+    try:
+        keys = json.loads(settings.read_text(encoding="utf-8"))["recorder"]["triggerHotkeys"]
+        key = next(k["inputs"] for k in keys if str(k.get("action", "")).startswith("clip") and k.get("device") == "keyboard")
+        key = re.sub(r"\bnumpad ", "num ", key.lower()).replace(" + ", "+")  # Medal's "numpad -" is keyboard's "num -"
+        keyboard.parse_hotkey(key)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
+        return None
+    return key, folder
 
 
 def fresh_turns(turns, recent):
@@ -1137,6 +1162,9 @@ class Companion:
             self.bridge.note.emit("(listening to your friend...)")
         else:
             logging.info("friend said: %s", text)
+            m = WakeListener.pattern([n for names in self.wake_of.values() for n in names]).match(text)
+            if commands.parse(text[m.end():] if m else text) == ("clip", None):  # a friend can clip it too (in a game)
+                return self.jobs.put(("clip", text)) if self.current_game() else None
             self.jobs.put(("friend", (text, audio)))
 
     def who(self, text, clip):
@@ -1229,6 +1257,14 @@ class Companion:
         elif kind == "challenge":  # "give me a challenge": the one you asked sets it (their line is the reply)
             self.recent.append(f"Player: {said}")
             self.jobs.put(("minigame", (who, "dare")))
+            return True
+        elif kind == "clip":  # "Clip that!": framed in the Hall of Shame with their verdict, and the clip saved
+            if not self.current_game():
+                self.bridge.note.emit("(Clip that! works while you're in a game)")
+                return True
+            self.recent.append(f"Player: {said}")
+            self.bridge.note.emit("(clipping that...)")
+            self.jobs.put(("clip", said))
             return True
         elif kind == "outfit":
             if dresser is None:
@@ -1454,6 +1490,8 @@ class Companion:
                 self.last_check = now
             out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
+        if kind == "clip":  # you asked: framed whatever they think of it
+            out["save_moment"] = True
         if out.get("event") == "menu":
             self.menu_at = time.monotonic()
         if trivia:  # your trivia answer, judged: right if they gave respect for it
@@ -1485,7 +1523,7 @@ class Companion:
         self.streak, fire = bloodfire(self.streak, out.get("event"), before, self.mem.d["respect"])
         event = fire or event
         shame = None
-        if out.get("save_moment") and shot and time.monotonic() - self.last_shame > 60:
+        if out.get("save_moment") and shot and (kind == "clip" or time.monotonic() - self.last_shame > 60):
             self.last_shame = time.monotonic()
             shame = save_moment(shot[2], self.focus, turns[0][2], HALL)
             if config.CLIP_KEY and self.current_game():  # auto-clips: the last 30 seconds of the game, too
@@ -1635,17 +1673,20 @@ class Companion:
         """Auto-clips: press the capture tool's "save what just happened" key (CLIP_KEY) and give the video it saves to this
         Hall of Shame moment (a screenshot's name). The video stays where the tool put it (your Videos folder)."""
         since = time.time()
+        tool = medal()  # Medal running: its key and folder (its clips have the game's and Discord's sound)
+        key, folder = tool or (config.CLIP_KEY, videos_folder())
         try:
-            keyboard.send(config.CLIP_KEY)
+            keyboard.send(key)
         except ValueError:
-            return logging.warning("auto-clips: %r isn't a key", config.CLIP_KEY)
-        video = new_clip(videos_folder(), since)
+            return logging.warning("auto-clips: %r isn't a key", key)
+        video = new_clip(folder, since)
         if video is None:
             logging.info("auto-clips: no clip was saved for %s", moment)
             if not self.clip_warned:  # (once a session)
                 self.clip_warned = True
-                self.bridge.note.emit("(no clip saved: turn on Windows Settings > Gaming > Captures > Record what happened)"
-                                      if "windows" in config.CLIP_KEY else "(no clip saved: turn on NVIDIA Instant Replay, Alt+Z)")
+                self.bridge.note.emit("(no clip saved: is Medal recording this game?)" if tool else
+                                      "(no clip saved: turn on Windows Settings > Gaming > Captures > Record what happened)"
+                                      if "windows" in key else "(no clip saved: turn on NVIDIA Instant Replay, Alt+Z)")
             return
         self.videos[moment] = str(video)  # (in case its Hall of Shame entry isn't written yet)
         if self.mem.hall_video(moment, str(video)):

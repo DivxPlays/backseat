@@ -18,7 +18,6 @@ Built and self-checked, but not yet seen working on a real day:
 GitHub issues land in Planned with their number. No issues yet (checked 2026-11-09).
 
 ### Squad and clips
-- **"Clip that!":** say it (or press a key) and they save the last 30 seconds right then and roast it into the Hall of Shame.
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
 - **Shareable clips:** an .mp4 with them and their roast burned in, ready to send (needs ffmpeg, a download).
 
@@ -52,6 +51,8 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.1.0 (in progress):
+- "Clip that!": said in a game (no wake word; friends too), the moment goes in the Hall of Shame with their verdict and the clip is saved.
+- Clips through Medal when it's running (its key and folder): Medal is needed for split audio (the game and Discord on their own tracks).
 - Report a problem: tray > Report a problem... opens a GitHub issue filled in with the version, Windows and the last error (names, paths and keys taken out).
 - Fresher lines: each automatic line is told their recent openings and pet words (this session and the last two) to avoid, and the hour comes up only now and then.
 - Fix: a sound device dropping out (a headset reconnecting) no longer crashes the app: the default device plays the line, or it shows as subtitles.

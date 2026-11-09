@@ -199,6 +199,15 @@ w.hear("Hey Vorn, wait")
 w.speaking = True
 w.flush()
 assert heard[-1] is None and w.active()  # not sent while you're still mid-sentence
+w.speaking = False
+w.flush(force=True)
+heard.clear()
+say("Clip that!")  # the one thing that needs no "Hey Vorn"
+say("clip that guy over there")  # (just talk)
+assert heard == ["Clip that!"], heard
+import commands  # noqa: E402
+assert commands.clip_that("Okay, clip it!") and not commands.clip_that("save that")  # (said bare, only the clear ones)
+assert main.SITUATIONS["clip"] and "clip" in __import__("costs_ui").GROUPS[0][1]
 
 # spending: cost math, monthly ledger, cheap mode at 80%, announced once
 from types import SimpleNamespace  # noqa: E402
@@ -272,8 +281,17 @@ with tempfile.TemporaryDirectory() as d:
     threading.Timer(0.1, lambda: (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").write_bytes(b"v" * 500)).start()
     assert senses_mod.new_clip(videos, since, timeout=3, step=0.05).name == "CoD4 2026-11-09 01-30-00.mp4"
     assert isinstance(senses_mod.videos_folder(), Path)
-    pressed, real_send, real_new, real_folder = [], main.keyboard.send, main.new_clip, main.videos_folder
-    main.keyboard.send, main.videos_folder = pressed.append, (lambda: videos)
+    # Medal running: its own clip key ("numpad -" is keyboard's "num -") and its clips folder
+    medal_set = videos / "medal.json"
+    medal_set.write_text(json.dumps({"recorder": {"triggerHotkeys": [
+        {"action": "segment_toggle", "device": "keyboard", "inputs": "f9"},
+        {"action": "clip;length=120", "device": "keyboard", "inputs": "numpad -"}]}}), encoding="utf-8")
+    assert main.medal(medal_set, True, videos) == ("num -", videos)
+    assert main.medal(medal_set, False, videos) is None and main.medal(videos / "none.json", True, videos) is None
+    medal_set.write_text('{"recorder": {"triggerHotkeys": [{"action": "clip", "device": "keyboard", "inputs": "not a key"}]}}')
+    assert main.medal(medal_set, True, videos) is None
+    pressed, real_send, real_new, real_folder, real_medal = [], main.keyboard.send, main.new_clip, main.videos_folder, main.medal
+    main.keyboard.send, main.videos_folder, main.medal = pressed.append, (lambda: videos), (lambda: None)
     try:
         notes = []
         clipper = SimpleNamespace(videos={}, clip_warned=False, mem=m, bridge=SimpleNamespace(note=SimpleNamespace(emit=notes.append)))
@@ -286,8 +304,12 @@ with tempfile.TemporaryDirectory() as d:
         main.Companion.capture_clip(clipper, "x.jpg")
         main.Companion.capture_clip(clipper, "y.jpg")
         assert len(notes) == 1 and "Record what happened" in notes[0] and clipper.clip_warned
+        main.medal = lambda: ("num -", videos)  # with Medal: its key, and it's named if no clip comes
+        clipper.clip_warned, notes[:] = False, []
+        main.Companion.capture_clip(clipper, "z.jpg")
+        assert pressed[-1] == "num -" and "Medal" in notes[0]
     finally:
-        main.keyboard.send, main.new_clip, main.videos_folder = real_send, real_new, real_folder
+        main.keyboard.send, main.new_clip, main.videos_folder, main.medal = real_send, real_new, real_folder, real_medal
     page = highlights.build(m.d, hall).read_text(encoding="utf-8")
     assert "<video" in page and (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").as_uri() in page
     assert 'poster="a%20b.jpg"' in page and "a.play()" in page and 'class="who"' not in page  # (no picture of them yet)
@@ -824,7 +846,9 @@ for text, outfits, want in [
         ("Wear something cool", V, None), ("Switch to a better loadout", V, None),
         ("Give me a challenge.", V, ("challenge", None)), ("Challenge me!", M, ("challenge", None)),
         ("I want a challenge for the next match", V, ("challenge", None)), ("Got a dare for me?", M, ("challenge", None)),
-        ("That challenge was impossible", V, None)]:
+        ("That challenge was impossible", V, None), ("Clip that!", V, ("clip", None)), ("save that for me", M, ("clip", None)),
+        ("Put that in the hall of shame.", V, ("clip", None)), ("That was clip worthy", M, ("clip", None)),
+        ("Clip that guy's head off", V, None)]:
     assert commands.parse(text, outfits, chars) == want, (text, commands.parse(text, outfits, chars), want)
 assert commands.duration(600) == "10 minutes" and commands.duration(3600) == "an hour" and commands.money(12.07) == "12 dollars and 7 cents"
 done = []
