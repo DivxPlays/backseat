@@ -16,7 +16,6 @@
 - **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
 
 ### Interaction
-- **Click reactions:** poke them, drag and throw them, and they react.
 - **Mini-games in menus and queues:** trivia about your game, or a dare from the character.
 - **Sound effects:** Vorn's scoffs and grunts (real ones), Mika's giggles.
 
@@ -28,6 +27,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Click reactions: Ctrl+click pokes them (head or body, more annoyed the more you poke), Ctrl+drag throws them across the screen and they glide back.
 - Grudges that stick: rage-quits, days of being ignored and too many "shut up"s cost respect and get a cold greeting and digs, until you apologize (or 2 days pass).
 - Jealousy across characters: they track your time alone with each; whoever was left out opens with it, and the rivalry comes up now and then.
 - Holidays: Halloween and Christmas outfits for both that switch in by themselves, bats, snow, confetti (New Year's, your birthday) and hearts (Valentine's), festive lines, and a birthday setting.

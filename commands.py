@@ -117,6 +117,12 @@ LINES = {
                               "You've earned {outfit}. Behold. It's in the outfit menu now."]),
         "locked": ("disgusted", ["{outfit}? Earn it first, weakling. You're at {left}.", "Not yet. {left}. Get to work."]),
         "already": ("disgusted", ["I'm already here, genius. Look at your screen."]),
+        "poke": ("surprised", ["Do NOT touch the warlord.", "Was that a poke? Bold. Stupid, but bold.", "Hands off, weakling."]),
+        "poke head": ("angry", ["Not the hair. Never the hair.", "You touched my head. Your bloodline ends with you."]),
+        "poke annoyed": ("angry", ["Poke me once more and I burn your save files.", "I conquered eleven worlds. I will not be poked.",
+                                   "Enough!"]),
+        "grabbed": ("surprised", ["Put me down this instant!", "Unhand me, peasant!"]),
+        "thrown": ("angry", ["You THREW me? I will remember this.", "My armor. My dignity. Mostly my dignity."]),
     },
     "mika": {
         "mute": ("smug", ["Okay, I'll be quiet... but I'm still watching you. Always.", "Shh, I'm being good. Talk to me when you miss me."]),
@@ -134,6 +140,11 @@ LINES = {
                                "{outfit}, just for you! I'm never taking it off. Well, maybe."]),
         "locked": ("smug", ["Not yet, sweetie. You're at {left} for {outfit}.", "{outfit}? You have to earn that one. {left}."]),
         "already": ("laugh", ["Silly, I'm already here!"]),
+        "poke": ("laugh", ["Hehe, that tickles!", "Ooh, you want my attention? You have it. Forever.", "Boop! My turn next."]),
+        "poke head": ("surprised", ["My headset! Careful, sweetie.", "Hey, I just fixed my hair!"]),
+        "poke annoyed": ("angry", ["Keep poking and I'll start poking back. Permanently.", "Okay, that's enough, cutie. I mean it."]),
+        "grabbed": ("laugh", ["Wheee! Don't you dare drop me!", "Ooh, carrying me? So bold."]),
+        "thrown": ("angry", ["You threw me?! I'm writing this down.", "Ow! You'll pay for that in cuddles."]),
     },
 }
 

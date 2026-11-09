@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 HOLD = timedelta(days=2)  # how long a grudge lasts without an apology
 IGNORED = 3  # days away that count as ignoring them
 SHUSHED = 3  # "shut up"s in one session that count
+POKED = 15  # pokes in one session that count
 QUIT = 180  # seconds of play after a death or loss within which ending the session counts as a rage-quit
 COST = 3  # respect each new grudge costs
 
@@ -17,6 +18,8 @@ def new(prev, last_with, now):
         why.append(f"rage-quitting right after a {prev['loss']} last time")
     if prev and prev.get("shushed", 0) >= SHUSHED:
         why.append(f"being told to shut up {prev['shushed']} times last time")
+    if prev and prev.get("poked", 0) >= POKED:
+        why.append(f"being poked {prev['poked']} times last time")
     if last_with:
         days = (now - datetime.fromisoformat(last_with)).days
         if days >= IGNORED:

@@ -11,7 +11,8 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
-from PySide6.QtGui import QImage  # noqa: E402
+from PySide6.QtCore import QEvent, QPointF, Qt  # noqa: E402
+from PySide6.QtGui import QImage, QMouseEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -780,6 +781,7 @@ assert grudges.new({"loss": "death", "loss_at": 100, "seconds": 900}, None, now)
 assert [g["why"] for g in grudges.new({"shushed": 4, "seconds": 900}, "2026-11-14T10:00", now)] == \
     ["being told to shut up 4 times last time", "being ignored for 6 days"]
 assert grudges.new({"shushed": 2}, "2026-11-19T10:00", now) == []
+assert [g["why"] for g in grudges.new({"poked": 16}, None, now)] == ["being poked 16 times last time"]
 assert grudges.active([{"why": "x", "until": "2026-11-21T09:00"}, {"why": "y", "until": "2026-11-20T17:00"}], now)[0]["why"] == "x"
 assert main.APOLOGY.search("Hey Mika, I'm sorry about yesterday") and not main.APOLOGY.search("what's the sorryest gun?")
 with tempfile.TemporaryDirectory() as d:
@@ -839,11 +841,52 @@ duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
 assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
 duo.show_line("angry", "Hands off my player.", None, "none", "Mika")
 assert duo.speaking == 1 and duo.text.startswith("Mika: ") and duo.chars[1].mood == "angry" and duo.chars[0].mood != "surprised"
+said = []  # click reactions: Ctrl+click pokes them (a line, at most every 3 s), Ctrl+drag throws them
+duo.poked.connect(lambda i, what, speak: said.append((i, what, speak)))
+x0, w0 = (0 if duo.left else main.BUBBLE_W), main.CW * config.SCALE
+assert duo.char_at(x0 + 10) == 0 and duo.char_at(x0 + w0 + 10) == 1 and duo.char_at(x0 - 5) is None
 QTest.qWait(900)  # the one listening reacts a beat later, not in the same frame
 assert duo.chars[0].mood == "surprised"
 duo.hide_at = time.monotonic()
 QTest.qWait(1700)  # the line ends: each settles back to idle in their own time
 assert [c.mood for c in duo.chars] == ["idle", "idle"] and not duo.later
+duo.timer.stop()  # (from here the test moves time itself)
+duo.text, duo.last_said = "", 0.0
+duo.poke(1, 400)
+assert said[-1] == (1, "poke", True) and duo.chars[1].mood == "surprised" and 1 in duo.jolts
+duo.poke(1, 400)
+assert said[-1] == (1, "poke", False)  # a line at most every 3 s
+duo.last_said = 0.0
+duo.poke(0, 20 * config.SCALE)
+assert said[-1][:2] == (0, "poke head")
+for _ in range(3):
+    duo.poke(0, 400)
+assert said[-1][1] == "poke annoyed" and duo.chars[0].mood == "angry"  # 5 pokes in 30 s
+
+
+def mouse(kind, x, y, home):
+    return QMouseEvent(kind, QPointF(x, y), QPointF(home.x() + x, home.y() + y), Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+
+
+home = duo.pos()
+duo.pokeable = True
+duo.mousePressEvent(mouse(QEvent.MouseButtonPress, x0 + 30, 300, home))
+for step in range(1, 5):  # a quick flick up and to the left
+    time.sleep(0.01)
+    duo.mouseMoveEvent(mouse(QEvent.MouseMove, x0 + 30 - 25 * step, 300 - 20 * step, home))
+duo.mouseReleaseEvent(mouse(QEvent.MouseButtonRelease, x0 + 30 - 100, 300 - 80, home))
+assert said[-1][1] == "grabbed" and duo.flight and duo.flight[0] < 0 and duo.home == home
+t = 1000.0
+for _ in range(2000):  # fly, bounce, land
+    t += 1 / 60
+    duo.fly(t, 1 / 60)
+    if not duo.flight:
+        break
+assert not duo.flight and said[-1] == (0, "thrown", True) and duo.chars[0].mood == "angry"
+for _ in range(600):  # wait, then glide home
+    t += 1 / 60
+    duo.fly(t, 1 / 60)
+assert duo.pos() == home and duo.home is None
 config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA = saved_duo
 assert brain.partner() is None or config.DUO
 heard_duo = []

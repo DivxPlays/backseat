@@ -4,6 +4,7 @@ import difflib
 import functools
 import json
 import logging
+import math
 import os
 import queue
 import random
@@ -170,9 +171,10 @@ class Bridge(QObject):
 
 
 def set_clickthrough(widget, on):
-    """Locked = mouse clicks pass straight through him to the game (WS_EX_TRANSPARENT)."""
+    """Locked = mouse clicks pass straight through him to the game (WS_EX_TRANSPARENT). Either way clicking him never
+    takes focus from your game (WS_EX_NOACTIVATE)."""
     hwnd = int(widget.winId())
-    style = user32.GetWindowLongPtrW(hwnd, -20)  # GWL_EXSTYLE
+    style = user32.GetWindowLongPtrW(hwnd, -20) | 0x08000000  # GWL_EXSTYLE
     user32.SetWindowLongPtrW(hwnd, -20, (style | 0x20) if on else (style & ~0x20))
 
 
@@ -198,6 +200,9 @@ def set_autostart(on):
 
 
 class Overlay(QWidget):
+    poked = Signal(int, str, bool)  # Ctrl+click or a throw: (which one, "poke"/"poke head"/"poke annoyed"/"grabbed"/"thrown", say a line)
+    GRAVITY, HEAD = 2600, 115  # thrown: px/s² of fall; pokes above this (drawing units) are on the head
+
     def __init__(self, voice, saved_pos, respect, spent):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -211,6 +216,11 @@ class Overlay(QWidget):
         self.names = [config.NAME] + ([other["NAME"]] if other else [])
         self.speaking = 0  # which of them is talking (their mouth follows the voice)
         self.later = {}  # {character index: (when, mood)}: duo mode, each one changes face in their own time
+        self.pokeable = False  # Ctrl held: clicks on them land on them instead of your game
+        self.grab = None  # Ctrl+drag: [which one, grab offset, recent (time, position) for the throw's speed, dragged yet]
+        self.flight = None  # thrown: [vx, vy] in px/s while they fly
+        self.home, self.home_at = None, 0.0  # where they glide back to after a throw, and when they start
+        self.pokes, self.jolts, self.last_said, self.thrown_by = deque(maxlen=12), {}, 0.0, 0
         self.span = CW * config.SCALE * len(self.chars)  # how wide the characters are together
         self.resize(int(BUBBLE_W + self.span), int(CH * config.SCALE) + 26)  # + a strip under their feet for the cost tag
         geo = QApplication.primaryScreen().availableGeometry()
@@ -229,6 +239,7 @@ class Overlay(QWidget):
         """F6: unlock to drag him anywhere; F6 again locks him. Returns the locked position to save."""
         self.moving = not self.moving
         set_clickthrough(self, not self.moving)
+        self.pokeable = False
         if self.moving:
             return None
         s = config.SCALE
@@ -240,13 +251,89 @@ class Overlay(QWidget):
             self.left = left
         return [self.x(), self.y(), self.left]
 
+    def char_at(self, x):
+        """Which character is at x (window coordinates), or None."""
+        i = int((x - (0 if self.left else BUBBLE_W)) // (CW * config.SCALE))
+        return i if 0 <= i < len(self.chars) else None
+
     def mousePressEvent(self, e):
         if self.moving:
             self.grab_at = e.globalPosition().toPoint() - self.pos()
+        elif self.pokeable and e.button() == Qt.LeftButton and self.char_at(e.position().x()) is not None and not self.flight:
+            p = e.globalPosition()
+            self.grab = [self.char_at(e.position().x()), p.toPoint() - self.pos(), [(time.monotonic(), p)], False]
 
     def mouseMoveEvent(self, e):
         if self.moving and e.buttons() & Qt.LeftButton:
             self.move(e.globalPosition().toPoint() - self.grab_at)
+        elif self.grab:
+            i, offset, trail, dragged = self.grab
+            p = e.globalPosition()
+            if not dragged and (p - trail[0][1]).manhattanLength() > 12:  # a drag, not a poke: grabbed
+                self.grab[3] = dragged = True
+                self.home = self.home or self.pos()
+                self.chars[i].set_mood("surprised")
+                self.react(i, "grabbed")
+            if dragged:
+                self.move(p.toPoint() - offset)
+            self.grab[2] = (trail + [(time.monotonic(), p)])[-6:]
+
+    def mouseReleaseEvent(self, e):
+        if not self.grab:
+            return
+        i, _, trail, dragged = self.grab
+        self.grab = None
+        if not dragged:
+            return self.poke(i, e.position().y())
+        (t0, p0), (t1, p1) = trail[0], trail[-1]
+        dt = max(t1 - t0, 1 / 60)
+        self.flight, self.thrown_by = [(p1.x() - p0.x()) / dt, (p1.y() - p0.y()) / dt], i  # let go: thrown at that speed
+
+    def poke(self, i, y):
+        """Ctrl+click: they flinch, and say something (more annoyed the more you poke)."""
+        now = time.monotonic()
+        self.pokes.append(now)
+        annoyed = sum(now - t < 30 for t in self.pokes) >= 5
+        self.chars[i].pop, self.jolts[i] = 1.0, now
+        if not self.text:
+            self.chars[i].set_mood("angry" if annoyed else "surprised")
+            self.later[i] = (now + 1.6, "idle")
+        self.react(i, "poke annoyed" if annoyed else "poke head" if y < self.HEAD * config.SCALE else "poke")
+
+    def react(self, i, what, force=False):
+        """Tell the companion (it counts pokes, and says a line at most every 3 s)."""
+        speak = force or time.monotonic() - self.last_said > 3
+        if speak:
+            self.last_said = time.monotonic()
+        self.poked.emit(i, what, speak)
+
+    def fly(self, now, dt):
+        """Thrown: gravity and bounces off the screen's edges; once they land they complain, then glide home."""
+        if self.flight:
+            vx, vy = self.flight[0], self.flight[1] + self.GRAVITY * dt
+            x, y = self.x() + vx * dt, self.y() + vy * dt
+            geo = (QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()).availableGeometry()
+            if x < geo.left() or x + self.width() > geo.right():
+                x, vx = min(max(x, geo.left()), geo.right() - self.width()), -vx * 0.6
+            if y < geo.top():
+                y, vy = geo.top(), -vy * 0.5
+            if y + self.height() > geo.bottom():
+                y, vy, vx = geo.bottom() - self.height(), -vy * 0.45, vx * 0.85
+            self.move(int(x), int(y))
+            self.flight = [vx, vy]
+            if y + self.height() >= geo.bottom() - 1 and abs(vy) < 160 and abs(vx) < 80:  # landed
+                self.flight, self.home_at = None, now + 2.5
+                self.chars[self.thrown_by].set_mood("angry")
+                self.chars[self.thrown_by].pop = 1.0
+                self.react(self.thrown_by, "thrown", force=True)
+        elif self.home and now > self.home_at and not self.grab:  # back to their spot
+            dx, dy = self.home.x() - self.x(), self.home.y() - self.y()
+            if abs(dx) + abs(dy) < 16:  # the last few pixels: snap (whole-pixel steps would stall short of it)
+                self.move(self.home)
+                self.home = None
+            else:
+                k = 1 - math.exp(-dt * 5)
+                self.move(int(self.x() + dx * k), int(self.y() + dy * k))
 
     def show_line(self, mood, line, audio, event="none", who=""):
         self.speaking = self.names.index(who) if who in self.names else 0
@@ -288,6 +375,11 @@ class Overlay(QWidget):
             char.tier = tier_for(self.respect())  # gear upgrades as you earn respect
             char.say = self.voice.mouth() if i == self.speaking else (0.0, 0.0, 0.0)  # lip-sync: the shape of each sound
             char.step(dt, level if i == self.speaking else 0.0)  # only the one talking moves their mouth
+        want = bool(user32.GetAsyncKeyState(0x11) & 0x8000) or self.grab is not None  # Ctrl: they can be poked
+        if want != self.pokeable and not self.moving:
+            self.pokeable = want
+            set_clickthrough(self, not want)
+        self.fly(now, dt)
         if self.ducker.saved and not self.voice.busy():
             self.ducker.restore()
         if self.voice.paused():
@@ -316,7 +408,9 @@ class Overlay(QWidget):
             g.drawText(QRectF(12, 8, BUBBLE_W, 40), Qt.TextWordWrap, f"Drag me anywhere.\n{config.KEY_MOVE.upper()} to lock.")
         for i, char in enumerate(self.chars):
             g.save()
-            g.translate((0 if self.left else BUBBLE_W) + i * CW * config.SCALE, 0)
+            e = time.monotonic() - self.jolts.get(i, -9)
+            jolt = math.sin(e * 55) * 7 * (1 - e / 0.35) if e < 0.35 else 0.0  # poked: a quick jolt
+            g.translate((0 if self.left else BUBBLE_W) + i * CW * config.SCALE + jolt, 0)
             g.scale(config.SCALE, config.SCALE)
             char.paint(g)
             g.restore()
@@ -690,6 +784,14 @@ class Companion:
             if not arg:
                 return self.bridge.note.emit("(didn't catch that)")
             kind = "ask"
+        if kind == "poke":  # you poked, grabbed or threw one of them (free): a quick line, unless it's gone stale
+            i, what, when = arg
+            if time.monotonic() - when < 3 and not self.voice.busy() and i < len(self.names):
+                mood, line = commands.reply(self.preset_of(i), what)
+                self.recent.append(f"(The player {'threw' if what == 'thrown' else 'grabbed' if what == 'grabbed' else 'poked'} "
+                                   f"{self.names[i]}.)")
+                self.speak(mood, line, "none", self.names[i])
+            return
         if kind == "unlock":  # an outfit you just earned: they put it on and tell you (free, no API call)
             i, outfit = arg
             self.dressers[i].outfit = outfit  # shown off right away; the tray menu picks for good
@@ -1032,6 +1134,14 @@ def main():
     app.screenRemoved.connect(update_skips)
     overlay = Overlay(comp.voice, comp.mem.d.get("overlay_pos"), lambda: comp.mem.d["respect"], comp.mem.spent)
     comp.dressers = overlay.chars  # for "Hey Vorn, wear Obsidian"
+
+    def poked(i, what, speak):  # Ctrl+click or a throw on the overlay
+        if what.startswith("poke"):
+            comp.mem.poked()  # (too many and they hold a grudge)
+        if speak:
+            comp.jobs.put(("poke", (i, what, time.monotonic())))
+
+    overlay.poked.connect(poked)
     set_clickthrough(overlay, True)  # also creates his window, even while he's hidden waiting for a game
 
     def set_stream(on):  # off = WDA_EXCLUDEFROMCAPTURE: hidden from OBS, recordings and his own screenshots

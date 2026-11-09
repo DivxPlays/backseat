@@ -120,6 +120,11 @@ class Memory:
                 self.d["seen"][p] = dict(self.d["alone"])
                 self.d["last_with"][p] = datetime.now().isoformat(timespec="minutes")  # (grudges: being ignored)
 
+    def poked(self):
+        """You poked one of them (grudges: too many in one session)."""
+        with self.lock:
+            self.session["poked"] = self.session.get("poked", 0) + 1
+
     def shush(self):
         """You told them to shut up (grudges: too many in one session)."""
         with self.lock:
