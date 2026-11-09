@@ -2167,7 +2167,8 @@ def main():
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
         f"<h3>{APP} {updater.pretty(FULL_VERSION)}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
         "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "
-        "Hearing: Whisper on your PC.</p><p><a href='https://github.com/DivxPlays/backseat'>github.com/DivxPlays/backseat</a></p>")))
+        "Hearing: Whisper on your PC.</p><p>Free software under the GNU GPL v3, with no warranty: you may change and share it "
+        "under its terms.</p><p><a href='https://github.com/DivxPlays/backseat'>github.com/DivxPlays/backseat</a></p>")))
     menu.addAction("Quit").triggered.connect(app.quit)
     menu.aboutToShow.connect(lambda: spend.setText(
         f"Costs: ${comp.mem.spent():.2f}" + (f" of ${config.MONTHLY_BUDGET}" if config.MONTHLY_BUDGET else "") + " this month..."))

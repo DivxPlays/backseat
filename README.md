@@ -4,7 +4,7 @@
 
 Version 2.1.0 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
-**[Download](https://github.com/DivxPlays/backseat/releases/latest)** · [Trailer](https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4) · [Setup](#setup) · [Controls and hotkeys](#controls) · [Voice commands](#voice-commands-free) · [How it behaves](#how-it-behaves) · [Cost](#cost) · [Settings](#tweaking) · [Updates](#updates) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/DivxPlays/backseat/issues)
+**[Download](https://github.com/DivxPlays/backseat/releases/latest)** · [Trailer](https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4) · [Setup](#setup) · [Controls and hotkeys](#controls) · [Voice commands](#voice-commands-free) · [How it behaves](#how-it-behaves) · [Cost](#cost) · [Settings](#tweaking) · [Updates](#updates) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/DivxPlays/backseat/issues) · [License](#license)
 
 Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
@@ -224,7 +224,7 @@ Once a day (when he starts) he checks GitHub for a newer version (the version nu
 
 ## What's on GitHub
 
-The code, this README, [CHANGELOG.md](CHANGELOG.md) (what changed in each version), [ROADMAP.md](ROADMAP.md) (planned features), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
+The code, this README, [CHANGELOG.md](CHANGELOG.md) (what changed in each version), [ROADMAP.md](ROADMAP.md) (planned features), [LICENSE](LICENSE) (the GNU GPL v3), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
 
 ## Moving him to another PC
 
@@ -234,3 +234,9 @@ The code, this README, [CHANGELOG.md](CHANGELOG.md) (what changed in each versio
 Your settings and API key aren't in the export; set those up on the new PC.
 
 If something breaks, look at `companion.log`. Run `.venv\Scripts\python test_selfcheck.py` to check the parts that work without the internet.
+
+## License
+
+Backseat is free software: you can use it, change it and share it under the [GNU General Public License v3](LICENSE). If you share a changed version, or something built on it, it has to be under the GPL v3 too, with its source code. It comes with no warranty. Copyright (C) 2026 DivxPlays.
+
+The sound effects in `sounds/` are public domain (CC0), and the Python packages the installer downloads keep their own licenses.
