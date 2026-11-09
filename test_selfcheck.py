@@ -238,7 +238,17 @@ for v in looks.values():
     v.glance_at = v.turn_at = v.blink_at = 1e9
     v.step(1.0, 0.0)
 renders = {o: bytes(v.render().constBits()) for o, v in looks.items()}
-assert len(set(renders.values())) == len(renders) == 5 and Vorn("nope").outfit in Vorn.OUTFITS
+assert len(set(renders.values())) == len(renders) == len(Vorn.OUTFITS) == 9 and Vorn("nope").outfit in Vorn.OUTFITS
+# unlockable outfits: "random" only picks what you've earned; an explicit choice still works
+saved_outfit, config.VORN_OUTFIT, saved_earned = config.VORN_OUTFIT, "random", set(Vorn.earned)
+Vorn.earned.clear()
+assert not any(Vorn().outfit in Vorn.UNLOCKS for _ in range(60)) and Vorn("gilded").outfit == "gilded"
+assert "gilded" not in Vorn.wardrobe() and len(Vorn.wardrobe()) == 5
+Vorn.earned.add("gilded")
+assert "gilded" in Vorn.wardrobe() and "gilded" not in __import__("mika").Mika.earned  # each keeps their own
+Vorn.earned.clear()
+Vorn.earned |= saved_earned
+config.VORN_OUTFIT = saved_outfit
 saved_outfit, config.VORN_OUTFIT = config.VORN_OUTFIT, "obsidian"
 assert Vorn().outfit == "obsidian"
 config.VORN_OUTFIT = saved_outfit
@@ -688,6 +698,59 @@ for said, want in [("Hey Mika, wear the hoodie.", ("wear", 1, "hoodie")), ("Hey 
 assert "1 dollar and 50 cents" in fake.recent[-5] and "10 minutes" in fake.recent[-9]  # what they said back is in the dialogue
 done.clear()
 assert not main.Companion.command(fake, "Hey Vorn, how was your day?") and not done  # a normal question goes to Claude
+# a locked outfit: they say how far you are and nothing changes; once earned, they put it on
+fake.mem = SimpleNamespace(spent=lambda: 1.5, line=lambda t: None, lock=threading.Lock(), d={"total_seconds": 3600, "days": {}},
+                           mind=lambda preset=None: {"respect": 64, "talks": 3})
+fake.preset_of = lambda i: ["vorn", "mika"][i]
+saved_earned = set(Vorn.earned)
+Vorn.earned.clear()
+done.clear()
+assert main.Companion.command(fake, "Hey Vorn, wear the gold armor.")
+assert not any(d[0] == "wear" for d in done) and any(d[0] == "say" and "64 of 100 respect" in d[2] for d in done), done
+Vorn.earned.add("gilded")
+done.clear()
+main.Companion.command(fake, "Hey Vorn, wear the gold armor.")
+assert ("wear", 0, "gilded") in done
+Vorn.earned.clear()
+Vorn.earned |= saved_earned
+
+# unlocks: what counts, the streak, and handing each one out once (announced as a job)
+import queue  # noqa: E402
+import unlocks  # noqa: E402
+from datetime import date, timedelta  # noqa: E402
+
+today = date.today()  # check_unlocks counts the streak up to the real today
+days = {(today - timedelta(days=k)).isoformat(): 1200 for k in range(1, 8)}  # the last 7 days, not today yet
+assert unlocks.streak(days, today) == 7 and unlocks.streak({**days, today.isoformat(): 1200}, today) == 8
+assert unlocks.streak({**days, (today - timedelta(days=3)).isoformat(): 100}, today) == 2  # 100 s isn't a day of play
+assert unlocks.progress("hours", 3.24, 10) == "3.2 of 10 hours" and unlocks.progress("streak", 2, 7) == "2 of 7 days in a row"
+with tempfile.TemporaryDirectory() as d:
+    real_preset, config.PRESET = config.PRESET, "vorn"
+    m = Memory(Path(d, "memory.json"))
+    m.d["total_seconds"], m.d["respect"], m.d["days"] = 11 * 3600, 40, dict(days)
+    for _ in range(3):
+        m.count_talk()
+    m.count_talk("mika")
+    assert m.d["talks"] == 3 and m.mind("mika")["talks"] == 1 and m.mind("vorn") is m.d
+    jobs = queue.Queue()
+    saved_vorn, saved_mika = set(Vorn.earned), set(Mika.earned)
+    Vorn.earned.clear()
+    Mika.earned.clear()
+    unlocker = SimpleNamespace(dressers=[Vorn("warlord"), Mika("jacket")], mem=m, names=["Vorn", "Mika"], jobs=jobs,
+                               preset_of=lambda i: ["vorn", "mika"][i])
+    main.Companion.check_unlocks(unlocker)
+    got = sorted(jobs.get_nowait()[1] for _ in range(jobs.qsize()))
+    assert got == [(0, "bloodforged"), (0, "shadow marshal"), (1, "crimson"), (1, "night owl")], got  # 11 h and 7 days in a row
+    main.Companion.check_unlocks(unlocker)
+    assert jobs.empty() and "night owl" in Mika.earned and m.mind("mika")["unlocked"] == ["night owl", "crimson"]  # only once
+    m.save()
+    config.PRESET = "mika"
+    assert Memory(Path(d, "memory.json")).d["unlocked"] == ["night owl", "crimson"]  # kept with her memory
+    config.PRESET = real_preset
+    Vorn.earned.clear()
+    Vorn.earned |= saved_vorn
+    Mika.earned.clear()
+    Mika.earned |= saved_mika
 duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
 assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
 duo.show_line("angry", "Hands off my player.", None, "none", "Mika")

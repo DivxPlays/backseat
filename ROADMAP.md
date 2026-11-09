@@ -5,7 +5,6 @@
 ### Characters
 - **Character creator:** make your own character in Settings (name, personality, voice, hair, eye and outfit colours) without touching code.
 - **Jealousy across characters:** switch from Mika to Vorn and back and she knows ("You were with *him*?"); Vorn mocks you for hiding behind the girl.
-- **Unlockable outfits and armour:** new outfits for Mika and armour for Vorn, earned through hours played, wins and challenges.
 - **Holiday outfits and events:** Halloween, Christmas and your birthday change their look and lines automatically.
 - **Grudges that stick:** rage-quit or ignore them for days and they hold it against you next session.
 
@@ -34,6 +33,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Outfits to earn: four each (10 hours, 100 talks, 7 days in a row, 100 respect), plus six free anime-inspired outfits for Mika (maid, shrine maiden, magical girl, yukata, netrunner, track suit).
 - Interrupting: talk over them and they pause to listen; they stop for good if you called them, and carry on if you didn't.
 - Free voice commands: shut up (for a while), talk again, stop looking / look again, change or name an outfit, switch character or duo mode, and "how much have you cost me", handled on your PC with in-character replies.
 - Outfits for Vorn: Warlord, Obsidian, Frostbound, Desert Raider and Off-Duty, picked in tray > Outfit or new each launch.

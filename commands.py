@@ -34,7 +34,10 @@ BOTH = {"both", "both of you", "both of them", "the both of you", "you both", "y
 ALIASES = {"off-duty": ("off duty", "offduty", "hoodie", "casual", "comfy"), "desert raider": ("desert", "raider"),
            "frostbound": ("frost", "winter", "ice", "snow"), "obsidian": ("black armor", "black armour"),
            "warlord": ("armor", "armour", "normal", "usual", "default"), "gothic": ("goth", "dress"), "jersey": ("esports",),
-           "jacket": ("gamer jacket",)}
+           "jacket": ("gamer jacket",), "shrine maiden": ("miko", "shrine"), "magical girl": ("magical",),
+           "track suit": ("tracksuit", "track"), "netrunner": ("cyber", "cyberpunk"), "yukata": ("kimono", "festival"),
+           "night owl": ("owl",), "battle-scarred": ("scarred",), "shadow marshal": ("shadow", "marshal"),
+           "gilded": ("gold", "golden"), "bloodforged": ("blood forged",)}
 
 
 def clean(text):
@@ -51,9 +54,10 @@ def clean(text):
 def outfit_named(what, outfits):
     """Which of `outfits` the words name ("the hoodie" -> "off-duty" for Vorn), or None."""
     for words_of in (lambda n: (n, n.replace("-", " ")), lambda n: ALIASES.get(n, ())):  # real names first, then nicknames
-        for name in outfits:  # anywhere in what was said: "the obsidian armor" is Obsidian, not the warlord's "armor"
-            if any(re.search(rf"\b{re.escape(word)}\b", what) for word in words_of(name)):
-                return name
+        hits = [(m.start(), name) for name in outfits for word in words_of(name)  # anywhere in what was said; the first one
+                if (m := re.search(rf"\b{re.escape(word)}\b", what))]  # wins: "the gold armor" is Gilded, not the warlord's "armor"
+        if hits:
+            return min(hits)[1]
     return None
 
 
@@ -109,6 +113,9 @@ LINES = {
         "switch": ("disgusted", ["Fine. Go to {other}. You'll come crawling back.", "{other}? Your loss, weakling."]),
         "switch both": ("smug", ["Both of us at once? Brave. Foolish, but brave."]),
         "only me": ("smug", ["Just me. The first wise decision you've made today."]),
+        "unlocked": ("smug", ["{outfit}. You actually earned this one. Don't let it go to your head.",
+                              "You've earned {outfit}. Behold. It's in the outfit menu now."]),
+        "locked": ("disgusted", ["{outfit}? Earn it first, weakling. You're at {left}.", "Not yet. {left}. Get to work."]),
         "already": ("disgusted", ["I'm already here, genius. Look at your screen."]),
     },
     "mika": {
@@ -123,6 +130,9 @@ LINES = {
         "switch": ("angry", ["You're choosing {other}? ...Fine. I'll be waiting right here.", "{other}? Okay. I'll remember this."]),
         "switch both": ("smug", ["Sharing me? Fine. But you're still mine."]),
         "only me": ("laugh", ["Just me? Finally, you're all mine!"]),
+        "unlocked": ("laugh", ["You unlocked {outfit} for me! Do you like it? It's in the outfit menu now.",
+                               "{outfit}, just for you! I'm never taking it off. Well, maybe."]),
+        "locked": ("smug", ["Not yet, sweetie. You're at {left} for {outfit}.", "{outfit}? You have to earn that one. {left}."]),
         "already": ("laugh", ["Silly, I'm already here!"]),
     },
 }

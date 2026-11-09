@@ -58,7 +58,24 @@ VORN_LOOKS = {
                      legs=("#3b3f36", "#1e201b"), shin=("#3b3f36", "#1e201b", "#5a5f52"), trim=("#b3202a", "#5a0c12"),
                      hem=None, tabard=None, collar="hood", collar_c=("#24222a", "#0c0b0f", "#3e3b48"),
                      gloves=("#d9a27c", "#a8694c"), boots=("#2a2420", "#120e0c")),  # a hoodie, combat trousers, bare hands
+    # earned (see VORN_UNLOCKS)
+    "shadow marshal": dict(steel=("#2f3340", "#14161d", "#5a6072"), polish="#9aa3b8", trim=("#c9ced8", "#7d8494"),
+                           suit=("#1d1a24", "#0c0a10"), cape=("#3a1f5c", "#1a0c2c"), lining="#c9ced8", tabard=("#3a1f5c", "#1a0c2c"),
+                           collar_c=("#3a3a42", "#1a1a1e", "#6a6a74"), gloves=("#25222b", "#4a4652"), boots=("#1e1c22", "#0a090c")),
+    "battle-scarred": dict(steel=("#5c5852", "#2a2824", "#8c867c"), polish="#aaa498", trim=("#8a4a2a", "#4a2414"),
+                           fore=("#d8d0c0", "#9a9282", "#efe8da"), shin=("#d8d0c0", "#9a9282", "#efe8da"), wraps=True,
+                           cape=("#6a2a26", "#2e100e"), hem=780, tabard=("#5a2420", "#26100e"), gloves=("#4a3a30", "#76665a"),
+                           boots=("#4a3a2e", "#221a12")),  # worn steel, bandages, a torn cape
+    "bloodforged": dict(steel=("#2c1416", "#0e0607", "#5c2a2c"), polish="#8c4448", trim=("#ff6a1a", "#9a2a06"),
+                        suit=("#1e0e10", "#0a0405"), cape=("#3a0608", "#120203"), lining="#ff6a1a", tabard=("#6a1206", "#2a0602"),
+                        collar="gorget", collar_c=("#2c1416", "#0e0607", "#5c2a2c"), gloves=("#1e1012", "#44242a"),
+                        boots=("#1e1012", "#0a0405")),
+    "gilded": dict(steel=("#d1a032", "#7a5410", "#f3d77e"), polish="#fff0b8", trim=("#f7f4ee", "#b8b0a0"), suit=("#3a2e22", "#1c150f"),
+                   cape=("#f2efe8", "#b5ad9c"), lining="#f2c64d", tabard=("#f2efe8", "#b5ad9c"), collar_c=("#ebe7df", "#9c958a", "#ffffff"),
+                   gloves=("#8a6a2a", "#c9a050"), boots=("#e8e2d4", "#9a927f")),
 }
+# outfits you earn: (what counts, how much) -- see unlocks.py
+VORN_UNLOCKS = {"shadow marshal": ("hours", 10), "battle-scarred": ("talks", 100), "bloodforged": ("streak", 7), "gilded": ("respect", 100)}
 
 
 def _outfit(changes):
@@ -185,10 +202,12 @@ FUR_EDGE = [(62, 270), (70, 250), (80, 258), (88, 238), (100, 250), (108, 230), 
 
 class Vorn:
     OUTFITS, OUTFIT_SETTING = VORN_OUTFITS, "VORN_OUTFIT"  # his wardrobe and the setting that picks from it
+    UNLOCKS = VORN_UNLOCKS  # the ones you have to earn
+    earned = set()  # which of those you've earned (set from memory at startup; "random" only picks from what you have)
 
     def __init__(self, outfit=None):
         outfit = outfit or getattr(config, self.OUTFIT_SETTING)
-        self.outfit = outfit if outfit in self.OUTFITS else random.choice(sorted(self.OUTFITS))  # "random": a new look each launch
+        self.outfit = outfit if outfit in self.OUTFITS else random.choice(self.wardrobe())  # "random": a new look each launch
         self.mood = "idle"
         self.p = dict(MOODS["idle"])
         self.t = 0.0
@@ -210,6 +229,11 @@ class Vorn:
         self.blood, self.blood_until = 0.0, -1.0  # Bloodfire: current strength 0..1, and until when it burns
         self.arms = {side: [*POSES["idle"][0][:2], POSES["idle"][0][3]] for side in (-1, 1)}  # current upper, forearm, length
         self.d = self._effective()
+
+    @classmethod
+    def wardrobe(cls):
+        """The outfits you can pick: the free ones and the ones you've earned."""
+        return sorted(o for o in cls.OUTFITS if o not in cls.UNLOCKS or o in cls.earned)
 
     def bloodfire(self, seconds):
         """Power up into Bloodfire for a while; it ignites fast and cools down slowly."""
@@ -1004,12 +1028,16 @@ class Vorn:
                 g.drawEllipse(P(rx, ry), 2.6, 2.6)
 
 
-def make_character(name):
-    """The drawing for a preset's CHARACTER: "vorn" or "mika"."""
+def character_class(name):
+    """The drawing class for a preset's CHARACTER: "vorn" or "mika"."""
     if name == "mika":
         from mika import Mika
-        char = Mika()
-    else:
-        char = Vorn()
+        return Mika
+    return Vorn
+
+
+def make_character(name):
+    """The drawing for a preset's CHARACTER: "vorn" or "mika"."""
+    char = character_class(name)()
     char.step(random.uniform(5, 60), 0.0)  # a random head start: two on screen don't breathe, sway and blink in lockstep
     return char

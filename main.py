@@ -43,11 +43,12 @@ import commands  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
 import transfer  # noqa: E402
+import unlocks  # noqa: E402
 from camera import BACKGROUNDS, REACT, Camera  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
-from character import H as CH, HEAD_Y, W as CW, make_character, tier_for  # noqa: E402
+from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
 from senses import SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
@@ -407,8 +408,31 @@ class Companion:
         if self.partner:
             self.voices_of[self.partner["NAME"]] = {k: self.partner[k] for k in ("VOICE", "VOICE_RATE", "VOICE_PITCH", "POWER")}
             self.wake_of[self.partner["NAME"]] = self.partner["WAKE_NAMES"]
+        for p in presets():  # the outfits you've earned, before anyone gets dressed ("random" only picks from those)
+            try:
+                cls = character_class(json.loads((config.PRESETS / f"{p}.json").read_text(encoding="utf-8"))["CHARACTER"])
+            except (OSError, ValueError, KeyError):
+                continue
+            cls.earned |= set(self.mem.mind(p).get("unlocked", []))
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
+
+    def preset_of(self, i):
+        """The preset of the character at position i on screen (0: the current one, 1: duo mode's partner)."""
+        return config.PRESET if i == 0 else self.partner["PRESET"]
+
+    def check_unlocks(self):
+        """Hand out outfits whose goal you've reached; each one is announced in character (see unlocks.py)."""
+        for i, dresser in enumerate(self.dressers):
+            cls = type(dresser)
+            with self.mem.lock:
+                mind = self.mem.mind(self.preset_of(i))
+                new = unlocks.due(cls.UNLOCKS, mind.setdefault("unlocked", []), unlocks.stats(self.mem.d, mind))
+                mind["unlocked"] += new
+            for outfit in new:
+                cls.earned.add(outfit)
+                logging.info("unlocked %s for %s", outfit, self.names[i])
+                self.jobs.put(("unlock", (i, outfit)))
 
     def start(self):
         preload = [self.ears.model] + ([self.voice.kokoro] if config.VOICE.startswith("kokoro:") else [])  # Whisper, Kokoro
@@ -538,9 +562,16 @@ class Companion:
         elif kind == "outfit":
             if dresser is None:
                 return False
-            value = value or random.choice([o for o in dresser.OUTFITS if o != dresser.outfit])  # "change your outfit": a new one
-            self.bridge.wear.emit(i, value)
-            values = {"outfit": value.title()}
+            have = dresser.wardrobe()
+            if value and value not in have:  # not earned yet: they tell you how far you are
+                goal, need = dresser.UNLOCKS[value]
+                with self.mem.lock:
+                    now = unlocks.stats(self.mem.d, self.mem.mind(preset))[goal]
+                key, values = "locked", {"outfit": value.title(), "left": unlocks.progress(goal, now, need)}
+            else:
+                value = value or random.choice([o for o in have if o != dresser.outfit] or have)  # "change your outfit": a new one
+                self.bridge.wear.emit(i, value)
+                values = {"outfit": value.title()}
         elif kind == "switch":
             if (bool(self.partner) if value == "both" else not self.partner and value == config.PRESET):
                 key = "already"
@@ -582,8 +613,16 @@ class Companion:
             if not arg:
                 return self.bridge.note.emit("(didn't catch that)")
             kind = "ask"
+        if kind == "unlock":  # an outfit you just earned: they put it on and tell you (free, no API call)
+            i, outfit = arg
+            self.dressers[i].outfit = outfit  # shown off right away; the tray menu picks for good
+            mood, line = commands.reply(self.preset_of(i), "unlocked", outfit=outfit.title())
+            self.speak(mood, line, "epic", self.names[i])
+            return
         if kind == "ask":
             self.bridge.note.emit(f'You: "{arg}"')
+            to = addressed(arg, self.wake_of) if self.partner else None
+            self.mem.count_talk(self.preset_of(self.names.index(to)) if to in self.names else None)  # toward an outfit
             if self.command(arg):  # "shut up for 10 minutes", "wear the hoodie"...: handled here, no API call
                 return
         speaker, enrolled = None, False
@@ -824,6 +863,7 @@ class Companion:
             else:
                 self.mem.tick(app_name(*self.app[:2]), dt)
             if now - last_save > 30:
+                self.check_unlocks()
                 self.mem.save()
                 last_save = now
             quiet = now - self.last_spoke
@@ -1020,23 +1060,43 @@ def main():
     camera.start()
     wearers = []  # wear(outfit) for each character on screen: the tray menus and "Hey Vorn, wear Obsidian" both use them
     bridge.wear.connect(lambda i, name: wearers[i](name))
-    for who, dresser in zip(overlay.names, overlay.chars):  # each one's wardrobe (both in duo mode), switched live
+    locks = []  # (menu entry, which character, outfit) for the ones you have to earn: refreshed whenever the menu opens
+    for i, (who, dresser) in enumerate(zip(overlay.names, overlay.chars)):  # each one's wardrobe (both in duo mode), switched live
         outfits = menu.addMenu("Outfit" if len(overlay.chars) == 1 else f"{who}'s outfit")
         choices = {}
 
         def wear(name, dresser=dresser, choices=choices):
             set_setting(dresser.OUTFIT_SETTING, name)
             setattr(config, dresser.OUTFIT_SETTING, name)
-            dresser.outfit = name if name in dresser.OUTFITS else random.choice(sorted(dresser.OUTFITS))  # "random": one now too
+            dresser.outfit = name if name in dresser.OUTFITS else random.choice(dresser.wardrobe())  # "random": one now too
             for n, action in choices.items():
                 action.setChecked(n == name)
 
         wearers.append(wear)
-        for name in sorted(dresser.OUTFITS) + ["random"]:
+        free = sorted(o for o in dresser.OUTFITS if o not in dresser.UNLOCKS)
+        for name in free + list(dresser.UNLOCKS) + ["random"]:  # the ones you earn after the free ones
+            if name == "random" or name in dresser.UNLOCKS and name == list(dresser.UNLOCKS)[0]:
+                outfits.addSeparator()
             choices[name] = outfits.addAction("Surprise me (a new one each launch)" if name == "random" else name.title())
             choices[name].setCheckable(True)
             choices[name].setChecked(name == getattr(config, dresser.OUTFIT_SETTING))
             choices[name].triggered.connect(lambda _=False, n=name, w=wear: w(n))
+            if name in dresser.UNLOCKS:
+                locks.append((choices[name], i, name))
+
+    def show_locks():
+        for action, i, name in locks:
+            dresser = overlay.chars[i]
+            earned = name in type(dresser).earned
+            action.setEnabled(earned)
+            if not earned:
+                goal, need = dresser.UNLOCKS[name]
+                with comp.mem.lock:
+                    have = unlocks.stats(comp.mem.d, comp.mem.mind(comp.preset_of(i)))[goal]
+            action.setText(name.title() if earned else f"\U0001F512 {name.title()} ({unlocks.progress(goal, have, need)})")
+
+    show_locks()
+    menu.aboutToShow.connect(show_locks)
     menu.addAction("Settings...").triggered.connect(lambda: (settings.show(), settings.raise_(), settings.activateWindow()))
     boot = menu.addAction("Start with Windows (wakes up when a game starts)")
     boot.setCheckable(True)

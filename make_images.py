@@ -20,8 +20,8 @@ for key, value in config._DEFAULTS.items():
     setattr(config, key, value)
 config.DUO, config.CAMERA_BACKGROUND = True, "dark"
 import main  # noqa: E402
-from character import VORN_LOOKS, Vorn  # noqa: E402
-from mika import OUTFITS, Mika  # noqa: E402
+from character import VORN_LOOKS, VORN_UNLOCKS, Vorn  # noqa: E402
+from mika import UNLOCKS as MIKA_UNLOCKS, Mika  # noqa: E402
 from senses import Voice  # noqa: E402
 
 sys.excepthook = sys.__excepthook__  # an error here is this script's, not a "Vorn crashed" popup
@@ -67,10 +67,15 @@ def main_images():
     pose(Mika("jacket"), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-mika.png"))
     lineup([pose(Vorn("warlord"), m) for m in ("idle", "smug", "angry", "laugh")] + [pose(Vorn("warlord"), "angry", power=True)],
            "vorn.png")
-    looks = dict(zip(VORN_LOOKS, ("idle", "smug", "angry", "disgusted", "laugh")))
-    lineup([pose(Vorn(o), looks[o]) for o in VORN_LOOKS], "vorn-outfits.png")
-    moods = dict(zip(sorted(OUTFITS), ("smug", "laugh", "idle", "angry")))
-    lineup([pose(Mika(o), moods[o]) for o in sorted(OUTFITS)] + [pose(Mika("jacket"), "smug", power=True)], "mika.png")
+    free = [o for o in VORN_LOOKS if o not in VORN_UNLOCKS]
+    lineup([pose(Vorn(o), m) for o, m in zip(free, ("idle", "smug", "angry", "disgusted", "laugh"))], "vorn-outfits.png")
+    lineup([pose(Vorn(o), m) for o, m in zip(VORN_UNLOCKS, ("smug", "angry", "disgusted", "idle"))], "vorn-unlockables.png")
+    anime = ("maid", "shrine maiden", "magical girl", "yukata", "netrunner", "track suit")
+    lineup([pose(Mika(o), m) for o, m in zip(anime, ("smug", "laugh", "idle", "smug", "angry", "laugh"))], "mika-anime.png")
+    lineup([pose(Mika(o), m) for o, m in zip(MIKA_UNLOCKS, ("idle", "laugh", "smug", "laugh"))], "mika-unlockables.png")
+    first = ("gothic", "hoodie", "jacket", "jersey")  # her original four, then Lovesick
+    lineup([pose(Mika(o), m) for o, m in zip(first, ("smug", "laugh", "idle", "angry"))] + [pose(Mika("jacket"), "smug", power=True)],
+           "mika.png")
 
     overlay = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)  # duo mode, as on your screen
     overlay.chars[0].outfit, overlay.chars[1].outfit = "warlord", "jacket"

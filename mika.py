@@ -28,7 +28,34 @@ OUTFITS = {
                    socks="#16141b", stripe=None, sock_top=520, shoes="#141218", shoe_trim="#c2185b"),
     "jersey": dict(top="jersey", main="#f6f4fa", trim="#ff4fa3", accent="#7b5cff", bottom="shorts", low="#ff4fa3",
                    socks="#f6f4fa", stripe="#7b5cff", sock_top=730, shoes="#26232e", shoe_trim="#ff4fa3"),
+    # anime-inspired (original takes on common looks). Extra pieces: apron, obi (sash colour), pattern (flower colour),
+    # chest_bow, sleeves ("puff" or "wide"), head ("maid" frill, "bow" or "flower"). Socks up at the hip make trousers.
+    "maid": dict(top="dress", main="#1e1b24", trim="#ffffff", accent="#ff4fa3", bottom="none", low="#1e1b24", socks="#ffffff",
+                 stripe=None, sock_top=600, shoes="#1a1720", shoe_trim="#ff4fa3", apron=True, sleeves="puff", head="maid"),
+    "shrine maiden": dict(top="kimono", main="#fbf8f4", trim="#d7263d", accent="#d7263d", bottom="hakama", low="#c8203a",
+                          socks="#ffffff", stripe=None, sock_top=860, shoes="#f2ede6", shoe_trim="#d7263d", obi="#c8203a",
+                          sleeves="wide", head="bow"),
+    "magical girl": dict(top="dress", main="#ffb3d9", trim="#ffffff", accent="#ffd34d", bottom="none", low="#ffb3d9",
+                         socks="#ffffff", stripe="#ff7fb8", sock_top=660, shoes="#ff7fb8", shoe_trim="#ffd34d", chest_bow=True,
+                         sleeves="puff", head="bow"),
+    "yukata": dict(top="kimono", main="#27325e", trim="#f3e9ff", accent="#ff8fc8", bottom="robe", low="#27325e", socks="#ffffff",
+                   stripe=None, sock_top=880, shoes="#b07a46", shoe_trim="#d7263d", obi="#ff8fc8", pattern="#ffc2e0",
+                   sleeves="wide", head="flower"),
+    "netrunner": dict(top="jacket", main="#121018", trim="#2ef2ff", accent="#ff2e9a", bottom="shorts", low="#1a1622",
+                      socks="#141119", stripe="#2ef2ff", sock_top=500, shoes="#1a1720", shoe_trim="#2ef2ff"),
+    "track suit": dict(top="jacket", main="#22305e", trim="#ffffff", accent="#ff4fa3", bottom="none", low="#22305e",
+                       socks="#22305e", stripe=None, sock_top=428, shoes="#ffffff", shoe_trim="#ff4fa3"),  # trousers from the jacket hem
+    # earned (see UNLOCKS)
+    "night owl": dict(top="hoodie", main="#1f2a4a", trim="#8fb4ff", accent="#ffe28a", bottom="shorts", low="#141b30",
+                      socks="#2a355a", stripe="#ffe28a", sock_top=700, shoes="#f5f3f7", shoe_trim="#8fb4ff"),
+    "idol": dict(top="jacket", main="#fbf7fb", trim="#ffd36b", accent="#ff8fc8", bottom="skirt", low="#ff4fa3", socks="#ffffff",
+                 stripe="#ffd36b", sock_top=640, shoes="#ffffff", shoe_trim="#ffd36b", head="bow"),
+    "crimson": dict(top="jacket", main="#24070e", trim="#e0244f", accent="#7a0f22", bottom="skirt", low="#1a060b", socks="#14050a",
+                    stripe="#e0244f", sock_top=600, shoes="#120608", shoe_trim="#e0244f"),
+    "sweetheart": dict(top="dress", main="#ffd6e6", trim="#ffffff", accent="#ff4f8b", bottom="none", low="#ffd6e6", socks="#ffffff",
+                       stripe="#ff8fb1", sock_top=680, shoes="#ff8fb1", shoe_trim="#ffffff", chest_bow=True, pattern="#ff8fb1"),
 }
+UNLOCKS = {"night owl": ("hours", 10), "idol": ("talks", 100), "crimson": ("streak", 7), "sweetheart": ("respect", 100)}
 
 
 def heart(cx, cy, s):
@@ -42,6 +69,8 @@ class Mika(Vorn):
     SHOULDER, UPPER, FORE = (92, 248), 112, 100
 
     OUTFITS, OUTFIT_SETTING = OUTFITS, "OUTFIT"  # her wardrobe and the setting that picks from it (Vorn.__init__ chooses)
+    UNLOCKS = UNLOCKS
+    earned = set()  # her own (not Vorn's)
 
     # ---------------------------------------------------------------- drawing
     def draw(self, g):
@@ -169,6 +198,43 @@ class Mika(Vorn):
             for side in (-1, 1):
                 fill(g, poly(*([(92, 420), (150, 420), (150, 476), (82, 498)] if side < 0 else
                               mirror([(92, 420), (150, 420), (150, 476), (82, 498)]))), main, 1.8)
+        elif o["bottom"] in ("hakama", "robe"):  # down to the ankles: wide pleated trousers, or a yukata's straight robe
+            sw = math.sin(self.t * 1.3) * 2
+            wide = o["bottom"] == "hakama"
+            x0, x1 = (52, 248) if wide else (100, 200)
+            long = poly((94, 372), (206, 372), (x1 + sw, 912), (x0 + sw, 912))
+            fill(g, long, vgrad(372, 912, main, mix(main, INK, 0.4)))
+            if wide:
+                for x in (112, 132, 150, 168, 188):  # pleats
+                    pleat = QPainterPath(P(x, 392))
+                    pleat.lineTo(P(x + (x - 150) * 0.9 + sw, 908))
+                    stroke(g, pleat, alpha(INK, 0.45), 1.4)
+            else:
+                fold = QPainterPath(P(162, 392))  # where the robe overlaps itself
+                fold.lineTo(P(178 + sw, 910))
+                stroke(g, fold, alpha(INK, 0.55), 1.6)
+                self._pattern(g, o, long, 400, 900)
+            hem = QPainterPath(P(x0 + sw, 908))
+            hem.lineTo(P(x1 + sw, 908))
+            stroke(g, hem, mix(main, INK, 0.5), 3)
+
+    def _pattern(self, g, o, shape, y0, y1):
+        """Little five-petal flowers scattered over a piece of clothing (yukata, sweetheart dress)."""
+        if not o.get("pattern"):
+            return
+        g.save()
+        g.setClipPath(shape)
+        color = QColor(o["pattern"])
+        for i in range(int((y1 - y0) / 34) * 3):
+            cx, cy = 60 + (i * 67) % 180, y0 + (i * 37) % (y1 - y0)
+            g.setPen(Qt.NoPen)
+            g.setBrush(QBrush(alpha(color, 0.85)))
+            for k in range(5):
+                a = k * 2 * math.pi / 5
+                g.drawEllipse(P(cx + math.cos(a) * 4.2, cy + math.sin(a) * 4.2), 3.2, 3.2)
+            g.setBrush(QBrush(QColor("#ffe28a")))
+            g.drawEllipse(P(cx, cy), 1.8, 1.8)
+        g.restore()
 
     def _top(self, g, o):
         main, trim, accent = QColor(o["main"]), QColor(o["trim"]), QColor(o["accent"])
@@ -184,10 +250,11 @@ class Mika(Vorn):
                 skirt.quadTo(P(x + 192 / 18, 584), P(x, 566))
             skirt.quadTo(P(64, 470), P(104, 380))
             fill(g, skirt, vgrad(378, 580, main, dark))
+            self._pattern(g, o, skirt, 386, 580)
             lace = QPainterPath(P(54 + sw, 566))
             lace.lineTo(P(246 + sw, 566))
             stroke(g, lace, trim, 5)
-        hem_y = {"hoodie": 476, "jersey": 446, "dress": 386}.get(style, 432)
+        hem_y = {"hoodie": 476, "jersey": 446, "dress": 386, "kimono": 384}.get(style, 432)
         wide = 12 if style == "hoodie" else 0
         body = QPainterPath(P(150, 226))
         body.lineTo(P(214 + wide, 236))
@@ -233,8 +300,43 @@ class Mika(Vorn):
             g.drawText(QRectF(110, 300, 80, 50), Qt.AlignCenter, "01")
         elif style == "dress":
             fill(g, poly((120, 230), (180, 230), (172, 250), (128, 250)), trim, 1.2)  # lace collar
+        elif style == "kimono":
+            fill(g, poly((128, 226), (172, 226), (150, 306)), trim, 0)  # the under-collar showing in the V
+            for a, b in (((122, 230), (166, 362)), ((178, 230), (148, 312))):  # crossed collar, left over right
+                band = QPainterPath(P(*a))
+                band.lineTo(P(*b))
+                stroke(g, band, INK, 11)
+                stroke(g, band, trim if main.lightness() < 160 else mix(trim, main, 0.2), 8)
+        self._pattern(g, o, body, 232, hem_y)
         g.restore()
-        if style == "dress":
+        if o.get("obi"):  # the sash at the waist, with a cord across it
+            obi = QPainterPath()
+            obi.addRoundedRect(84, 346, 132, 42, 6, 6)
+            fill(g, obi, vgrad(346, 388, QColor(o["obi"]), mix(QColor(o["obi"]), INK, 0.35)), 1.8)
+            cord = QPainterPath(P(86, 368))
+            cord.lineTo(P(214, 368))
+            stroke(g, cord, accent if o["obi"] != o["accent"] else trim, 3)
+        if o.get("apron"):  # maid: a frilled bib and a waist apron
+            bib = poly((126, 252), (174, 252), (178, 340), (122, 340))
+            fill(g, bib, WHITE, 1.6)
+            front = QPainterPath(P(106, 390))
+            front.lineTo(P(194, 390))
+            front.lineTo(P(206, 528))
+            for i in range(6):  # scalloped hem
+                x = 206 - (i + 1) * 112 / 6
+                front.quadTo(P(x + 112 / 12, 544), P(x, 528))
+            front.closeSubpath()
+            fill(g, front, WHITE, 1.6)
+            stroke(g, poly((104, 380), (196, 380), (196, 392), (104, 392)), INK, 1.2)
+            fill(g, poly((104, 380), (196, 380), (196, 392), (104, 392)), WHITE, 0)  # the apron strings at her waist
+        if o.get("chest_bow"):  # magical girl: a big bow with tails, a gem in the knot
+            for side in (-1, 1):
+                fill(g, poly((150, 262), (150 + side * 36, 242), (150 + side * 40, 262), (150 + side * 34, 286)), accent, 1.6)
+                fill(g, poly((150 + side * 3, 268), (150 + side * 16, 318), (150 + side * 6, 312), (150, 272)), accent, 1.4)
+            gem = QPainterPath()
+            gem.addEllipse(P(150, 263), 8, 8)
+            fill(g, gem, vgrad(255, 271, WHITE, trim if trim != WHITE else QColor("#ff4f8b")), 1.6)
+        elif style == "dress":
             for side in (-1, 1):  # red ribbon bow at the collar
                 fill(g, poly((150, 240), (150 + side * 18, 230), (150 + side * 18, 252)), accent, 1.4)
             g.setBrush(QBrush(accent))
@@ -259,8 +361,20 @@ class Mika(Vorn):
             g.scale(1.35, 1.35)
             self._hand(g, pose[side][2], side)
             g.restore()
-            self._limb(g, elbow, wrist, 16, 12.5, SKIN if short else sleeve, SKIN_SH if short else INK, width=1.8)
-            self._limb(g, shoulder, elbow, 22 if o["top"] == "hoodie" else 20, 16, sleeve, INK, width=1.8)
+            wide = o.get("sleeves") == "wide"  # kimono sleeves: loose and hanging below the arm
+            if wide:
+                fill(g, poly((elbow[0] - 14, elbow[1]), (wrist[0] - 14, wrist[1]), (wrist[0] - 4, wrist[1] + 44),
+                             (elbow[0] + 4, elbow[1] + 30)), vgrad(elbow[1], wrist[1] + 44, sleeve, mix(sleeve, INK, 0.3)), 1.6)
+            self._limb(g, elbow, wrist, 24 if wide else 16, 21 if wide else 12.5, SKIN if short else sleeve,
+                       SKIN_SH if short else INK, width=1.8)
+            self._limb(g, shoulder, elbow, 24 if wide else 22 if o["top"] == "hoodie" else 20, 22 if wide else 16, sleeve, INK, width=1.8)
+            if o.get("sleeves") == "puff":  # puffed shoulders
+                puff = QPainterPath()
+                puff.addEllipse(P(shoulder[0] + side * 4, shoulder[1] + 10), 25, 21)
+                fill(g, puff, vgrad(shoulder[1] - 10, shoulder[1] + 32, sleeve, mix(sleeve, INK, 0.3)), 1.6)
+                rim = QPainterPath(P(shoulder[0] - 20 + side * 4, shoulder[1] + 26))
+                rim.quadTo(P(shoulder[0] + side * 4, shoulder[1] + 36), P(shoulder[0] + 20 + side * 4, shoulder[1] + 26))
+                stroke(g, rim, cuff, 3)
             if not short:
                 band = QPainterPath(P(wrist[0] - dy * 14 - dx * 6, wrist[1] + dx * 14 - dy * 6))
                 band.lineTo(P(wrist[0] + dy * 14 - dx * 6, wrist[1] - dx * 14 - dy * 6))
@@ -348,12 +462,45 @@ class Mika(Vorn):
         for side in (-1, 1):
             self._brow(g, 150 + side * 22, 140, side)
         self._headset(g)
+        self._headpiece(g, OUTFITS[self.outfit])
         if p["vein"] > 0.05:  # anime anger mark
             c = alpha(QColor("#e0263a"), p["vein"])
             for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
                 v = QPainterPath(P(186 + dx * 3, 94 + dy * 7))
                 v.quadTo(P(186 + dx * 3, 94 + dy * 3), P(186 + dx * 7, 94 + dy * 3))
                 stroke(g, v, c, 2.4)
+
+    def _headpiece(self, g, o):
+        """What some outfits add on her head, in front of the headset: a maid's frill, a bow, or a flower."""
+        kind = o.get("head")
+        if kind == "maid":
+            band = QPainterPath(P(102, 96))
+            band.cubicTo(P(100, 52), P(200, 52), P(198, 96))
+            stroke(g, band, INK, 12)
+            stroke(g, band, WHITE, 9)
+            for i in range(9):  # the frill along it
+                u = i / 8
+                x, y = 104 + 92 * u, 92 - 34 * math.sin(math.pi * u)
+                frill = QPainterPath()
+                frill.addEllipse(P(x, y - 6), 7, 6)
+                fill(g, frill, WHITE, 1.3)
+        elif kind == "bow":  # on the side of her head, by the cat ear
+            c, accent = (194, 76), QColor(o["accent"] if o["top"] != "kimono" else o["trim"])
+            for side in (-1, 1):
+                fill(g, poly(c, (c[0] + side * 22, c[1] - 14), (c[0] + side * 24, c[1] + 12)), accent, 1.6)
+            knot = QPainterPath()
+            knot.addEllipse(P(*c), 5.5, 5.5)
+            fill(g, knot, mix(accent, INK, 0.2), 1.4)
+        elif kind == "flower":  # a big flower clip above her ear
+            cx, cy, petal = 102, 98, QColor(o["accent"])
+            for k in range(5):
+                a = k * 2 * math.pi / 5 - math.pi / 2
+                leaf = QPainterPath()
+                leaf.addEllipse(P(cx + math.cos(a) * 9, cy + math.sin(a) * 9), 8, 8)
+                fill(g, leaf, petal, 1.4)
+            center = QPainterPath()
+            center.addEllipse(P(cx, cy), 5, 5)
+            fill(g, center, QColor("#ffe28a"), 1.2)
 
     def _headset(self, g):
         led = mix(LED, CYAN, 0.0) if self.tier < 1 else mix(LED, QColor("white"), 0.25)

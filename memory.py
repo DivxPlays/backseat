@@ -40,12 +40,13 @@ def month():
     return date.today().strftime("%Y-%m")
 
 
-MINE = ("respect", "lore", "notes", "pinned", "profile", "games", "friends", "sessions", "hall")  # per character; time and spend are shared
+MINE = ("respect", "lore", "notes", "pinned", "profile", "games", "friends", "sessions", "hall", "unlocked", "talks")  # per character; time and spend are shared
 
 
 def fresh_mind():
     """What a character remembers before meeting you."""
-    return {"respect": 10, "lore": [], "notes": [], "pinned": [], "profile": "", "games": {}, "friends": {}, "sessions": [], "hall": []}
+    return {"respect": 10, "lore": [], "notes": [], "pinned": [], "profile": "", "games": {}, "friends": {}, "sessions": [], "hall": [],
+            "unlocked": [], "talks": 0}
 
 
 def pick_pinned(pinned, query):
@@ -77,7 +78,8 @@ class Memory:
             self.d = {}
         for key, empty in (("total_seconds", 0), ("session_count", 0), ("apps", {}), ("games", {}), ("notes", []),
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
-                           ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {})):
+                           ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {}),
+                           ("unlocked", []), ("talks", 0)):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
@@ -166,6 +168,18 @@ class Memory:
         if not friend:
             self.remember(out.get("remember", ""))
         self.add_lore(out.get("lore", ""))
+
+    def mind(self, preset=None):
+        """One character's own memory: the current one's, or (duo mode) another's by preset name. Hold the lock to change it."""
+        if preset is None or preset == self.d.get("character", "vorn"):  # (same default as the swap in __init__)
+            return self.d
+        return self.d.setdefault("characters", {}).setdefault(preset, fresh_mind())
+
+    def count_talk(self, preset=None):
+        """You talked to them (counts toward an outfit)."""
+        with self.lock:
+            mind = self.mind(preset)
+            mind["talks"] = mind.get("talks", 0) + 1
 
     def add_lore(self, text, preset=None):
         """A new fact from a character's own past: the current one's, or (duo mode) the partner's, by preset name."""
