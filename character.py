@@ -244,6 +244,7 @@ WEATHER = None  # and what falls around them: "bats", "snow", "confetti" or "hea
 
 class Vorn:
     OUTFITS, OUTFIT_SETTING = VORN_OUTFITS, "VORN_OUTFIT"  # his wardrobe and the setting that picks from it
+    BUILD = "vorn"  # whose sound effects (sounds/vorn)
     SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, IRIS, IRIS_SH = SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, IRIS, IRIS_SH  # (recolor())
     SHADES = {"hair": ("HAIR", "HAIR_SH", "HAIR_HI"), "eyes": ("IRIS", "IRIS_SH"), "skin": ("SKIN", "SKIN_SH")}
     GEM, TINTED = GEM, ("GEM",)  # also in the outfit's colour (recolor()): his chest gem

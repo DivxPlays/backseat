@@ -77,6 +77,7 @@ class Mika(Vorn):
     SHOULDER, UPPER, FORE = (92, 248), 112, 100
 
     OUTFITS, OUTFIT_SETTING = OUTFITS, "OUTFIT"  # her wardrobe and the setting that picks from it (Vorn.__init__ chooses)
+    BUILD = "mika"  # whose sound effects (sounds/mika)
     SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, HAIR_DEEP = SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, HAIR_DEEP  # (recolor())
     IRIS, IRIS_SH, PUPIL = IRIS, IRIS_SH, PUPIL
     LED, TINTED = LED, ("LED",)  # her headset's lights and glow: in the outfit's colour

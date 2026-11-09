@@ -5,9 +5,6 @@
 ### Gameplay
 - **Accurate stats from the game itself:** kills and deaths from game logs or Steam where possible, instead of guessing from screenshots.
 
-### Interaction
-- **Sound effects:** Vorn's scoffs and grunts (real ones), Mika's giggles.
-
 ### Under the hood
 - **Auto-update:** checks your GitHub for a new version and updates himself, also on your friends' PCs.
 
@@ -15,6 +12,8 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Sound effects: 37 real recordings (public domain, from Freesound): grunts on pokes, grabs and landings, sighs, yawns, chuckles and giggles with idle animations, and a scoff or giggle before some lines.
+- Fix: in duo mode the free local model no longer answers with a copy of the line it's answering.
 - Auto-clips: a Hall of Shame moment in a game saves the last 30 seconds through Windows Game Bar's "Record what happened" (or NVIDIA Instant Replay), and the highlights page plays the clip with their roast over its end and them standing in the corner of it with their line. No downloads.
 - Frame-rate guard: with the free local model, a game keeping the GPU 90%+ busy gets its comments from Claude Haiku instead, so the local model never takes frames (NVIDIA, via nvidia-smi; adjustable, 0 = off).
 - Squad leaderboard: weekly shame points for your Discord friends (deaths, fails and epic plays seen on screen or told, their talk roasted or praised), standings when asked, and last week's worst player award announced when a friend first talks that week.

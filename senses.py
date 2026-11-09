@@ -477,6 +477,7 @@ class Voice:
 
     def __init__(self):
         self._audio = None
+        self.effect = False  # what's playing is a sound effect (a grunt), not a line: a line may cut it off
         self._t0 = 0.0
         self._held = None  # paused mid-line because you started talking: (audio, where to carry on)
         self._track = None  # the playing line's mouth shapes
@@ -525,10 +526,10 @@ class Voice:
         snd = miniaudio.decode(mp3, output_format=miniaudio.SampleFormat.FLOAT32, nchannels=1, sample_rate=SR)
         return np.frombuffer(snd.samples, dtype=np.float32).copy()
 
-    def play(self, audio):
-        """Start playing; returns the duration in seconds."""
+    def play(self, audio, effect=False):
+        """Start playing (effect: a sound effect, not a line); returns the duration in seconds."""
         sd.stop()
-        self._audio, self._t0, self._held = audio, time.monotonic(), None
+        self._audio, self._t0, self._held, self.effect = audio, time.monotonic(), None, effect
         self._track = mouth_track(audio)  # a few milliseconds for a 5 s line
         sd.play(audio, SR, device=find_device(config.VOICE_DEVICE, "output"))  # a VoiceMeeter input puts him in your calls
         return len(audio) / SR

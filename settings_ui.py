@@ -339,12 +339,14 @@ class SettingsWindow(QDialog):
         w["BIRTHDAY"].setPlaceholderText("month-day, like 02-10")
         w["INTERRUPT"] = QCheckBox("Talk over them and they pause to listen (needs a headset)")
         w["INTERRUPT"].setChecked(config.INTERRUPT)
+        w["SOUND_EFFECTS"] = QCheckBox("Real grunts, gasps, giggles, sighs and yawns (pokes, throws, idles, some lines)")
+        w["SOUND_EFFECTS"].setChecked(config.SOUND_EFFECTS)
         behave = self._page([("Seconds between comments", w["LOOK_COOLDOWN"]), ("Roast after this much silence", w["QUIET_ROAST"]),
                              ("Screen change that counts (lower = more comments)", w["CHANGE_THRESHOLD"]),
                              ("You're AFK after", w["AFK_AFTER"]), ("Nag to take a break after", w["BREAK_AFTER"]),
                              ("Bedtime nags from / until", bed_row), ("Minimum time between nags", w["NAG_EVERY"]),
                              ("Wake word", w["WAKE_WORD"]), ("Mic loudness that counts as speech", w["WAKE_LEVEL"]),
-                             ("Interrupting", w["INTERRUPT"]), ("Your birthday (they celebrate it)", w["BIRTHDAY"]),
+                             ("Interrupting", w["INTERRUPT"]), ("Sound effects", w["SOUND_EFFECTS"]), ("Your birthday (they celebrate it)", w["BIRTHDAY"]),
                              ("Music", w["MUSIC"]), ("", w["MUSIC_SEARCH"])])
 
         keys = []

@@ -1513,6 +1513,88 @@ try:
 finally:
     main.gpu_load, config.GPU_BUSY = real_load, saved_busy
 
+# sound effects: real recordings per build (at the voice's sample rate), before some lines, on pokes, grabs and landings
+# (never over a line), and with idle animations (at most every IDLE_GAP s, none in shut-up mode)
+import sfx  # noqa: E402
+import wave as wave_mod  # noqa: E402
+
+assert sfx.SR == senses.SR and {wave_mod.open(str(p)).getframerate() for p in sfx.FOLDER.rglob("*.wav")} == {senses.SR}
+assert all(sfx.clips("vorn", k) for k in ("grunt", "scoff", "chuckle", "laugh", "sigh", "yawn"))
+assert all(sfx.clips("mika", k) for k in ("grunt", "gasp", "giggle", "sigh", "yawn", "pout")) and not sfx.clips("vorn", "giggle")
+assert Vorn.BUILD == "vorn" and Mika.BUILD == "mika" and (sfx.FOLDER / "CREDITS.md").exists()
+assert sfx.pick("vorn", ("giggle",)) is None and sfx.pick("mika", ("giggle",)) is not None  # Vorn doesn't giggle
+saved_fx, config.SOUND_EFFECTS = config.SOUND_EFFECTS, False
+assert sfx.pick("mika", ("giggle",)) is None  # turned off
+config.SOUND_EFFECTS = saved_fx
+line_audio = np.zeros(1000, np.float32)
+assert len(sfx.before(sfx.clips("vorn", "scoff")[0], line_audio)) == len(sfx.clips("vorn", "scoff")[0]) + int(sfx.SR * 0.12) + 1000
+assert sfx.before(None, line_audio) is line_audio and sfx.before(sfx.clips("vorn", "scoff")[0], None) is None
+
+
+class FakeVoice:
+    def __init__(self, busy=False, effect=False):
+        self.played, self._busy, self.effect = [], busy, effect
+
+    def busy(self):
+        return self._busy
+
+    def play(self, audio, effect=False):
+        self.played.append((len(audio), effect))
+
+    def synth(self, line, *a):
+        return np.zeros(1000, np.float32)
+
+
+fx = SimpleNamespace(voice=FakeVoice(), chars=[SimpleNamespace(BUILD="vorn"), SimpleNamespace(BUILD="mika")], speaking=0)
+assert main.Overlay.effect(fx, 1, ("giggle",)) and fx.speaking == 1 and fx.voice.played[-1][1] is True
+assert not main.Overlay.effect(fx, 0, ("giggle",))  # nothing to play
+fx.voice = FakeVoice(busy=True)  # saying a line: no grunt over it
+assert not main.Overlay.effect(fx, 0, ("grunt",)) and not fx.voice.played
+fx.voice = FakeVoice(busy=True, effect=True)  # only a sound playing: the next one may replace it
+assert main.Overlay.effect(fx, 0, ("grunt",))
+idle_played = []
+idler = SimpleNamespace(chars=[SimpleNamespace(act=None, yawn_t0=0.0, BUILD="vorn")], acts={}, yawns={}, idle_sound={},
+                        hush=lambda: False, effect=lambda i, kinds: (idle_played.append(kinds), True)[1])
+real_random = main.random.random
+main.random.random = lambda: 0.0
+try:
+    main.Overlay.idle_sounds(idler, 100.0)
+    idler.chars[0].act = "sigh"
+    main.Overlay.idle_sounds(idler, 101.0)
+    main.Overlay.idle_sounds(idler, 102.0)  # (the same sigh, still going)
+    assert idle_played == [("sigh",)]
+    idler.chars[0].act = "power stance"
+    main.Overlay.idle_sounds(idler, 110.0)  # too soon after the sigh
+    idler.chars[0].act = "crack knuckles"
+    main.Overlay.idle_sounds(idler, 150.0)  # no sound for this one
+    idler.chars[0].act, idler.chars[0].yawn_t0 = None, 149.0  # a yawn while you're away
+    main.Overlay.idle_sounds(idler, 151.0)
+    assert idle_played == [("sigh",), ("yawn",)]
+    idler.hush, idler.chars[0].act = (lambda: True), "sigh"  # shut-up mode
+    main.Overlay.idle_sounds(idler, 300.0)
+    assert len(idle_played) == 2
+    said = []
+    talker = SimpleNamespace(voices_of={"Vorn": {}}, names=["Vorn"], dressers=[SimpleNamespace(BUILD="vorn")], voice=FakeVoice(),
+                             bridge=SimpleNamespace(say=SimpleNamespace(emit=lambda *a: said.append(a))))
+    main.Companion.speak(talker, "smug", "Pathetic.", "none", "Vorn")  # a scoff or chuckle, then the line
+    assert said[-1][1] == "Pathetic." and len(said[-1][2]) > 1000 + int(sfx.SR * 0.12)
+    saved_fx, config.SOUND_EFFECTS = config.SOUND_EFFECTS, False  # off: said instead, as before
+    main.Companion.speak(talker, "smug", "Pathetic.", "none", "Vorn")
+    assert said[-1][1] in ("Heh. Pathetic.", "Hmph. Pathetic.") and len(said[-1][2]) == 1000
+    config.SOUND_EFFECTS = saved_fx
+finally:
+    main.random.random = real_random
+played_voice = Voice()
+real_sd = (senses.sd.play, senses.sd.stop)
+senses.sd.play = senses.sd.stop = lambda *a, **k: None
+try:
+    played_voice.play(np.zeros(2400, np.float32), effect=True)
+    assert played_voice.effect and played_voice.busy()
+    played_voice.play(np.zeros(2400, np.float32))
+    assert not played_voice.effect
+finally:
+    senses.sd.play, senses.sd.stop = real_sd
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

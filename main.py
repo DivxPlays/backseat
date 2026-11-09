@@ -55,6 +55,7 @@ import holidays  # noqa: E402
 import transfer  # noqa: E402
 import unlocks  # noqa: E402
 from camera import BACKGROUNDS, REACT, Camera  # noqa: E402
+import sfx  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
@@ -334,6 +335,8 @@ class Overlay(QWidget):
         self.phase, self.phase_t0, self.rest = None, 0.0, 0.0  # "drag", "fly", "down" (in a heap), "up", "home"
         self.scream = None  # a throw: scream(i) -> (audio, text), set by main (the companion has them ready)
         self.pokes, self.jolts, self.last_said, self.thrown_by = deque(maxlen=12), {}, 0.0, 0
+        self.acts, self.yawns, self.idle_sound = {}, {}, {}  # sound effects: idle animation and yawn seen, last idle sound
+        self.hush = lambda: False  # shut-up mode: no idle sounds (set by the companion)
         self.span = CW * config.SCALE * len(self.chars)  # how wide the characters are together
         self.resize(int(BUBBLE_W + self.span), int(CH * config.SCALE) + 26)  # + a strip under their feet for the cost tag
         geo = QApplication.primaryScreen().availableGeometry()
@@ -387,6 +390,7 @@ class Overlay(QWidget):
                 self.flyer, self.thrown_by, self.phase = Flyer(self.chars[i], self.slot(i)), i, "drag"  # into your hand
                 self.grab[1] = offset = trail[0][1] - self.flyer.center
                 self.chars[i].set_mood("surprised")
+                self.effect(i, sfx.MOMENTS["grabbed"])
                 self.react(i, "grabbed")
             if dragged:  # they dangle from your hand: tilting against the motion, limbs flailing with the speed
                 last_t, last_p = trail[-1]
@@ -412,12 +416,32 @@ class Overlay(QWidget):
         if got:  # and they scream
             self.show_line("surprised", got[1], got[0], "none", self.names[i])
 
+    def effect(self, i, kinds):
+        """Character i makes a sound (a grunt, a giggle: sfx.py), unless one of them is saying a line."""
+        clip = None if self.voice.busy() and not self.voice.effect else sfx.pick(self.chars[i].BUILD, kinds)
+        if clip is not None:
+            self.speaking = i  # (their mouth moves with it)
+            self.voice.play(clip, effect=True)
+        return clip is not None
+
+    def idle_sounds(self, now):
+        """A sigh, yawn, chuckle or giggle with some idle animations, and a yawn when they yawn while you're away; at
+        most one every IDLE_GAP s each, none in shut-up mode."""
+        for i, char in enumerate(self.chars):
+            act, yawn = char.act, char.yawn_t0
+            started = act if act and act != self.acts.get(i) else "nod off" if yawn != self.yawns.get(i, yawn) else None
+            self.acts[i], self.yawns[i] = act, yawn
+            if (started in sfx.IDLES and now - self.idle_sound.get(i, -sfx.IDLE_GAP) >= sfx.IDLE_GAP and not self.hush()
+                    and random.random() < 0.7 and self.effect(i, sfx.IDLES[started])):
+                self.idle_sound[i] = now
+
     def poke(self, i, y):
         """Ctrl+click: they flinch, and say something (more annoyed the more you poke)."""
         now = time.monotonic()
         self.pokes.append(now)
         annoyed = sum(now - t < 30 for t in self.pokes) >= 5
         self.chars[i].pop, self.jolts[i] = 1.0, now
+        self.effect(i, sfx.MOMENTS["poke annoyed" if annoyed else "poke"])
         if not self.text:
             self.chars[i].set_mood("angry" if annoyed else "surprised")
             self.later[i] = (now + 1.6, "idle")
@@ -491,6 +515,7 @@ class Overlay(QWidget):
         char.slump()  # limp
         char.set_mood("angry")
         char.pop = 1.0
+        self.effect(self.thrown_by, sfx.MOMENTS["thrown"])  # (thud)
         self.react(self.thrown_by, "thrown", force=True)
 
     def show_line(self, mood, line, audio, event="none", who=""):
@@ -537,6 +562,7 @@ class Overlay(QWidget):
         if want != self.pokeable and not self.moving:
             self.pokeable = want
             set_clickthrough(self, not want)
+        self.idle_sounds(now)
         self.fly(now, dt)
         if self.flyer:
             self.flyer.update()
@@ -1098,7 +1124,7 @@ class Companion:
             return self.profile(arg)
         if kind == "poke":  # you poked, grabbed or threw one of them (free): a quick line, unless it's gone stale
             i, what, when = arg
-            if time.monotonic() - when < 3 and not self.voice.busy() and i < len(self.names):
+            if time.monotonic() - when < 3 and (not self.voice.busy() or self.voice.effect) and i < len(self.names):
                 mood, line = commands.reply(self.preset_of(i), what)
                 self.recent.append(f"(The player {'threw' if what == 'thrown' else 'grabbed' if what == 'grabbed' else 'poked'} "
                                    f"{self.names[i]}.)")
@@ -1517,12 +1543,16 @@ class Companion:
     def speak(self, mood, line, event="none", who=None):
         """Say a line in the voice of `who` (a character's name; default the current one)."""
         voice = self.voices_of.get(who) or {}
+        i = self.names.index(who) if who in self.names else 0
+        sound = None
         if event in BLOODFIRE:
             line = f"{voice.get('POWER', config.POWER)}! {line}"  # shouted as the character transforms
-        elif random.random() < 0.4 and not ALREADY_A_SOUND.match(line):  # a scoff, laugh or grunt first
-            line = f"{random.choice(SOUNDS.get(mood, ['Hmph.']))} {line}"
+        elif random.random() < 0.4 and not ALREADY_A_SOUND.match(line):  # a scoff, chuckle, giggle or grunt first
+            sound = sfx.pick(self.dressers[i].BUILD if i < len(self.dressers) else config.CHARACTER, sfx.MOODS.get(mood, ()))
+            if not config.SOUND_EFFECTS:
+                line = f"{random.choice(SOUNDS.get(mood, ['Hmph.']))} {line}"  # (sound effects off: said instead)
         try:
-            audio = self.voice.synth(line, voice.get("VOICE"), voice.get("VOICE_RATE"), voice.get("VOICE_PITCH"))
+            audio = sfx.before(sound, self.voice.synth(line, voice.get("VOICE"), voice.get("VOICE_RATE"), voice.get("VOICE_PITCH")))
         except Exception:
             logging.exception("voice failed; showing text only")
             audio = None
@@ -1641,6 +1671,7 @@ def main():
 
     overlay.poked.connect(poked)
     overlay.scream = comp.scream  # thrown: they scream
+    overlay.hush = lambda: comp.muted  # shut-up mode: no idle sounds
     set_clickthrough(overlay, True)  # also creates his window, even while he's hidden waiting for a game
 
     def set_stream(on):  # off = WDA_EXCLUDEFROMCAPTURE: hidden from OBS, recordings and his own screenshots

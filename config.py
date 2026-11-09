@@ -97,6 +97,7 @@ WAKE_LEVEL = 0.02  # mic loudness that counts as speech; raise it if game sound 
 GAME_PROFILES = True  # look each game up once on the web (about 1 cent): its modes, maps, weapons, what good players do
 MUSIC = True  # they notice what you play on Spotify (read from the Spotify app on this PC) and comment on it now and then
 MUSIC_SEARCH = True  # and look a new song up on the web first (one search, about 1 cent; at most every 10 minutes)
+SOUND_EFFECTS = True  # real grunts, gasps, scoffs, giggles, sighs and yawns (sounds/): pokes, throws, idles, before some lines
 INTERRUPT = True  # talk over him and he pauses to listen (stops if you say his name). Needs a headset: turn off with speakers
 
 BREAK_AFTER = 90  # minutes of play without a 5-minute break before he nags you to take one
