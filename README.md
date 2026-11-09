@@ -51,13 +51,15 @@ Backseat drivers, but for your gaming: an animated, full-body character in the c
 ## Setup
 
 1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
-2. Get the code: on the repo page (https://github.com/DivxPlays/backseat, private, so sign in first) click **Code > Download ZIP** and extract it, or `git clone` it.
+2. Get the code: on the repo page (https://github.com/DivxPlays/backseat, public, no account needed) click **Code > Download ZIP** and extract it, or `git clone` it.
 3. Double-click **Install Backseat.bat**. It:
    - installs Python 3.12 if it's missing (through winget),
    - puts it in `%LOCALAPPDATA%\Programs\Backseat` (an older install in `Programs\Vorn` is moved there, memory and all),
    - installs everything he needs (a few minutes the first time),
    - asks for your API key (kept only in `api_key.txt` on that PC, never uploaded),
    - adds Backseat shortcuts to the Start menu and desktop, and starts it.
+
+   Running it again updates an install: your memory, settings, key, Hall of Shame and characters are never touched (a character you edited in Settings keeps your edits; only characters the PC doesn't have yet are added).
 
    If Windows says the file came from the internet, click **More info > Run anyway**.
 4. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
@@ -207,9 +209,13 @@ Screenshots go to Anthropic's API, which means whatever is on your screen, inclu
 
 Right-click the tray icon > **Settings...** to change his name, colours, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Only the settings you changed are stored in `settings.json`, so improvements to the defaults in `config.py` still reach you; **Restore Defaults** deletes it.
 
+## Updates
+
+Once a day (when he starts) he checks GitHub for a newer version (the version number in `main.py` on GitHub). When there is one, a Windows notification says so and the tray menu shows **Update to x.y.z**; tray > **Check for updates** asks any time. Updating asks you first, then closes him, downloads the new version from GitHub, runs its installer in a window you can watch (memory, settings, key, Hall of Shame and your characters stay as they are) and starts him again. A new version comes out when the version number goes up, not with every change. A copy made with `git clone` is never updated this way: use `git pull`. Settings > Brain & budget > Updates turns the daily check off.
+
 ## What's on GitHub
 
-The code, this README, [ROADMAP.md](ROADMAP.md) (planned features), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
+The code, this README, [ROADMAP.md](ROADMAP.md) (planned features), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
 
 ## Moving him to another PC
 
