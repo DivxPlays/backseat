@@ -18,7 +18,6 @@ Built and self-checked, but not yet seen working on a real day:
 GitHub issues land in Planned with their number. No issues yet (checked 2026-11-09).
 
 ### Squad and clips
-- **Report a problem:** tray > Report a problem opens a pre-filled GitHub issue (version and the error, with names, paths and keys stripped), so friends can report bugs straight into this roadmap.
 - **"Clip that!":** say it (or press a key) and they save the last 30 seconds right then and roast it into the Hall of Shame.
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
 - **Shareable clips:** an .mp4 with them and their roast burned in, ready to send (needs ffmpeg, a download).
@@ -53,6 +52,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.1.0 (in progress):
+- Report a problem: tray > Report a problem... opens a GitHub issue filled in with the version, Windows and the last error (names, paths and keys taken out).
 - Fresher lines: each automatic line is told their recent openings and pet words (this session and the last two) to avoid, and the hour comes up only now and then.
 - Fix: a sound device dropping out (a headset reconnecting) no longer crashes the app: the default device plays the line, or it shows as subtitles.
 - Fix: mini-games start only while a game is in front, never on the desktop or in other apps.

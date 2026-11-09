@@ -1842,6 +1842,26 @@ assert main.stale_note([], hour=True) == "" and "Don't mention the time" in main
 assert main.TIME_TALK.search("still here at 3 AM?") and main.TIME_TALK.search("it's 2:30am") and not main.TIME_TALK.search("I am done")
 assert "only now and then" in config.RULES
 
+# Report a problem: the last error in the log, with names, paths and keys taken out, in a link short enough to open
+import urllib.parse  # noqa: E402
+user = os.environ.get("USERNAME", "someone")
+crash_log = ("2026-11-08 18:50:00,749 INFO start -> hi\n2026-11-08 18:51:00,749 CRITICAL crash\nTraceback (most recent call last):\n"
+             f'  File "{Path.home()}\\Backseat\\senses.py", line 534, in play\n'
+             f"sounddevice.PortAudioError: Device unavailable, Mikey, {user}, sk-ant-abc123_def, me@x.com 76561198000000000\n"
+             "2026-11-08 18:52:00,000 INFO change -> {'line': 'Mikey, pathetic'}\n")
+crash = main.last_error(crash_log)
+assert crash.startswith("2026-11-08 18:51") and "pathetic" not in crash and " start " not in crash
+issue = urllib.parse.parse_qs(urllib.parse.urlsplit(main.report_url(crash_log, ["Mikey"])).query)
+assert "Device unavailable" in issue["body"][0] and main.VERSION in issue["body"][0] and "PortAudioError" in issue["title"][0]
+for secret in ("Mikey", user, "sk-ant", "me@x.com", "76561198000000000", str(Path.home())):
+    assert secret not in issue["body"][0] + issue["title"][0], secret
+long_crash = ("2026-11-08 18:51:00,749 ERROR boom\n" + "".join(f'  File "x.py", line {i}, in f\n    {"y" * 250}\n' for i in range(40))
+              + "ValueError: last\n")
+long_url = main.report_url(long_crash)
+assert len(long_url) < 8000 and "ValueError: last" in urllib.parse.unquote_plus(long_url) and "boom" in urllib.parse.unquote_plus(long_url)
+assert main.last_error("2026-11-08 18:50:00,749 INFO fine\n") == "" and "No errors" in urllib.parse.unquote_plus(main.report_url(""))
+assert main.last_error("2026-11-08 18:50:00,749 WARNING local model failed\nTraceback (most recent call last):\nOSError: x\n")
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

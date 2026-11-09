@@ -10,6 +10,9 @@ version's entry is also its release notes on GitHub.
   idling..."), a third brought up the hour and one in nine said "Pathetic". Now each one they start themselves is told
   how they opened lately and the words they keep leaning on (from this session and the last two), and they bring up the
   time only now and then. Tried on the free local model: "Pathetic" went from 4 of 6 lines to none.
+- **Report a problem.** Tray > Report a problem... opens a new issue on GitHub in your browser, already filled in with
+  your version, your Windows version and the last error in companion.log, with names, paths, keys, emails and Steam IDs
+  taken out. Nothing is sent until you read it and press Submit (you need a GitHub account).
 
 ### Fixed
 - **A crash when the sound device dropped out.** A headset reconnecting or Windows switching its default device made

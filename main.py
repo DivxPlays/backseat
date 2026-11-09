@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import platform
 import queue
 import random
 import re
@@ -14,6 +15,8 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
+import webbrowser
 import winreg
 from collections import Counter, deque
 from ctypes import wintypes
@@ -180,6 +183,48 @@ def stale_note(said, keep=(), hour=False):
     return (" (To sound fresh: don't open the way you did lately (" + "; ".join(f'"{o}"' for o in opens)
             + "), and don't start with the player's name."
             + (" Words you've leaned on lately, use none of them: " + ", ".join(pet) + "." if pet else "") + no_hour + ")")
+
+
+ISSUES = "https://github.com/DivxPlays/backseat/issues/new"
+STAMP = re.compile(r"(?m)^(?=\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d+ )")  # where each companion.log entry starts
+
+
+def last_error(log):
+    """The last error or crash in companion.log's text, with its traceback (its first line and last 39), or ""."""
+    bad = [b for b in STAMP.split(log) if re.match(r"\S+ \S+ (ERROR|CRITICAL) ", b) or (" WARNING " in b[:40] and "Traceback" in b)]
+    lines = bad[-1].rstrip().splitlines() if bad else []
+    return "\n".join(lines[:1] + lines[1:][-39:])
+
+
+def scrub(text, names=()):
+    """Text fit for a public issue: no home folder, Windows user or PC name, keys, emails, Steam IDs or the given names."""
+    for home in {str(Path.home()), str(Path.home()).replace("\\", "/")}:
+        text = re.sub(re.escape(home), "~", text, flags=re.I)
+    text = re.sub(r"(?i)\b[a-z]:[\\/]+users[\\/]+[^\\/\s\"']+", "~", text)  # (another account's folder)
+    text = re.sub(r"sk-ant-[\w-]+|\b[0-9A-F]{32}\b", "[key]", text)  # Anthropic and Steam Web API keys
+    text = re.sub(r"\b7656119\d{10}\b", "[steam id]", text)
+    text = re.sub(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", "[email]", text)
+    for name in {os.environ.get("USERNAME", ""), os.environ.get("COMPUTERNAME", ""), *names}:
+        if len(name) > 2:
+            text = re.sub(rf"(?i)\b{re.escape(name)}\b", "[name]", text)
+    return text
+
+
+def report_url(log, names=(), about=""):
+    """A GitHub new-issue link filled in with the version, Windows and the last error in the log (scrubbed). Under 8,000
+    characters (longer links fail): the oldest lines of a long traceback go first, the error itself is at its end."""
+    lines = [line[:300] for line in scrub(last_error(log), names).splitlines()]
+    while True:
+        error = "\n".join(lines)
+        body = ("**What happened?**\n(What were you doing, and what went wrong?)\n\n"
+                f"**Version:** {APP} {updater.pretty(FULL_VERSION)} on Windows {platform.version()}{about}\n\n"
+                + (f"**Last error in companion.log** (names, paths and keys taken out):\n```\n{error}\n```\n" if error
+                   else "No errors in companion.log.\n"))
+        title = re.sub(r"^\S+ \S+ \w+ ", "", lines[-1])[:80] if lines else ""
+        url = ISSUES + "?" + urllib.parse.urlencode({"title": title, "body": body})
+        if len(url) < 8000 or len(lines) < 3:
+            return url
+        lines = lines[:1] + lines[3:]
 
 
 def fresh_turns(turns, recent):
@@ -2053,6 +2098,20 @@ def main():
             comp.bridge.update.emit(found)
 
     threading.Thread(target=daily_check, daemon=True).start()
+    def report_problem():
+        """Tray > Report a problem: a new GitHub issue in the browser, filled in; nothing is sent until you submit it."""
+        ask = ("This opens a new issue on Backseat's GitHub page in your browser, filled in with your version, your Windows "
+               "version and the last error in companion.log, with names, paths and keys taken out. Read it before you "
+               "submit it: issues are public. You need a GitHub account.")
+        if QMessageBox.question(None, "Report a problem", ask) != QMessageBox.Yes:
+            return
+        log = HERE / "companion.log"
+        with comp.mem.lock:  # friends' names: from every character's memory
+            names = [f for m in (comp.mem.d, *comp.mem.d.get("characters", {}).values()) for f in m.get("friends", {})]
+        about = (" · duo mode" if config.DUO else "") + (" · free local model" if config.LOCAL_MODEL else "")
+        webbrowser.open(report_url(log.read_text(errors="replace")[-200_000:] if log.exists() else "", names, about))
+
+    menu.addAction("Report a problem...").triggered.connect(report_problem)
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
         f"<h3>{APP} {updater.pretty(FULL_VERSION)}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
         "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "
