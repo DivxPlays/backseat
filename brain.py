@@ -200,6 +200,24 @@ def look_up_song(client, model, artist, song):
     return (out["note"].strip() if out else ""), spent
 
 
+MINIGAME_SCHEMA = {"type": "object", "properties": {"mood": SCHEMA["properties"]["mood"], "line": {"type": "string"},
+                                                    "answer": {"type": "string"}},
+                   "required": ["mood", "line", "answer"], "additionalProperties": False}
+
+
+def minigame(client, model, name, game, kind):
+    """A mini-game for a menu or queue, from `name`: a trivia question about `game` (answer: the right answer) or a dare
+    for their next match (answer: the dare, plainly). Returns (reply, dollars)."""
+    if kind == "trivia":
+        ask = (f"Mini-game while the player sits in a menu. As {name}, in character, ask them one short trivia question about "
+               f"{game} (or about gaming in general if you don't know {game} well), under 25 words. Pick a question with one "
+               "clear answer you're sure of. answer: the correct answer, short.")
+    else:
+        ask = (f"Mini-game while the player sits in a menu. As {name}, in character, dare them to do one specific thing in "
+               f"their next match of {game}, under 20 words. answer: the dare itself, short and plain (to check it later).")
+    return _ask(client, model, [{"type": "text", "text": ask}], MINIGAME_SCHEMA)
+
+
 COACH_SCHEMA = {"type": "object", "properties": {"headline": {"type": "string"}, "better": {"type": "string"},
                                                  "worse": {"type": "string"}, "tips": {"type": "array", "items": {"type": "string"}}},
                 "required": ["headline", "better", "worse", "tips"], "additionalProperties": False}

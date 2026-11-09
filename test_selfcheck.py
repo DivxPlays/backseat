@@ -843,6 +843,49 @@ with tempfile.TemporaryDirectory() as d:
         brain.look_up_song = real_lookup
 assert "{song}" in main.SITUATIONS["music"] and "music" in main.AUTO
 
+# mini-games: in a menu now and then, trivia (answer without the wake word, judged by the one who asked) and dares
+real_random = main.random.random
+main.random.random = lambda: 0.0  # (the chance always hits)
+try:
+    assert main.minigame_due(1000, 950, 0) and not main.minigame_due(1000, 800, 0)  # in a menu lately, or not
+    assert not main.minigame_due(1000, 950, 700)  # one 5 minutes ago: too soon
+finally:
+    main.random.random = real_random
+note = main.judge_note({"q": "What's the M40A3's magazine size?", "a": "5", "who": "Vorn"})
+assert '"5"' in note and "Vorn judges" in note and 'respect "up"' in note
+answers = []
+ear = WakeListener(None, None, lambda text, audio: answers.append(text))
+ear.WAKE = WakeListener.pattern(["vorn", "mika"])
+ear.expect(20, "Hey Mika")
+ear.hear("Five rounds.")  # no "Hey Mika" needed: she just asked
+ear.flush(force=True)
+assert answers == ["Hey Mika, Five rounds."], answers
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    m.trivia_result(True)
+    m.trivia_result(False)
+    m.trivia_result(True)
+    assert m.d["trivia"] == {"right": 2, "wrong": 1}
+asked, expected = [], []
+real_game = brain.minigame
+brain.minigame = lambda client, model, name, game, kind: (asked.append((name, game, kind)),
+                                                         ({"mood": "smug", "line": f"{name} asks about {game}?", "answer": "5"}, 0.0005))[1]
+try:
+    game_comp = SimpleNamespace(client=object(), names=["Vorn", "Mika"], partner={"PRESET": "mika"}, app=("cod4.exe", "Call of Duty 4", 1),
+                                mem=SimpleNamespace(spend=lambda *a: None, spent=lambda: 0.0), recent=[], trivia=None, dare=None,
+                                speak=lambda mood, line, event, who: (line, None), wake_heard=lambda *a: None,
+                                bridge=SimpleNamespace(note=SimpleNamespace(emit=lambda t: None)))
+    game_comp.listeners = [SimpleNamespace(on_heard=game_comp.wake_heard, expect=lambda s, called: expected.append((s, called)))]
+    main.random.random = lambda: 0.1  # trivia
+    main.Companion.minigame(game_comp)
+    who = game_comp.trivia["who"]
+    assert asked[-1][1:] == ("Call of Duty 4", "trivia") and game_comp.trivia["a"] == "5" and expected == [(20, f"Hey {who}")]
+    main.random.random = lambda: 0.9  # a dare
+    main.Companion.minigame(game_comp)
+    assert asked[-1][2] == "dare" and game_comp.dare["dare"] == "5" and len(expected) == 1  # (no answer to listen for)
+finally:
+    brain.minigame, main.random.random = real_game, real_random
+
 # coaching: this week against last from the stats (today included), a report at most weekly, and the page
 import coaching  # noqa: E402
 from datetime import datetime  # noqa: E402

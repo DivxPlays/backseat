@@ -97,6 +97,7 @@ BANTER = ([1, 2, 3, 4, 5, 6], [2, 4, 3, 2, 1, 1])  # duo mode: how many lines an
 LOCAL_BANTER = 4
 CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one of these gets Claude to double-check
 CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
+GAME_GAP, ANSWER_TIME = 480, 20  # mini-games: at most every 8 minutes; how long the mic takes your trivia answer
 MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
                  "words), in your own style: roast what {a} said, or take the player's side against {a}. Your past is your "
@@ -125,6 +126,20 @@ def preset_name(preset):
         return json.loads((config.PRESETS / f"{preset}.json").read_text(encoding="utf-8"))["NAME"]
     except (OSError, ValueError, KeyError):
         return preset.title()
+
+
+def minigame_due(now, menu_at, last_game):
+    """Time for a mini-game? You're in a menu (seen in the last 90 s) and there hasn't been one for GAME_GAP; checked
+    every second, so a small chance each time makes it start after a while, not the moment you open a menu."""
+    return now - menu_at < 90 and now - last_game > GAME_GAP and random.random() < 0.02
+
+
+def judge_note(trivia):
+    """What the one who asked needs to judge your trivia answer."""
+    who = trivia["who"]
+    return (f' (Mini-game: {who} just asked them a trivia question: "{trivia["q"]}" The right answer: "{trivia["a"]}". What '
+            f"they just said is their answer. {who} judges it, in character: if it's right (close enough counts), admit it "
+            "grudgingly and set respect \"up\"; if it's wrong, roast them, tell them the answer, and set respect \"down\".)")
 
 
 def needs_check(level, since, event=None):
@@ -624,6 +639,8 @@ class Companion:
         self.listening = music.Listening()  # Spotify: what's on, and repeats this session
         self.coached = ""  # a new weekly coaching report's headline, for the greeting
         self.screams = {}  # {character index: [(audio, text)]}, ready before anyone gets thrown
+        self.menu_at, self.last_game = -999.0, time.monotonic()  # mini-games: when they last saw a menu, and last played
+        self.trivia = self.dare = None  # the trivia question waiting for your answer; the dare for your next match
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
@@ -707,6 +724,33 @@ class Companion:
     def preset_of(self, i):
         """The preset of the character at position i on screen (0: the current one, 1: duo mode's partner)."""
         return config.PRESET if i == 0 else self.partner["PRESET"]
+
+    def minigame(self):
+        """In a menu: one of them asks you a trivia question about your game (the mic then takes your answer for
+        ANSWER_TIME s, no wake word) or dares you to do something in your next match."""
+        if self.client is None or (config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET):
+            return
+        i = random.randrange(len(self.names))
+        who, game = self.names[i], self.app[1] or app_name(*self.app[:2])
+        kind = "trivia" if random.random() < 0.7 else "dare"
+        out, spent = brain.minigame(self.client, config.MODEL, who, game, kind)
+        self.mem.spend(spent, "game")
+        logging.info("mini-game %s ($%.4f) -> %s", kind, spent, out)
+        if not out or not out["line"].strip():
+            return
+        said = f"You ({who}): {out['line']}" if self.partner else f"You: {out['line']}"
+        self.recent = (self.recent + [said])[-12:]
+        _, audio = self.speak(out["mood"], out["line"], "none", who)
+        if kind == "dare":
+            self.dare = {"dare": out["answer"], "who": who, "at": time.monotonic()}
+            return
+        self.trivia = {"q": out["line"], "a": out["answer"], "who": who, "until": time.monotonic() + ANSWER_TIME + 25}
+        if audio is not None:
+            time.sleep(len(audio) / SR + 0.5)  # let them finish asking
+        for listener in self.listeners:
+            if listener.on_heard == self.wake_heard:  # your mic (not your friends'): just say the answer
+                listener.expect(ANSWER_TIME, f"Hey {who}" if self.partner else "")
+                self.bridge.note.emit("(your answer?)")
 
     def prepare_screams(self):
         """Their screams for when you throw them, in their own voices, a bit faster (a throw can't wait for the voice)."""
@@ -916,6 +960,8 @@ class Companion:
             if not arg:
                 return self.bridge.note.emit("(didn't catch that)")
             kind = "ask"
+        if kind == "minigame":
+            return self.minigame()
         if kind == "poke":  # you poked, grabbed or threw one of them (free): a quick line, unless it's gone stale
             i, what, when = arg
             if time.monotonic() - when < 3 and not self.voice.busy() and i < len(self.names):
@@ -991,6 +1037,10 @@ class Companion:
             situation += (f" {self.jealous} Bring it up in the greeting, in character: whoever was left out is jealous, "
                           "hurt or mocking about it.")
             self.jealous = ""
+        trivia = self.trivia if kind == "ask" and self.trivia and time.monotonic() < self.trivia["until"] else None
+        if trivia:
+            situation += judge_note(trivia)
+            self.trivia = None
         if kind == "ask" and APOLOGY.search(arg):  # "sorry": the one you're talking to lets their grudge go
             to_whom = addressed(arg, self.wake_of) if self.partner else None
             i = self.names.index(to_whom) if to_whom in self.names else 0
@@ -1021,7 +1071,8 @@ class Companion:
         alone = random.choice([brain.me(), self.partner]) if local and self.partner else None
         query = arg if kind in ("ask", "friend") else ""  # picks the facts relevant to what was said
         context = self.knowledge(app, title, exe, query, alone)
-        smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
+        smart = kind in ("ask", "look", "breakdown") and level == 0 and not trivia  # cheap mode: Haiku only, no web search
+        # (judging a trivia answer is easy: Haiku does it)
         model = config.SMART_MODEL if smart else config.MODEL
         search = smart and kind == "ask" and bool(SEARCH_ASKED.search(arg))  # having the tool costs ~2 cents even unused
         out = None
@@ -1029,6 +1080,8 @@ class Companion:
             try:
                 out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent[-4:], situation, jpegs,
                                                only=alone)  # less old talk to mix up
+                if out.get("event") == "menu":  # (a menu is the one thing it's trusted to spot: mini-games)
+                    self.menu_at = now
                 if needs_check(level, now - self.last_check, out.get("event")):
                     logging.info("local model saw a %s: Claude double-checks", out["event"])  # (it calls every kill a win)
                     out, check = None, True
@@ -1055,6 +1108,10 @@ class Companion:
                 self.last_check = now
             out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
+        if out.get("event") == "menu":
+            self.menu_at = time.monotonic()
+        if trivia:  # your trivia answer, judged: right if they gave respect for it
+            self.mem.trivia_result(out.get("respect") == "up")
         logging.info("%s%s ($%.4f) -> %s", kind, " (check)" if check else " (local)" if spent == 0 and local else "", spent, out)
         turns = turns_of(out, self.names)  # [(speaker, mood, line)]: one for a solo character, a short exchange in duo mode
         if to:  # only the one you called speaks, even if the model wrote a line for the other
@@ -1140,6 +1197,12 @@ class Companion:
             top = self.mem.top_artists(3)
             if top:
                 text += " Their most-played artists: " + ", ".join(f"{a} ({fmt(s)})" for a, s in top) + "."
+        record = self.mem.d.get("trivia")
+        if record and (record["right"] or record["wrong"]):  # mini-games
+            text += f"\nTheir trivia record with you: {record['right']} right, {record['wrong']} wrong."
+        if self.dare and time.monotonic() - self.dare["at"] < 1200:
+            text += (f'\n{self.dare["who"]} dared them {fmt(time.monotonic() - self.dare["at"])} ago: "{self.dare["dare"]}". '
+                     "If you can see whether they did it, gloat or grudgingly admit it.")
         if self.season:  # a holiday or your birthday
             text += "\n" + self.season[1]
         return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
@@ -1293,6 +1356,10 @@ class Companion:
             broke = not config.LOCAL_MODEL and config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET
             talking_to_him = self.ears.recording or any(listener.active() for listener in self.listeners)
             if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or talking_to_him or quiet < config.LOOK_COOLDOWN:
+                continue
+            if not (self.muted or self.paused) and minigame_due(now, self.menu_at, self.last_game):  # sitting in a menu
+                self.last_game = now
+                self.jobs.put(("minigame", None))
                 continue
             if self.music_news and not self.muted and now - self.last_music_said > MUSIC_GAP:
                 playing, self.music_news = self.music_news, None

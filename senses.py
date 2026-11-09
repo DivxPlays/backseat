@@ -350,6 +350,12 @@ class WakeListener:
                 self.clips.append(audio)
         self.last_end = time.monotonic()
 
+    def expect(self, seconds, called=""):
+        """Take what's said in the next `seconds` as said to them, no wake word needed (they just asked you something).
+        called: in duo mode, the "Hey Mika" it counts as (so the one who asked answers)."""
+        self.pending, self.clips, self.called = "", [], called
+        self.last_end = time.monotonic() + seconds - self.WAIT
+
     def flush(self, force=False):
         """Send the collected question once you've stopped talking (force: now)."""
         if self.pending is None or (self.speaking and not force):

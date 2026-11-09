@@ -107,6 +107,12 @@ class Memory:
             for old in sorted(d["days"])[:-MAX_DAYS]:
                 del d["days"][old]
 
+    def trivia_result(self, right):
+        """A trivia answer judged: your record (shared, both of them know it)."""
+        with self.lock:
+            record = self.d.setdefault("trivia", {"right": 0, "wrong": 0})
+            record["right" if right else "wrong"] += 1
+
     def listened(self, artist, seconds):
         """Spotify: time you've spent on an artist (your taste)."""
         with self.lock:

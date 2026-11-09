@@ -15,7 +15,6 @@
 - **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
 
 ### Interaction
-- **Mini-games in menus and queues:** trivia about your game, or a dare from the character.
 - **Sound effects:** Vorn's scoffs and grunts (real ones), Mika's giggles.
 
 ### Under the hood
@@ -26,6 +25,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Mini-games in menus: trivia about your game (answer without the wake word, judged in character, a record kept) and dares for your next match.
 - Ragdoll throws with screams: they flail, spin, bounce, land in a heap and get up; and they scream when thrown.
 - Varied duo banter: 1 to 6 lines an exchange, usually short, now and then a real argument.
 - Coaching reports: weekly, this week against last with charts, and a verdict with 3 tips from their notes on your play (one call a week).
