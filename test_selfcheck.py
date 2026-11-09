@@ -1763,6 +1763,29 @@ try:
 finally:
     config.STEAM_KEY, main.steam_app = saved_key, real_steam_app
 
+# Start with Windows: a log-on task in Task Scheduler (Windows' startup list skipped him at log-on), the startup list
+# only when the task can't be made; turning it off removes both (faked here: your real startup settings aren't touched)
+import xml.etree.ElementTree as ET  # noqa: E402
+
+xml = main.task_xml("PC\\me & you", r"C:\Back seat\pythonw.exe", '"C:\\Back seat\\main.py" --wait-for-game', r"C:\Back seat")
+ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
+root = ET.fromstring(xml.split("?>", 1)[1])  # (parses: the & is escaped)
+assert root.find(".//t:LogonTrigger/t:UserId", ns).text == "PC\\me & you" and root.find(".//t:LogonTrigger/t:Delay", ns).text == "PT20S"
+assert root.find(".//t:Principal/t:RunLevel", ns).text == "LeastPrivilege" and root.find(".//t:Principal/t:LogonType", ns).text == "InteractiveToken"
+assert root.find(".//t:Exec/t:Arguments", ns).text.endswith("--wait-for-game") and root.find(".//t:ExecutionTimeLimit", ns).text == "PT0S"
+asked, entry = [], []
+real_schtasks, real_entry = main.schtasks, main.set_run_entry
+try:
+    main.set_run_entry = entry.append
+    for code, want_entry in ((0, False), (1, True)):  # the task made: no startup-list entry; refused: the startup list instead
+        main.schtasks = lambda *a, code=code: (asked.append(a), SimpleNamespace(returncode=code, stderr="Access is denied."))[1]
+        assert main.set_autostart(True) is (code == 0) and entry[-1] is want_entry
+        assert asked[-1][:4] == ("/create", "/tn", "Backseat", "/xml") and not Path(asked[-1][4]).exists()  # (its file cleaned up)
+    main.set_autostart(False)
+    assert asked[-1] == ("/delete", "/tn", "Backseat", "/f") and entry[-1] is False
+finally:
+    main.schtasks, main.set_run_entry = real_schtasks, real_entry
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

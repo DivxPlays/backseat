@@ -11,6 +11,7 @@ import random
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import winreg
@@ -18,6 +19,7 @@ from collections import deque
 from ctypes import wintypes
 from datetime import datetime, timedelta
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 HERE = Path(__file__).parent
 APP, VERSION, AUTHOR = "Backseat", "2.0.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
@@ -79,7 +81,8 @@ INK = QColor("#1b1418")
 HALL = HERE / "Hall of Shame"
 REPORTS = HERE / "battle reports.txt"
 PYTHONW = HERE / ".venv" / "Scripts" / "pythonw.exe"
-RUN_KEY, RUN_NAME = r"Software\Microsoft\Windows\CurrentVersion\Run", "BackseatCompanion"
+RUN_KEY, RUN_NAME = r"Software\Microsoft\Windows\CurrentVersion\Run", "BackseatCompanion"  # (the fallback)
+TASK = "Backseat"  # Task Scheduler: starts him hidden at log-on
 OLD_RUN_NAMES = ("VornCompanion",)  # the app was called Vorn before
 SITUATIONS = {
     "start": "The player just started you up. Greet them with a roast. If your stats include a battle report on their last session, "
@@ -266,7 +269,12 @@ def set_clickthrough(widget, on):
     user32.SetWindowLongPtrW(hwnd, -20, (style | 0x20) if on else (style & ~0x20))
 
 
-def autostart_on():
+def schtasks(*args):
+    return subprocess.run(["schtasks", *args], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+
+def run_entry_on():
+    """An entry in Windows' startup list (the Run key): how 2.0.0 and older started with Windows."""
     for name in (RUN_NAME, *OLD_RUN_NAMES):
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
@@ -277,8 +285,7 @@ def autostart_on():
     return False
 
 
-def set_autostart(on):
-    """Start with Windows, hidden, and wake up when a game starts."""
+def set_run_entry(on):
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
         if on:
             winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, f'"{PYTHONW}" "{HERE / "main.py"}" --wait-for-game')
@@ -287,6 +294,43 @@ def set_autostart(on):
                 winreg.DeleteValue(k, name)
             except FileNotFoundError:
                 pass
+
+
+def task_xml(user, command, arguments, folder):
+    """A log-on task for `user` alone: as them (no admin), 20 s after log-on, never stopped, one copy at a time."""
+    user, command, arguments, folder = (xml_escape(str(x)) for x in (user, command, arguments, folder))
+    return f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>Starts Backseat hidden; Vorn and Mika wake up when a game starts.</Description></RegistrationInfo>
+  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId><Delay>PT20S</Delay></LogonTrigger></Triggers>
+  <Principals><Principal id="Author"><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Priority>7</Priority></Settings>
+  <Actions Context="Author"><Exec><Command>{command}</Command><Arguments>{arguments}</Arguments><WorkingDirectory>{folder}</WorkingDirectory></Exec></Actions>
+</Task>"""
+
+
+def autostart_on():
+    return schtasks("/query", "/tn", TASK).returncode == 0 or run_entry_on()
+
+
+def set_autostart(on):
+    """Start with Windows, hidden, and wake up when a game starts: a log-on task in Task Scheduler (Windows' startup
+    list skipped him at log-on on some PCs, without a word), or the startup list if the task can't be made."""
+    task = False
+    if on:
+        user = f'{os.environ.get("USERDOMAIN", ".")}\\{os.environ.get("USERNAME", "")}'
+        xml = Path(tempfile.gettempdir()) / "backseat-task.xml"
+        xml.write_text(task_xml(user, PYTHONW, f'"{HERE / "main.py"}" --wait-for-game', HERE), encoding="utf-16")
+        made = schtasks("/create", "/tn", TASK, "/xml", str(xml), "/f")
+        xml.unlink(missing_ok=True)
+        task = made.returncode == 0
+        if not task:
+            logging.warning("couldn't make the log-on task (%s); using Windows' startup list", made.stderr.strip())
+    else:
+        schtasks("/delete", "/tn", TASK, "/f")
+    set_run_entry(on and not task)
+    return task
 
 
 class Flyer(QWidget):
@@ -1704,10 +1748,15 @@ def main():
     k32.CreateMutexW.restype = wintypes.HANDLE
     k32.CloseHandle.argtypes = [wintypes.HANDLE]
     mutex = k32.CreateMutexW(None, False, "Local\\BackseatCompanion")
-    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS: one Vorn at a time (two would double your API bill)
-        user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
-        return
     waiting = "--wait-for-game" in sys.argv
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS: one Vorn at a time (two would double your API bill)
+        if not waiting:  # (started with Windows while he's already up: just bow out)
+            user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
+        return
+    if waiting:
+        logging.info("started with Windows: hidden until a game starts")
+    if run_entry_on() and schtasks("/query", "/tn", TASK).returncode != 0:  # 2.0.0's startup entry: move it to the task
+        threading.Thread(target=set_autostart, args=(True,), daemon=True).start()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     bridge = Bridge()
