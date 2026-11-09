@@ -1,10 +1,10 @@
 <p align="center"><img src="docs/images/icon-vorn.png" width="96" alt="Vorn"> <img src="docs/images/icon-mika.png" width="96" alt="Mika"></p>
 
-# Vorn: your trash-talking gaming companion
+# Backseat: your trash-talking gaming companions
 
-Version 1.2.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
+Version 1.2.0 · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
-An animated, full-body character in the corner of your screen: Vorn the warlord, or Mika the yandere gamer girl. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
+Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
 <p align="center"><img src="docs/images/duo.png" width="520" alt="Vorn and Mika in duo mode, Mika talking"></p>
 
@@ -39,18 +39,18 @@ An animated, full-body character in the corner of your screen: Vorn the warlord,
 ## Setup
 
 1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
-2. Get the code: on the repo page (https://github.com/DivxPlays/vorn, private, so sign in first) click **Code > Download ZIP** and extract it, or `git clone` it.
-3. Double-click **Install Vorn.bat**. It:
+2. Get the code: on the repo page (https://github.com/DivxPlays/backseat, private, so sign in first) click **Code > Download ZIP** and extract it, or `git clone` it.
+3. Double-click **Install Backseat.bat**. It:
    - installs Python 3.12 if it's missing (through winget),
-   - puts him in `%LOCALAPPDATA%\Programs\Vorn`,
+   - puts it in `%LOCALAPPDATA%\Programs\Backseat` (an older install in `Programs\Vorn` is moved there, memory and all),
    - installs everything he needs (a few minutes the first time),
    - asks for your API key (kept only in `api_key.txt` on that PC, never uploaded),
-   - adds Vorn shortcuts to the Start menu and desktop, and starts him.
+   - adds Backseat shortcuts to the Start menu and desktop, and starts it.
 
    If Windows says the file came from the internet, click **More info > Run anyway**.
 4. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
 
-Running **Install Vorn.bat** from a newer download updates him; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall, turn off Start with Windows in his tray menu, quit him, then delete `%LOCALAPPDATA%\Programs\Vorn` and the two shortcuts.
+Running **Install Backseat.bat** from a newer download updates it; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall, turn off Start with Windows in his tray menu, quit him, then delete `%LOCALAPPDATA%\Programs\Vorn` and the two shortcuts.
 
 Working on his code instead? Put your key in `api_key.txt` in the code folder and double-click `run.bat`; it sets everything up there and starts him.
 
@@ -112,7 +112,7 @@ These are handled on your PC, instantly and without an API call, and confirmed i
 - **Spending tracker:** he estimates the cost of every call and keeps a monthly total, always shown in a small tag under him. Click the cost line at the top of the tray menu for the **Costs window**: this month against your budget, today, a bar per day, a month-end estimate, and what it went to (talking to him, automatic comments, breakdowns, battle reports). At 80% of `MONTHLY_BUDGET` he switches to cheap mode (Haiku only, no web search, no breakdowns); at 100% he only talks when you talk to him. He tells you when either happens. These are estimates from token counts; the Anthropic Console is the real bill.
 - **Start with Windows:** tray > Start with Windows. He starts hidden at login and wakes up when a Steam game (or one listed in `GAMES`) comes to the front. Until then he doesn't watch, listen or track anything. Tray > Wake up now skips the wait.
 - **Volume ducking:** while he talks, every other app drops to 35% of its volume (`DUCK_TO`), then goes back. If he ever crashes mid-sentence, raise them again in the Windows Volume Mixer.
-- **Only one Vorn at a time:** starting a second copy just tells you he's already running, so you can't double your bill by accident.
+- **Only one copy at a time:** starting a second copy just tells you he's already running, so you can't double your bill by accident.
 - **Idle life:** he yawns when you go AFK, rolls his eyes when you sit in menus, glances at your other screens, and his aura flares when you win. Sometimes he scoffs or laughs before speaking.
 - **Long-term memory:** say "Hey Vorn, **remember that** my main is the M40A3" and it's pinned for good; "**forget** the M40A3" removes it. Up to 500 pinned facts; when full, they tell you to make room (nothing is dropped). With more than 40, each message only carries the facts relevant to what was said and the game you're in (plus the 10 newest), so a big memory doesn't make calls cost more. The free local model reads all of this memory too, but only Claude adds to it. They also take their own notes on lasting things (your name, preferences, habits, running jokes); when those fill up, the oldest are folded into a short long-term profile of you (Haiku, about 0.04 cents) instead of being lost. Tray > **Memories** shows the profile, the pinned facts and the recent notes, and lets you edit or delete any of it. Each character has their own: what you tell Mika, Vorn doesn't know.
 - Memory lives in `memory.json`: time stats, score, respect, your last 20 sessions, and his notes about you (general and per game). Delete the file to wipe it.

@@ -1,8 +1,9 @@
-# Installs Vorn on this PC: Python 3.12 if needed, his files in %LOCALAPPDATA%\Programs\Vorn, everything he needs,
-# your API key, and Start menu + desktop shortcuts. Run it through "Install Vorn.bat". Running it again updates him.
+# Installs Backseat on this PC: Python 3.12 if needed, its files in %LOCALAPPDATA%\Programs\Backseat, everything it needs,
+# your API key, and Start menu + desktop shortcuts. Run it through "Install Backseat.bat". Running it again updates it.
 # The parameters are for testing; a normal install uses the defaults.
 param(
-    [string]$Dest = (Join-Path $env:LOCALAPPDATA "Programs\Vorn"),
+    [string]$Dest = (Join-Path $env:LOCALAPPDATA "Programs\Backseat"),
+    [string]$Old = (Join-Path $env:LOCALAPPDATA "Programs\Vorn"),  # where it lived when the app was called Vorn
     [string[]]$ShortcutDirs = @([Environment]::GetFolderPath("Programs"), [Environment]::GetFolderPath("Desktop")),
     [switch]$NoLaunch
 )
@@ -20,7 +21,20 @@ function Find-Python {
     return $null
 }
 
-Write-Host "Installing Vorn into $Dest" -ForegroundColor Yellow
+Write-Host "Installing Backseat into $Dest" -ForegroundColor Yellow
+
+# 0. Installed back when the app was called Vorn: move it over (memory, settings, key and all) and tidy up after it
+if ((Test-Path $Old) -and -not (Test-Path $Dest)) {
+    Write-Host "Moving your Vorn install (memory, settings and key included) to $Dest"
+    Move-Item $Old $Dest
+    $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    $boot = (Get-ItemProperty $run -ErrorAction SilentlyContinue).VornCompanion
+    if ($boot) {
+        Set-ItemProperty $run BackseatCompanion ($boot.Replace($Old, $Dest))
+        Remove-ItemProperty $run VornCompanion
+    }
+}
+foreach ($dir in $ShortcutDirs) { Remove-Item (Join-Path $dir "Vorn.lnk") -ErrorAction SilentlyContinue }
 
 # 1. Python 3.12
 $python = Find-Python
@@ -65,15 +79,15 @@ if (-not (Test-Path "api_key.txt")) {
 $shell = New-Object -ComObject WScript.Shell
 foreach ($dir in $ShortcutDirs) {
     New-Item -ItemType Directory -Force $dir | Out-Null
-    $link = $shell.CreateShortcut((Join-Path $dir "Vorn.lnk"))
+    $link = $shell.CreateShortcut((Join-Path $dir "Backseat.lnk"))
     $link.TargetPath = Join-Path $Dest ".venv\Scripts\pythonw.exe"
     $link.Arguments = '"' + (Join-Path $Dest "main.py") + '"'
     $link.WorkingDirectory = $Dest
     $link.IconLocation = Join-Path $Dest "vorn.ico"
-    $link.Description = "Vorn, your trash-talking gaming companion"
+    $link.Description = "Backseat: Vorn and Mika, your trash-talking gaming companions"
     $link.Save()
 }
 
 Write-Host ""
-Write-Host "Vorn is installed. Start him from the Start menu or the desktop shortcut." -ForegroundColor Green
+Write-Host "Backseat is installed. Start it from the Start menu or the desktop shortcut." -ForegroundColor Green
 if (-not $NoLaunch) { Start-Process (Join-Path $Dest ".venv\Scripts\pythonw.exe") -ArgumentList ('"' + (Join-Path $Dest "main.py") + '"') -WorkingDirectory $Dest }

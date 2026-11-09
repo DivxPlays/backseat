@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
-APP, VERSION, AUTHOR = "Vorn", "1.2.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
+APP, VERSION, AUTHOR = "Backseat", "1.2.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
 logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 for noisy in ("httpx", "httpx2", "huggingface_hub", "faster_whisper", "comtypes"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
@@ -67,7 +67,8 @@ INK = QColor("#1b1418")
 HALL = HERE / "Hall of Shame"
 REPORTS = HERE / "battle reports.txt"
 PYTHONW = HERE / ".venv" / "Scripts" / "pythonw.exe"
-RUN_KEY, RUN_NAME = r"Software\Microsoft\Windows\CurrentVersion\Run", "VornCompanion"
+RUN_KEY, RUN_NAME = r"Software\Microsoft\Windows\CurrentVersion\Run", "BackseatCompanion"
+OLD_RUN_NAMES = ("VornCompanion",)  # the app was called Vorn before
 SITUATIONS = {
     "start": "The player just started you up. Greet them with a roast. If your stats include a battle report on their last session, "
              "open with its highlights; otherwise use their time stats or notes.",
@@ -179,12 +180,14 @@ def set_clickthrough(widget, on):
 
 
 def autostart_on():
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
-            winreg.QueryValueEx(k, RUN_NAME)
-        return True
-    except OSError:
-        return False
+    for name in (RUN_NAME, *OLD_RUN_NAMES):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+                winreg.QueryValueEx(k, name)
+            return True
+        except OSError:
+            pass
+    return False
 
 
 def set_autostart(on):
@@ -192,9 +195,9 @@ def set_autostart(on):
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
         if on:
             winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, f'"{PYTHONW}" "{HERE / "main.py"}" --wait-for-game')
-        else:
+        for name in OLD_RUN_NAMES + (() if on else (RUN_NAME,)):  # (an entry from when the app was called Vorn goes too)
             try:
-                winreg.DeleteValue(k, RUN_NAME)
+                winreg.DeleteValue(k, name)
             except FileNotFoundError:
                 pass
 
@@ -1150,7 +1153,7 @@ def main():
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     k32.CreateMutexW.restype = wintypes.HANDLE
     k32.CloseHandle.argtypes = [wintypes.HANDLE]
-    mutex = k32.CreateMutexW(None, False, "Local\\VornCompanion")
+    mutex = k32.CreateMutexW(None, False, "Local\\BackseatCompanion")
     if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS: one Vorn at a time (two would double your API bill)
         user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
         return
@@ -1368,9 +1371,9 @@ def main():
     boot.setChecked(autostart_on())
     boot.toggled.connect(set_autostart)
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
-        f"<h3>{APP} {VERSION}</h3><p>Your trash-talking gaming companion.</p><p>Made by <b>{AUTHOR}</b>.</p>"
+        f"<h3>{APP} {VERSION}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
         "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "
-        "Hearing: Whisper on your PC.</p><p><a href='https://github.com/DivxPlays/vorn'>github.com/DivxPlays/vorn</a></p>")))
+        "Hearing: Whisper on your PC.</p><p><a href='https://github.com/DivxPlays/backseat'>github.com/DivxPlays/backseat</a></p>")))
     menu.addAction("Quit").triggered.connect(app.quit)
     menu.aboutToShow.connect(lambda: spend.setText(
         f"Costs: ${comp.mem.spent():.2f}" + (f" of ${config.MONTHLY_BUDGET}" if config.MONTHLY_BUDGET else "") + " this month..."))

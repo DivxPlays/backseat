@@ -6,7 +6,7 @@ start "" .venv\Scripts\pythonw.exe main.py
 exit /b
 
 :setup
-echo Installing what Vorn needs, this can take a few minutes...
+echo Installing what Backseat needs, this can take a few minutes...
 rem Rebuild the environment only if it's missing or broken; otherwise just add the missing packages.
 .venv\Scripts\python.exe -c "import pip" 2>nul || (if exist .venv rmdir /s /q .venv) & .venv\Scripts\python.exe -c "import pip" 2>nul || python -m venv .venv || exit /b 1
 .venv\Scripts\python -m pip install -r requirements.txt || exit /b 1
