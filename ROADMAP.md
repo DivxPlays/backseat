@@ -14,7 +14,7 @@ Built and self-checked, but not yet seen working on a real day:
 - The squad leaderboard with friends on a real Discord call.
 - 2.1.0: "Clip that!" and clips through Medal in a real game, a milestone party, and Report a problem opening a real issue.
 
-## Ideas for 2.1.0 (not decided: pick the ones you want)
+## Ideas for 2.2.0 (not decided: pick the ones you want)
 
 GitHub issues land in Planned with their number. No issues yet (checked 2026-11-09).
 
@@ -30,6 +30,11 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 ### Quality
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
+- **An .exe installer instead of the .bat** (asked for on 2026-11-09): one Install-Backseat.exe to download and run,
+  with Backseat's icon, a proper window and an uninstaller, built by the release script (for example with Inno Setup,
+  a free tool download). An unsigned .exe still gets Windows' "More info > Run anyway" warning, and antivirus flags
+  unsigned installers more often than a .bat; a code-signing certificate (about $10 a month through Azure Trusted
+  Signing, or more elsewhere) removes most of that.
 
 ## Bigger ideas (a later version)
 
