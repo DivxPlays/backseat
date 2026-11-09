@@ -40,6 +40,7 @@ Your reply is spoken aloud by a voice engine and is latency-sensitive; begin you
 
 MODEL = "claude-haiku-5-5"  # his automatic comments and roasts (most calls): ~0.05 cents each
 SMART_MODEL = "claude-opus-5-5"  # when you talk to him or press the look key: better hints, ~2 cents each
+LOCAL_MODEL = ""  # a free vision model in Ollama (e.g. "qwen3-vl:8b-instruct") for his automatic comments; "" = Claude does them
 
 VOICE = "en-US-ChristopherNeural"  # any edge-tts voice (list them with: edge-tts --list-voices)
 VOICE_RATE = "+6%"

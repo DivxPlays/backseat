@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import urllib.request
 from pathlib import Path
 
 import anthropic
@@ -10,6 +11,7 @@ import config
 from character import MOODS
 
 KEY_FILE = Path(__file__).with_name("api_key.txt")
+OLLAMA = "http://127.0.0.1:11434"  # the local model server, only used when LOCAL_MODEL is set
 EVENTS = ["none", "death", "win", "loss", "fail", "epic", "menu"]
 SCHEMA = {
     "type": "object",
@@ -68,12 +70,38 @@ def _ask(client, model, content, schema, tools=None):
     return json.loads([b.text for b in r.content if b.type == "text"][-1]), spent  # the JSON answer is the last text block
 
 
-def think(client, model, context, recent, situation, jpegs, search=False):
+def prompt(context, recent, situation, jpegs):
     text = f"{context}\n\nRecent dialogue (oldest first):\n" + ("\n".join(recent) or "(nothing yet)") + f"\n\nRight now: {situation}"
     if not jpegs:
         text += "\n(The player has paused your vision, so you can't see the screen right now.)"
     elif len(jpegs) > 1:
         text += f"\n(The {len(jpegs)} images are the player's displays, left to right. The game is usually on one of them.)"
+    return text
+
+
+def local_think(model, context, recent, situation, jpegs):
+    """think() on a free vision model running on this PC through Ollama. Returns (reply, 0.0); raises if Ollama fails."""
+    body = {"model": model, "stream": False, "format": SCHEMA, "keep_alive": "15m", "options": {"num_predict": 400},
+            "messages": [{"role": "system", "content": config.PERSONA.replace("{name}", config.NAME)},
+                         {"role": "user", "content": prompt(context, recent, situation, jpegs), "images": jpegs}]}
+    req = urllib.request.Request(f"{OLLAMA}/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:  # the first call also loads the model onto the GPU
+        out = json.loads(json.loads(r.read())["message"]["content"])
+    return {**QUIET_REPLY, **{k: v for k, v in out.items() if k in SCHEMA["properties"]}}, 0.0
+
+
+def start_ollama():
+    """Start the Ollama app if it's installed but not running (it runs the local model)."""
+    try:
+        urllib.request.urlopen(f"{OLLAMA}/api/version", timeout=2).close()
+    except OSError:
+        app = Path(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama app.exe")
+        if app.exists():
+            os.startfile(app)
+
+
+def think(client, model, context, recent, situation, jpegs, search=False):
+    text = prompt(context, recent, situation, jpegs)
     content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": j}} for j in jpegs]
     content.append({"type": "text", "text": text})
     tools = WEB_SEARCH if search and "haiku" not in model else None

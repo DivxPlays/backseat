@@ -74,6 +74,16 @@ Each look sends a screenshot of every display he watches: the display with your 
 
 Example: 8 active hours a day, comments every 60 s, and 10 questions a day comes to at most ~40 cents a day, about $12 a month. With the default 15 s it's up to ~90 cents a day, about $26 a month.
 
+### Free local model (optional)
+
+With a strong graphics card, a free vision model on your own PC can make his automatic comments instead of Claude Haiku, so only talking to him costs money (about 20 cents a day in the example above, ~$6 a month). Claude still answers when you talk to him, and does F10 hints, breakdowns and battle reports.
+
+1. Install Ollama from ollama.com.
+2. In a terminal: `ollama pull qwen3-vl:8b-instruct` (6.2 GB; uses about 7-8 GB of video memory while loaded). On a smaller card use `qwen3-vl:4b-instruct` (3.3 GB).
+3. Tray > Settings > Brain & budget > **Free local model for automatic comments**: pick that model, then Save & restart.
+
+He starts Ollama himself if it isn't running. Each local comment takes about a second (12 seconds for the first one while the model loads), and the model unloads after 15 minutes without use. Its roasts are a bit blander than Claude's. It shares your GPU with the game, so watch for frame drops; if Ollama fails, he quietly uses Claude for 5 minutes. With a local model, his automatic comments keep going even after your monthly budget is used up.
+
 To spend less: watch one display (`MONITOR = 1`), raise the seconds between comments, or set the model for talking to him to Haiku (questions drop to about a tenth of a cent, but hints get weaker). Set a monthly spend limit in the Anthropic Console as a hard backstop. The spend in the tray menu is his own estimate from token counts; the Console is the real bill.
 
 ## Privacy

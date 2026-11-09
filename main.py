@@ -329,6 +329,9 @@ class Companion:
         self.base_thumb = None
         self.history = deque(maxlen=3)  # the game's display from the last few looks, for post-match breakdowns
         self.streak = 0  # wins and epic plays in a row, for Bloodfire
+        self.local_down_until = 0.0  # after the local model fails, use Claude until then
+        if config.LOCAL_MODEL:
+            threading.Thread(target=brain.start_ollama, daemon=True).start()
 
     def start(self):
         for target in (self.worker, self.watcher, self.ears.model):  # ears.model preloads Whisper
@@ -404,8 +407,9 @@ class Companion:
         if self.client is None:
             return self.speak("disgusted", "You forgot my API key, fool. Put it in api underscore key dot text.")
         level, crossed = self.mem.budget_level()
-        if level == 2 and kind in AUTO and not crossed:
-            return  # budget used up: he only answers when you talk to him
+        local = config.LOCAL_MODEL and kind in AUTO and kind != "breakdown" and time.monotonic() > self.local_down_until
+        if level == 2 and kind in AUTO and not crossed and not local:
+            return  # budget used up: he only answers when you talk to him (the free local model keeps going)
         if kind == "start":
             self.write_battle_report()
         exe, title, _ = self.app
@@ -428,9 +432,17 @@ class Companion:
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
         model = config.SMART_MODEL if smart else config.MODEL
         search = smart and kind == "ask" and bool(SEARCH_ASKED.search(arg))  # having the tool costs ~2 cents even unused
-        out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
+        out = None
+        if local:
+            try:
+                out, spent = brain.local_think(config.LOCAL_MODEL, context, self.recent, situation, jpegs)
+            except Exception:
+                logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
+                self.local_down_until = time.monotonic() + 300
+        if out is None:
+            out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
-        logging.info("%s ($%.4f) -> %s", kind, spent, out)
+        logging.info("%s%s ($%.4f) -> %s", kind, " (local)" if spent == 0 and local else "", spent, out)
         before = self.mem.d["respect"]
         self.mem.record(app, out)
         event = "epic" if tier_for(self.mem.d["respect"]) > tier_for(before) else out.get("event", "none")  # new gear: aura flare
@@ -525,7 +537,7 @@ class Companion:
                 self.mem.save()
                 last_save = now
             quiet = now - self.last_spoke
-            broke = config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET
+            broke = not config.LOCAL_MODEL and config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET
             if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or self.ears.recording or quiet < config.LOOK_COOLDOWN:
                 continue
             start, end = config.BEDTIME

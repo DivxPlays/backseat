@@ -309,6 +309,44 @@ with tempfile.TemporaryDirectory() as old_pc, tempfile.TemporaryDirectory() as n
     frozen.save()
     assert json.loads((new / "memory.json").read_text(encoding="utf-8")) == {"respect": 77}  # no save over an import
 
+# free local model through Ollama: same reply format as Claude, costs nothing, raises on failure so he falls back to Claude
+import http.server  # noqa: E402
+import threading  # noqa: E402
+
+seen = []
+
+
+class FakeOllama(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        seen.append(body)
+        if body["model"] == "broken":
+            self.send_response(500)
+            self.end_headers()
+            return
+        reply = json.dumps({"message": {"content": json.dumps({"mood": "smug", "line": "Free roast.", "event": "death", "extra": 1})}})
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(reply.encode())
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.HTTPServer(("127.0.0.1", 0), FakeOllama)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+real_ollama, brain.OLLAMA = brain.OLLAMA, f"http://127.0.0.1:{server.server_port}"
+out, spent = brain.local_think("qwen3-vl:8b-instruct", "stats", [], "Roast them.", ["aW1n"])
+assert spent == 0.0 and out["line"] == "Free roast." and out["event"] == "death" and out["killer"] == "" and "extra" not in out
+assert seen[0]["format"] == brain.SCHEMA and seen[0]["messages"][1]["images"] == ["aW1n"] and not seen[0]["stream"]
+try:
+    brain.local_think("broken", "stats", [], "Roast them.", [])
+    raise AssertionError("a failing local model must raise so he falls back to Claude")
+except OSError:
+    pass
+brain.OLLAMA = real_ollama
+server.shutdown()
+
 # Bloodfire: epic plays, two wins in a row, or reaching 100 respect; he ignites, then cools down
 assert main.bloodfire(0, "epic", 40, 43) == (1, "bloodfire")
 assert main.bloodfire(0, "win", 40, 43) == (1, None) and main.bloodfire(1, "win", 40, 43) == (2, "bloodfire")
