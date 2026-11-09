@@ -650,6 +650,44 @@ try:
 finally:
     brain.urllib.request.urlopen = real_urlopen
 assert speakers == {"Vorn", "Mika"}
+
+# free voice commands: a whole sentence that is a command is handled on this PC, no API call; anything else goes to Claude
+import commands  # noqa: E402
+
+V, M = sorted(Vorn.OUTFITS), sorted(OUTFITS)
+chars = {"vorn": VORN_NAMES, "mika": ["mika", "micah"]}
+for text, outfits, want in [
+        ("Shut up for 10 minutes.", V, ("mute", 600)), ("shut up", V, ("mute", None)), ("Be quiet for half an hour please", V, ("mute", 1800)),
+        ("shut up for a minute", V, ("mute", 60)), ("Can you be quiet for a while?", V, ("mute", 600)), ("You can talk again.", V, ("unmute", None)),
+        ("Stop looking at my screen.", V, ("vision", False)), ("Look again", V, ("vision", True)),
+        ("How much have you cost me this month?", V, ("cost", None)), ("Change your outfit.", V, ("outfit", None)),
+        ("Wear the hoodie.", V, ("outfit", "off-duty")), ("Wear the hoodie.", M, ("outfit", "hoodie")),
+        ("Put on your obsidian armor", V, ("outfit", "obsidian")), ("Switch to the desert one", V, ("outfit", "desert raider")),
+        ("Switch to Micah.", V, ("switch", "mika")), ("Both of you.", V, ("switch", "both")), ("Go back to Vorn", M, ("switch", "vorn")),
+        ("Shut up, you're wrong about that map.", V, None), ("How much did this game cost?", V, None), ("I want pizza", V, None),
+        ("Wear something cool", V, None), ("Switch to a better loadout", V, None)]:
+    assert commands.parse(text, outfits, chars) == want, (text, commands.parse(text, outfits, chars), want)
+assert commands.duration(600) == "10 minutes" and commands.duration(3600) == "an hour" and commands.money(12.07) == "12 dollars and 7 cents"
+done = []
+fake = SimpleNamespace(  # just what Companion.command touches: duo mode, Vorn current, Mika beside him
+    wake_of={"Vorn": VORN_NAMES, "Mika": ["mika", "micah"]}, partner=brain.partner(), names=["Vorn", "Mika"],
+    dressers=[Vorn("warlord"), Mika("jacket")], recent=[], mem=SimpleNamespace(spent=lambda: 1.5, line=lambda t: None),
+    set_mute=lambda on, seconds=0: done.append(("mute", on, seconds)), set_pause=lambda on: done.append(("pause", on)),
+    bridge=SimpleNamespace(wear=SimpleNamespace(emit=lambda i, n: done.append(("wear", i, n))),
+                           switch=SimpleNamespace(emit=lambda t: done.append(("switch", t)))),
+    speak=lambda mood, line, event, who: (done.append(("say", who, line)), (line, None))[1])
+for said, want in [("Hey Mika, wear the hoodie.", ("wear", 1, "hoodie")), ("Hey Vorn, wear the hoodie.", ("wear", 0, "off-duty")),
+                   ("Hey Vorn, shut up for 10 minutes.", ("mute", True, 600)), ("Hey Mika, stop looking.", ("pause", True)),
+                   ("Hey Mika, how much have you cost me?", None), ("Hey Mika, switch to Vorn.", ("switch", "vorn")),
+                   ("Hey Vorn, both of you.", None)]:
+    done.clear()
+    assert main.Companion.command(fake, said), said
+    who = "Mika" if "Mika," in said else "Vorn"
+    assert (want is None or want in done) and any(d[0] == "say" and d[1] == who for d in done), (said, done)
+    assert not any(d[0] == "switch" for d in done) or "switch to" in said  # "both of you" while they're both here: no restart
+assert "1 dollar and 50 cents" in fake.recent[-5] and "10 minutes" in fake.recent[-9]  # what they said back is in the dialogue
+done.clear()
+assert not main.Companion.command(fake, "Hey Vorn, how was your day?") and not done  # a normal question goes to Claude
 duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
 assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
 duo.show_line("angry", "Hands off my player.", None, "none", "Mika")

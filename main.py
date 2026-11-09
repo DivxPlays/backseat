@@ -1,6 +1,7 @@
 """Vorn: an AI gaming companion that watches your screen, talks, gives hints and trash-talks you."""
 import ctypes
 import difflib
+import json
 import logging
 import os
 import queue
@@ -38,6 +39,7 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainter
 from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMenu, QMessageBox, QSystemTrayIcon, QWidget  # noqa: E402
 
 import brain  # noqa: E402
+import commands  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
 import transfer  # noqa: E402
@@ -138,6 +140,8 @@ class Bridge(QObject):
     chat = Signal()
     move = Signal()
     awake = Signal()
+    wear = Signal(int, str)  # voice command: which character (0 = the current one) puts on which outfit
+    switch = Signal(str)  # voice command: switch to a preset, or "both" (restarts him)
 
 
 def set_clickthrough(widget, on):
@@ -376,6 +380,8 @@ class Companion:
         self.jobs = queue.Queue()
         self.recent = []
         self.paused = self.muted = self.busy = self.started = False
+        self.unmute_at = 0.0  # "shut up for 10 minutes": when he may talk again (0 = not on a timer)
+        self.dressers = []  # the characters on screen (set once the overlay exists), for outfit commands
         self.awake = not waiting  # started with Windows: stay hidden until a game starts
         self.show_on_stream = bool(self.mem.d.get("show_on_stream"))
         now = time.monotonic()
@@ -476,15 +482,77 @@ class Companion:
             self.jobs.put(("heard", audio))
 
     def toggle_pause(self):
-        self.paused = not self.paused
+        self.set_pause(not self.paused)
+
+    def set_pause(self, on):
+        self.paused = on
         cue("off" if self.paused else "on")
         self.bridge.note.emit(f"(not watching your screen: {config.KEY_PAUSE.upper()} to resume)" if self.paused else "(watching again)")
 
     def toggle_mute(self):
-        self.muted = not self.muted
+        self.set_mute(not self.muted)
+
+    def set_mute(self, on, seconds=0):
+        """Shut-up mode on or off; with seconds, it ends by itself (the watcher checks)."""
+        self.muted = on
+        self.unmute_at = time.monotonic() + seconds if on and seconds else 0.0
         cue("off" if self.muted else "on")
         self.bridge.note.emit(f"(shut-up mode: I'll only talk when you talk to me. {config.KEY_MUTE.upper()} to undo)"
                               if self.muted else "(free to speak my mind again)")
+
+    def command(self, said):
+        """A voice command, handled here for free and instantly (see commands.py). True if `said` was one."""
+        m = WakeListener.pattern([n for names in self.wake_of.values() for n in names]).match(said)
+        who = addressed(said, self.wake_of) if self.partner else None  # duo mode: the one you called confirms it
+        who = who if who in self.names else config.NAME
+        i = self.names.index(who)
+        dresser = self.dressers[i] if i < len(self.dressers) else None
+        characters = {}
+        for p in presets():
+            try:
+                characters[p] = json.loads((config.PRESETS / f"{p}.json").read_text(encoding="utf-8"))["WAKE_NAMES"]
+            except (OSError, ValueError, KeyError):
+                characters[p] = []
+        cmd = commands.parse(said[m.end():] if m else said, sorted(dresser.OUTFITS) if dresser else (), characters)
+        if not cmd:
+            return False
+        kind, value = cmd
+        logging.info("voice command: %s %s", kind, value)
+        preset = config.PRESET if i == 0 else self.partner["PRESET"]
+        key, values, then = kind, {}, None
+        if kind == "mute":
+            self.set_mute(True, value or 0)
+            key, values = ("mute for", {"n": commands.duration(value)}) if value else ("mute", {})
+        elif kind == "unmute":
+            self.set_mute(False)
+        elif kind == "vision":
+            self.set_pause(not value)
+            key = "vision on" if value else "vision off"
+        elif kind == "cost":
+            values = {"spent": commands.money(self.mem.spent())}
+        elif kind == "outfit":
+            if dresser is None:
+                return False
+            value = value or random.choice([o for o in dresser.OUTFITS if o != dresser.outfit])  # "change your outfit": a new one
+            self.bridge.wear.emit(i, value)
+            values = {"outfit": value.title()}
+        elif kind == "switch":
+            if (bool(self.partner) if value == "both" else not self.partner and value == config.PRESET):
+                key = "already"
+            else:
+                key, then = ("switch both" if value == "both" else "only me" if value == preset else "switch"), value
+                values = {"other": value.title()}
+        mood, line = commands.reply(preset, key, **values)
+        self.recent.append(f"Player: {said}")
+        self.mem.line(f"Player: {said}")
+        said_back = f"You ({who}): {line}" if self.partner else f"You: {line}"
+        self.recent = (self.recent + [said_back])[-12:]
+        self.mem.line(said_back)
+        _, audio = self.speak(mood, line, "none", who)
+        if then:  # let them finish, then restart as the other character
+            time.sleep((len(audio) / SR if audio is not None else 2.0) + 0.3)
+            self.bridge.switch.emit(then)
+        return True
 
     def worker(self):
         while True:
@@ -511,6 +579,8 @@ class Companion:
             kind = "ask"
         if kind == "ask":
             self.bridge.note.emit(f'You: "{arg}"')
+            if self.command(arg):  # "shut up for 10 minutes", "wear the hoodie"...: handled here, no API call
+                return
         speaker, enrolled = None, False
         if kind == "friend":  # someone in your Discord call said "Hey Vorn"
             arg, clip = arg
@@ -726,6 +796,8 @@ class Companion:
             exe, title, pid = foreground_app()
             if pid != os.getpid():
                 self.app, self.focus = (exe, title, pid), foreground_center()
+            if self.unmute_at and now >= self.unmute_at:  # "shut up for 10 minutes" is over
+                self.set_mute(False)
             if not self.awake:  # started with Windows: wait for a game, without tracking or looking
                 if steam_app(self.app[0]) or app_name(*self.app[:2]) in [g.lower() for g in config.GAMES]:
                     self.wake_up()
@@ -783,6 +855,7 @@ def main():
     app.screenAdded.connect(update_skips)
     app.screenRemoved.connect(update_skips)
     overlay = Overlay(comp.voice, comp.mem.d.get("overlay_pos"), lambda: comp.mem.d["respect"], comp.mem.spent)
+    comp.dressers = overlay.chars  # for "Hey Vorn, wear Obsidian"
     set_clickthrough(overlay, True)  # also creates his window, even while he's hidden waiting for a game
 
     def set_stream(on):  # off = WDA_EXCLUDEFROMCAPTURE: hidden from OBS, recordings and his own screenshots
@@ -809,6 +882,17 @@ def main():
         k32.CloseHandle(mutex)  # let the new copy start
         subprocess.Popen([str(PYTHONW if PYTHONW.exists() else sys.executable), str(HERE / "main.py")], cwd=HERE)
         app.quit()
+
+    def switch_to(target):
+        """Another character (a preset name) or "both" (duo mode); he restarts as them. Tray menu and voice command."""
+        if target == "both":
+            set_setting("DUO", True)
+        else:
+            set_setting("PRESET", target)
+            set_setting("DUO", False)
+        restart()
+
+    bridge.switch.connect(switch_to)
 
     def weekly():
         with comp.mem.lock:
@@ -890,12 +974,11 @@ def main():
         pick = characters.addAction(preset.title())
         pick.setCheckable(True)
         pick.setChecked(preset == config.PRESET and not config.DUO)
-        pick.triggered.connect(lambda _=False, p=preset: (set_setting("PRESET", p), set_setting("DUO", False), restart())
-                               if p != config.PRESET or config.DUO else None)
+        pick.triggered.connect(lambda _=False, p=preset: switch_to(p) if p != config.PRESET or config.DUO else None)
     both = characters.addAction("Both (duo mode)")
     both.setCheckable(True)
     both.setChecked(config.DUO)
-    both.triggered.connect(lambda: (set_setting("DUO", True), restart()) if not config.DUO else None)
+    both.triggered.connect(lambda: switch_to("both") if not config.DUO else None)
     camera = Camera(overlay, lambda: comp.focus)  # the Discord camera
     cam_menu = menu.addMenu("Discord camera")
     cam_picks = {}
@@ -919,6 +1002,8 @@ def main():
             cam_picks[key, value].triggered.connect(lambda _=False, k=key, v=value: set_camera(k, v))
         cam_menu.addSeparator()
     camera.start()
+    wearers = []  # wear(outfit) for each character on screen: the tray menus and "Hey Vorn, wear Obsidian" both use them
+    bridge.wear.connect(lambda i, name: wearers[i](name))
     for who, dresser in zip(overlay.names, overlay.chars):  # each one's wardrobe (both in duo mode), switched live
         outfits = menu.addMenu("Outfit" if len(overlay.chars) == 1 else f"{who}'s outfit")
         choices = {}
@@ -930,6 +1015,7 @@ def main():
             for n, action in choices.items():
                 action.setChecked(n == name)
 
+        wearers.append(wear)
         for name in sorted(dresser.OUTFITS) + ["random"]:
             choices[name] = outfits.addAction("Surprise me (a new one each launch)" if name == "random" else name.title())
             choices[name].setCheckable(True)

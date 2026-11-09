@@ -51,6 +51,19 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
 | tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, switch Character, open Settings, turn on Start with Windows, see About (version and who made it), or quit |
 
+### Voice commands (free)
+
+These are handled on your PC, instantly and without an API call, and confirmed in character. Say them after "Hey Vorn" or "Hey Mika" (or hold F8, or type them with F9). Only a sentence that is just the command counts: "shut up, you're wrong about that map" still goes to Claude.
+
+| Say | What happens |
+|---|---|
+| "shut up" / "be quiet for 10 minutes" / "...for half an hour" / "...for a while" | shut-up mode (F4), for good or for that long |
+| "you can talk again" | ends shut-up mode |
+| "stop looking" / "look again" | pause / resume watching your screen (F7) |
+| "change your outfit" / "wear the hoodie" / "put on your obsidian armor" | a different outfit, or that one (the one you called changes in duo mode) |
+| "switch to Mika" / "switch to Vorn" / "both of you" | another character or duo mode (he restarts) |
+| "how much have you cost me?" | this month's API spend, read out loud |
+
 ## How it behaves
 
 - He sees all your displays except the ones in `SKIP_DISPLAYS` (the XENEON EDGE is skipped), each sent as its own image. Add a display's name to `SKIP_DISPLAYS` to hide it from him, or set `MONITOR = 1` to watch only your main display.
