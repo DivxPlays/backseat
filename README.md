@@ -64,6 +64,7 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 - **Volume ducking:** while he talks, every other app drops to 35% of its volume (`DUCK_TO`), then goes back. If he ever crashes mid-sentence, raise them again in the Windows Volume Mixer.
 - **Only one Vorn at a time:** starting a second copy just tells you he's already running, so you can't double your bill by accident.
 - **Idle life:** he yawns when you go AFK, rolls his eyes when you sit in menus, glances at your other screens, and his aura flares when you win. Sometimes he scoffs or laughs before speaking.
+- **Long-term memory:** say "Hey Vorn, **remember that** my main is the M40A3" and it's pinned for good; "**forget** the M40A3" removes it. They also take their own notes on lasting things (your name, preferences, habits, running jokes); when those fill up, the oldest are folded into a short long-term profile of you (Haiku, about 0.04 cents) instead of being lost. Tray > **Memories** shows the profile, the pinned facts and the recent notes, and lets you edit or delete any of it. Both characters share what they know about you.
 - Memory lives in `memory.json`: time stats, score, respect, your last 20 sessions, and his notes about you (general and per game). Delete the file to wipe it.
 - He is hidden from screenshots and recordings by default, so he can't see himself. Tick **Show me on stream / recordings** in the tray menu to have him appear in OBS and clips.
 

@@ -13,6 +13,7 @@ import config
 
 FILE = Path(__file__).with_name("memory.json")
 MAX_NOTES, MAX_GAME_NOTES, MAX_SESSIONS, MAX_DAYS, MAX_LINES = 40, 20, 20, 30, 30
+MAX_PINNED, CONDENSE = 100, 20  # facts you asked them to remember; how many old notes fold into the profile at once
 COUNTED = {"death": "deaths", "win": "wins", "loss": "losses", "fail": "fails", "epic": "epic plays"}  # events he keeps score of
 
 
@@ -56,7 +57,7 @@ class Memory:
             self.d = {}
         for key, empty in (("total_seconds", 0), ("session_count", 0), ("apps", {}), ("games", {}), ("notes", []),
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
-                           ("spend_days", {}), ("spend_level", {}), ("hall", [])):
+                           ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", "")):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own respect meter and past
@@ -79,6 +80,36 @@ class Memory:
             d["days"][today] = d["days"].get(today, 0) + dt
             for old in sorted(d["days"])[:-MAX_DAYS]:
                 del d["days"][old]
+
+    def pin(self, fact):
+        """Something the player asked to be remembered: kept for good (not pushed out like notes)."""
+        fact = fact.strip().rstrip(".")
+        with self.lock:
+            if fact and fact.lower() not in (p.lower() for p in self.d["pinned"]):
+                self.d["pinned"] = (self.d["pinned"] + [fact])[-MAX_PINNED:]
+
+    def unpin(self, words):
+        """Forget pinned facts and notes that mention all of `words`; returns what was forgotten."""
+        want = [w for w in re.findall(r"[a-z0-9']+", words.lower()) if w not in ("the", "a", "an", "my", "that", "about", "i")]
+        gone = []
+        with self.lock:
+            for key in ("pinned", "notes"):
+                keep = []
+                for item in self.d[key]:
+                    (gone if want and all(w in item.lower() for w in want) else keep).append(item)
+                self.d[key] = keep
+        return gone
+
+    def old_notes(self):
+        """When the notes are nearly full: the oldest ones, to be folded into the long-term profile."""
+        with self.lock:
+            return list(self.d["notes"][:CONDENSE]) if len(self.d["notes"]) >= MAX_NOTES - 4 else []
+
+    def condensed(self, notes, profile):
+        """The oldest notes were folded into a new profile: drop them and keep it."""
+        with self.lock:
+            self.d["notes"] = [n for n in self.d["notes"] if n not in notes]
+            self.d["profile"] = profile.strip()
 
     def remember(self, note):
         note = note.strip()
@@ -199,7 +230,11 @@ class Memory:
                 lines.append(f'Your battle report on their last session: "{report}"')
             lines.append("Your own past (stay consistent with it):" + ("".join(f"\n- {n}" for n in d["lore"]) or " nothing told yet."))
             lines.append("Notes about the player in this game:" + ("".join(f"\n- {n}" for n in g["notes"]) or " nothing yet."))
-            lines.append("Things you remember about the player:" + ("".join(f"\n- {n}" for n in d["notes"]) or " nothing yet."))
+            if d["profile"]:
+                lines.append(f"Your long-term picture of the player: {d['profile']}")
+            if d["pinned"]:
+                lines.append("The player asked you to always remember:" + "".join(f"\n- {p}" for p in d["pinned"]))
+            lines.append("Things you remember about the player (recent):" + ("".join(f"\n- {n}" for n in d["notes"]) or " nothing yet."))
             friends = d.get("friends", {})
             if friends:
                 lines.append("The player's friends you know from voice calls (running jokes to use):" + "".join(

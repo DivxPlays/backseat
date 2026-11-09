@@ -131,3 +131,17 @@ def report(client, model, session_text):
            "under 60 words, no markdown. It will be read aloud at the start of their next session.")
     out, spent = _ask(client, model, [{"type": "text", "text": ask}], REPORT_SCHEMA)
     return (out["report"] if out else ""), spent
+
+
+PROFILE_SCHEMA = {"type": "object", "properties": {"profile": {"type": "string"}}, "required": ["profile"], "additionalProperties": False}
+
+
+def condense(client, model, profile, notes):
+    """Fold old notes into the long-term profile of the player (so nothing lasting is lost). Returns (profile, dollars)."""
+    ask = ("Your current long-term picture of the player:\n" + (profile or "(empty)") + "\n\nOlder notes you took about them:\n"
+           + "\n".join(f"- {n}" for n in notes)
+           + "\n\nRewrite the long-term picture so it keeps everything lasting from these notes: their name, preferences, skills, "
+             "habits, favourite games and gear, running jokes, friends. Drop anything that was only true at the moment (what they "
+             "were doing, the time) and duplicates. Write it as plain notes, not in character: plain sentences, under 120 words.")
+    out, spent = _ask(client, model, [{"type": "text", "text": ask}], PROFILE_SCHEMA)
+    return (out["profile"] if out else profile), spent

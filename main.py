@@ -44,6 +44,7 @@ import transfer  # noqa: E402
 from camera import BACKGROUNDS, Camera  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
+from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, make_character, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
 from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
@@ -97,6 +98,8 @@ def bloodfire(streak, event, before, after):
     return streak, None
 
 
+REMEMBER = re.compile(r"^(?:please\s+)?(?:remember|don'?t forget)\s+(?:that\s+|this:?\s+)?(?!my voice)(.{3,})", re.I)
+FORGET = re.compile(r"^(?:please\s+)?forget\s+(?:that\s+|about\s+|this:?\s+)?(.{2,})", re.I)
 ENROLL = re.compile(r"\b(?:remember|learn|save)\s+my\s+voice\W+(?:please\W+)?(?:(?:i'?m|i am|my name is|it'?s|this is|call me)\s+)?"
                     r"(?!please\b)([a-z][a-z'-]{1,20})", re.I)
 SEARCH_ASKED = re.compile(r"\b(search|look (it |that |this )?up|google|wiki|guide|walkthrough)", re.I)
@@ -491,6 +494,8 @@ class Companion:
                          f'with the player, says to you: "{arg}". Answer them.')
         else:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
+        if kind == "ask":
+            situation += self.memory_command(arg)
         if crossed:
             situation += " " + BUDGET_NEWS[level]
         context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start)
@@ -541,6 +546,34 @@ class Companion:
         line, audio = self.speak(out.get("mood", "idle"), out["line"], event)
         if shame:
             self.hall_entry(shame, line, title or app, audio)
+        self.condense_memory()
+
+    def memory_command(self, said):
+        """ "Remember that ..." pins a fact for good, "forget ..." removes it; returns a note for the reply."""
+        m = REMEMBER.match(said)
+        if m:
+            self.mem.pin(m.group(1))
+            return f' (You have now pinned this in your memory for good: "{m.group(1)}". Confirm it briefly, in character.)'
+        m = FORGET.match(said)
+        if m:
+            gone = self.mem.unpin(m.group(1))
+            return (f" (You erased this from your memory: {'; '.join(gone)}. Confirm it briefly, in character.)" if gone else
+                    " (Nothing in your memory matched that. Say so, in character.)")
+        return ""
+
+    def condense_memory(self):
+        """When the notes are nearly full, fold the oldest into the long-term profile instead of losing them."""
+        old = self.mem.old_notes()
+        if not old or self.client is None:
+            return
+        try:
+            profile, spent = brain.condense(self.client, config.MODEL, self.mem.d["profile"], old)
+        except Exception:
+            return logging.warning("couldn't update the long-term profile", exc_info=True)
+        self.mem.spend(spent, "memory")
+        self.mem.condensed(old, profile)
+        self.mem.save()
+        logging.info("folded %d old notes into the long-term profile ($%.4f)", len(old), spent)
 
     def hall_entry(self, path, line, game, audio):
         clip = path.with_suffix(".wav") if audio is not None else None
@@ -718,6 +751,13 @@ def main():
         windows["costs"].show()
         windows["costs"].raise_()
         windows["costs"].activateWindow()
+
+    def open_memories():
+        windows["memories"] = MemoriesWindow(comp.mem, config.NAME)  # fresh each time: shows what they remember now
+        windows["memories"].show()
+        windows["memories"].raise_()
+        windows["memories"].activateWindow()
+
     bridge.say.connect(overlay.show_line)
     bridge.note.connect(overlay.note)
     bridge.chat.connect(lambda: comp.awake and chat.popup(overlay))
@@ -745,6 +785,7 @@ def main():
     menu.addAction("Open this week's highlights").triggered.connect(weekly)
     menu.addAction("Open battle reports").triggered.connect(lambda: REPORTS.exists() and os.startfile(REPORTS))
     menu.addSeparator()
+    menu.addAction("Memories (what they remember about you)...").triggered.connect(open_memories)
     menu.addAction("Export memory (to move him to another PC)...").triggered.connect(export_memory)
     menu.addAction("Import memory...").triggered.connect(import_memory)
     menu.addSeparator()

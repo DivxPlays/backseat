@@ -515,6 +515,33 @@ config.CAMERA, config.CAMERA_BACKGROUND = "off", "dark"
 # friends' ear on a call's audio: a missing speaker or device is refused (never a silent fallback to your own mic)
 assert not senses.listen_source_ok("loopback:No Such Speaker 123") and not senses.listen_source_ok("No Such Mic 123")
 
+# long-term memory: pinned facts stay, "forget" removes them, old notes fold into the profile, the window round-trips
+for said, fact in (("remember that my main is the M40A3", "my main is the M40A3"), ("Don't forget I hate snipers.", "I hate snipers."),
+                   ("remember my voice, I'm Mike", None), ("how do I remember the map", None)):
+    m = main.REMEMBER.match(said)
+    assert (m.group(1) if m else None) == fact, (said, m and m.group(1))
+assert main.FORGET.match("forget about the M40A3").group(1) == "the M40A3"
+from memories_ui import MemoriesWindow  # noqa: E402
+
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    m.pin("My main is the M40A3.")
+    m.pin("my main is the m40a3")  # no duplicates
+    m.pin("I hate snipers")
+    m.d["notes"] = [f"2026-11-0{i % 9 + 1}: note {i}" for i in range(38)] + ["2026-11-08: Plays CoD4 on a 5120x1440 screen."]
+    assert m.d["pinned"] == ["My main is the M40A3", "I hate snipers"], m.d["pinned"]
+    old = m.old_notes()
+    assert len(old) == 20 and old[0].endswith("note 0")
+    m.condensed(old, "DivxPlays, plays CoD4, mains the M40A3.")
+    assert len(m.d["notes"]) == 19 and m.d["profile"].startswith("DivxPlays") and not m.old_notes()
+    ctx = m.context("g.exe", "G", None, 0)
+    assert "long-term picture of the player: DivxPlays" in ctx and "always remember:\n- My main is the M40A3" in ctx
+    assert m.unpin("the M40A3") == ["My main is the M40A3"] and m.d["pinned"] == ["I hate snipers"]
+    win = MemoriesWindow(m, "Mika")
+    win.pinned.addItem("Birthday is in March")
+    win.save()
+    assert m.d["pinned"] == ["I hate snipers", "Birthday is in March"] and json.loads(Path(d, "memory.json").read_text(encoding="utf-8"))["pinned"][-1] == "Birthday is in March"
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
