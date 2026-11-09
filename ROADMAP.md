@@ -6,9 +6,6 @@
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
 - **Accurate stats from the game itself:** kills and deaths from game logs or Steam where possible, instead of guessing from screenshots.
 
-### Social
-- **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
-
 ### Interaction
 - **Sound effects:** Vorn's scoffs and grunts (real ones), Mika's giggles.
 
@@ -20,6 +17,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Squad leaderboard: weekly shame points for your Discord friends (deaths, fails and epic plays seen on screen or told, their talk roasted or praised), standings when asked, and last week's worst player award announced when a friend first talks that week.
 - Character creator: your own character on Vorn's or Mika's body (name, who they are, voice, power-up, hair, eye, skin and outfit colours, live preview); Claude writes their full personality, misheard names and their own voice-command lines (about 6 cents). Colours for Vorn and Mika too; created characters travel with Export memory.
 - Challenges and bounties: one thing for your next match they can check on screen, with a bounty (easy, hard, brutal) paid by whoever set it, a fine when you fail or dodge it, settled from your screen, and a record. Ask for one any time ("give me a challenge").
 - Fixes: the Discord ear no longer takes their own voices for a friend talking; test scripts can't pop up a crash box or write to companion.log.

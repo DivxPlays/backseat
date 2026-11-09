@@ -27,8 +27,11 @@ SCHEMA = {
         "killer": {"type": "string"},
         "lore": {"type": "string"},
         "challenge": {"type": "string", "enum": ["none", "done", "failed"]},
+        "squad": {"type": "array", "items": {"type": "object", "properties": {
+            "friend": {"type": "string"}, "event": {"type": "string", "enum": ["death", "fail", "epic"]}},
+            "required": ["friend", "event"], "additionalProperties": False}},
     },
-    "required": ["mood", "line", "event", "respect", "save_moment", "remember", "game_note", "killer", "lore", "challenge"],
+    "required": ["mood", "line", "event", "respect", "save_moment", "remember", "game_note", "killer", "lore", "challenge", "squad"],
     "additionalProperties": False,
 }
 PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50)}  # $ per million tokens
@@ -44,7 +47,7 @@ def cost(model, usage):
 REPORT_SCHEMA = {"type": "object", "properties": {"report": {"type": "string"}}, "required": ["report"], "additionalProperties": False}
 WEB_SEARCH = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 2}]
 QUIET_REPLY = {"mood": "disgusted", "line": "Hmph. Not worth my breath.", "event": "none", "respect": "same",
-               "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": "", "challenge": "none"}
+               "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": "", "challenge": "none", "squad": []}
 
 
 SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the player and their friends want it raw and asked for it. "

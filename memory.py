@@ -62,6 +62,16 @@ def pick_pinned(pinned, query):
     return [pinned[i] for i in sorted(pick)]
 
 
+SHAME = {"death": 1, "fail": 2, "roasted": 1, "epic": -2, "praised": -1, "talked": 0}  # squad leaderboard points
+SQUAD_WEEKS = 8  # weeks of squad boards kept
+
+
+def week(day=None):
+    """ "2026-W45": the ISO week of `day` (today by default), the squad board's key."""
+    y, w, _ = (day or date.today()).isocalendar()
+    return f"{y}-W{w:02d}"
+
+
 def app_name(exe, title):
     return Path(exe).name.lower() if exe else (title or "unknown")
 
@@ -133,6 +143,23 @@ class Memory:
             record = self.d.setdefault("challenges", {"done": 0, "failed": 0, "last": []})
             record["done" if done else "failed"] += 1
             record["last"] = (record["last"] + [{"challenge": challenge, "done": done}])[-5:]
+
+    def squad_event(self, friend, event, day=None):
+        """One for a friend on this week's squad board: "death", "fail" or "epic" (seen on screen), "roasted" or "praised"
+        (what they said to them), "talked"."""
+        with self.lock:
+            boards = self.d.setdefault("squad", {})
+            row = boards.setdefault(week(day), {}).setdefault(friend.lower(), {})
+            row[event] = row.get(event, 0) + 1
+            for old in sorted(k for k in boards if k.count("-W"))[:-SQUAD_WEEKS]:
+                del boards[old]
+
+    def squad_board(self, which=None):
+        """[(friend, shame points, {thing: count})] for a week ("2026-W45"; this one by default), worst first."""
+        with self.lock:
+            rows = [(f, sum(SHAME.get(k, 0) * n for k, n in r.items()), dict(r))
+                    for f, r in self.d.get("squad", {}).get(which or week(), {}).items()]
+        return sorted(rows, key=lambda r: (-r[1], r[0]))
 
     def trivia_result(self, right):
         """A trivia answer judged: your record (shared, both of them know it)."""
@@ -234,7 +261,8 @@ class Memory:
             if out.get("event") in COUNTED:
                 for score in (g["events"], self.session["events"]):
                     score[out["event"]] = score.get(out["event"], 0) + 1
-            self.d["respect"] = max(0, min(100, self.d["respect"] + {"up": 3, "down": -2}.get(out.get("respect"), 0)))
+            if not friend:  # (a friend talking: the verdict is on them, for the squad board)
+                self.d["respect"] = max(0, min(100, self.d["respect"] + {"up": 3, "down": -2}.get(out.get("respect"), 0)))
             note = out.get("game_note", "").strip()
             if note and note not in g["notes"]:
                 g["notes"] = (g["notes"] + [note])[-MAX_GAME_NOTES:]

@@ -59,8 +59,8 @@ import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
-from memory import (Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen, idle_seconds,  # noqa: E402
-                    is_game, steam_app, steam_hours)  # noqa: E402
+from memory import (SHAME, Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen,  # noqa: E402
+                    idle_seconds, is_game, steam_app, steam_hours, week as memory_week)
 from senses import SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
@@ -127,6 +127,23 @@ def echo(heard, recent):
     words = set(re.findall(r"[a-z']+", heard.lower())) - {"hey", "hay", "hi", "a", "ok", "okay", "oh", "ooh"}
     return len(words) >= 2 and any(len(words & set(re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower()))) >= 0.7 * len(words)
                                    for said in recent[-8:] if said.startswith("You"))
+
+
+def squad_line(rows):
+    """A squad board as words: "Mike 7 (death 3, roasted 2, talked 5), Sam 1 (...)"."""
+    return ", ".join(f"{f.title()} {pts} (" + ", ".join(f"{k} {n}" for k, n in sorted(r.items())) + ")" for f, pts, r in rows)
+
+
+def award_due(mem, today=None):
+    """Last week's worst player, once: (their name, last week's board) if there was a squad last week, someone ended up
+    with shame points, and it hasn't been announced; else None. Announcing marks it."""
+    last = memory_week((today or datetime.now().date()) - timedelta(days=7))
+    rows = mem.squad_board(last)
+    with mem.lock:
+        if not rows or rows[0][1] <= 0 or mem.d.setdefault("squad", {}).get("announced") == last:
+            return None
+        mem.d["squad"]["announced"] = last
+    return rows[0][0], rows
 
 
 def addressed(text, wake_of):
@@ -1107,6 +1124,13 @@ class Companion:
                          f"Greet {name} with a roast." if enrolled else
                          f'{name or "One of the player`s friends (you can`t tell which; if they say their name, use it)"}, in the voice call '
                          f'with the player, says to you: "{arg}". Answer them.')
+            if name:
+                situation += (f' (respect: here it\'s your verdict on {name}, not the player: "down" if what they said deserves a '
+                              'roast, "up" if it was genuinely smart or funny, else "same".)')
+            award = award_due(self.mem)
+            if award:  # the squad's first word to them this week: last week's worst player, as a short ceremony
+                situation += (f" (Before you answer: announce last week's squad award, a short ceremony in character. Worst "
+                              f"player of the week: {award[0].title()}. The board, worst first: {squad_line(award[1])}.)")
         else:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
         if kind == "music":  # a new song on Spotify: look it up once (if allowed), then react
@@ -1181,7 +1205,7 @@ class Companion:
                     # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
                     # (it reads your memory, it doesn't write it); Claude does those
                     out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="",
-                               challenge="none")
+                               challenge="none", squad=[])
                     said, voice = (out["turns"][0] if alone else None), alone
                     while said and said["line"].strip() and len(out["turns"]) < min(lines, LOCAL_BANTER):  # they go back and forth
                         voice = brain.me() if voice is self.partner else self.partner  # each from their own head: own past only
@@ -1213,6 +1237,14 @@ class Companion:
             return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again
         before = self.mem.d["respect"]
         self.mem.record(app, out, friend=speaker)
+        known = set(self.mem.d.get("friends", {}))
+        for seen in out.get("squad", []):  # friends from the call dying, failing or popping off on your screen
+            if str(seen.get("friend", "")).lower() in known and seen.get("event") in SHAME:
+                self.mem.squad_event(seen["friend"], seen["event"])
+        if speaker:  # a friend talked to them: the verdict on what they said goes on the squad board
+            self.mem.squad_event(speaker, "talked")
+            if out.get("respect") in ("up", "down"):
+                self.mem.squad_event(speaker, "praised" if out["respect"] == "up" else "roasted")
         if self.dare and out.get("challenge") in ("done", "failed"):  # (they paid out or collected in this very line)
             self.settle_challenge(out["challenge"] == "done")
         for t in out.get("turns", []):  # duo mode: a story goes to whoever told it (the local model's turns have none)
@@ -1302,6 +1334,10 @@ class Companion:
             text += (f'\nActive challenge from {c["who"]}, set {fmt(time.monotonic() - c["at"])} ago: "{c["dare"]}" (bounty: '
                      f'+{c["bounty"]} respect from {c["who"]} if they do it, -{c["fine"]} if they fail). When you settle it, '
                      f"{c['who']} pays out grudgingly or collects gleefully, in character.")
+        board = self.mem.squad_board() if query else []
+        if board:  # asked or talked to: the squad leaderboard, for "who's the worst?" and trash talk
+            points = ", ".join(f"{k} {v:+d}" for k, v in SHAME.items() if v)
+            text += f"\nSquad leaderboard this week (shame points: {points}; worst first): {squad_line(board)}."
         record = self.mem.d.get("challenges")
         if record:
             last = "; ".join(f'"{r["challenge"]}" ({"done" if r["done"] else "failed"})' for r in record["last"][-3:])

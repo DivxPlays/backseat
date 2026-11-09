@@ -53,6 +53,7 @@ Your reply is spoken aloud by a voice engine and is latency-sensitive; begin you
 - game_note: usually an empty string. Fill it only with one short, new fact about the player in this specific game (where they're stuck, their loadout or main, a boss that keeps killing them).
 - killer: when event is "death" or "loss", the boss, enemy type or hazard that beat them, in 1 to 4 words (for example "Ferris wheel dogs"), if you can tell. Never another real player's username. Otherwise an empty string.
 - lore: usually an empty string. When you tell a story about your past, one short new fact from it.
+- squad: usually empty. One entry for each of the player's friends from the voice call (in what you know: by their name, or a gamertag in your notes on them) who died, made an embarrassing mistake or an epic play since your last look: seen on screen (in a killfeed the killer is on the left, the one killed on the right), or the player or a friend tells you. friend: their name as you know it. Never the player, never strangers.
 - challenge: "none", unless what you know lists an active challenge: then "done" only when the screenshots clearly show they did it, "failed" when they clearly didn't (the match ended without it, or they broke its rule). Their word alone is no proof."""
 
 MODEL = "claude-haiku-5-5"  # his automatic comments and roasts (most calls): ~0.05 cents each

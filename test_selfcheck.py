@@ -469,6 +469,34 @@ with tempfile.TemporaryDirectory() as d:
     m.record("g.exe", {"remember": "The player camps in corners."})
     assert m.d["friends"]["mike"]["notes"] == ["Mike blames lag for everything."] and len(m.d["notes"]) == 1
     assert "Mike: Mike blames lag for everything." in m.context("g.exe", "G", None, 0)
+    m.d["respect"] = 40
+    m.record("g.exe", {"respect": "down"}, friend="mike")  # a friend's dumb question: the verdict is on them, not the player
+    assert m.d["respect"] == 40
+
+# squad leaderboard: shame points per friend per week (deaths, fails, epics on screen; talk roasted or praised), worst first,
+# old weeks dropped, and last week's worst player announced once, the first time a friend talks that week
+from datetime import date as _date, timedelta  # noqa: E402
+
+import memory as memory_mod  # noqa: E402
+
+assert memory_mod.week(_date(2026, 11, 9)) == "2026-W46" and memory_mod.week(_date(2027, 1, 1)) == "2026-W53"
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    last_week, today = _date(2026, 11, 3), _date(2026, 11, 10)
+    for friend, event in (("mike", "death"), ("mike", "death"), ("mike", "fail"), ("Mike", "roasted"), ("sam", "epic"),
+                          ("sam", "roasted"), ("sam", "talked")):
+        m.squad_event(friend, event, last_week)
+    rows = m.squad_board(memory_mod.week(last_week))
+    assert [(f, p) for f, p, _ in rows] == [("mike", 5), ("sam", -1)] and rows[0][2] == {"death": 2, "fail": 1, "roasted": 1}
+    assert m.squad_board() == []  # this week: nothing yet
+    assert main.squad_line(rows[:1]) == "Mike 5 (death 2, fail 1, roasted 1)"
+    award = main.award_due(m, today)
+    assert award[0] == "mike" and award[1] == rows and main.award_due(m, today) is None  # announced once
+    m.squad_event("sam", "praised", today)
+    assert main.award_due(m, today + timedelta(days=7)) is None  # nobody with shame points: no award
+    for n in range(12):  # only the last 8 weeks are kept
+        m.squad_event("mike", "death", last_week - timedelta(days=7 * n))
+    assert len([k for k in m.d["squad"] if "-W" in k]) == memory_mod.SQUAD_WEEKS and m.d["squad"]["announced"] == "2026-W45"
 
 
 class FakeVoices:
@@ -933,6 +961,7 @@ with tempfile.TemporaryDirectory() as d:
     assert m.d["challenges"] == {"done": 1, "failed": 1, "last": [{"challenge": "win on Crash", "done": True},
                                                                   {"challenge": "knife only", "done": False}]}
 assert brain.SCHEMA["properties"]["challenge"]["enum"] == ["none", "done", "failed"] and brain.QUIET_REPLY["challenge"] == "none"
+assert brain.QUIET_REPLY["squad"] == [] and "squad" in brain.schema()["required"] and "- squad:" in config.RULES
 assert "challenge:" in config.RULES and "no proof" in config.RULES
 
 # game profiles: which game is in front (Steam, your list, Windows' Game Bar, a launcher folder, or fullscreen); each is
