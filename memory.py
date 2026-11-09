@@ -124,6 +124,16 @@ class Memory:
         with self.lock:
             self.d["game_profiles"].pop(key, None)
 
+    def challenge_result(self, preset, challenge, done, points):
+        """A challenge settled: `points` to (done) or from (failed or dodged) the respect of the one who set it, and it
+        goes on the record (shared: either of them can bring it up)."""
+        with self.lock:
+            mind = self.mind(preset)
+            mind["respect"] = max(0, min(100, mind["respect"] + (points if done else -points)))
+            record = self.d.setdefault("challenges", {"done": 0, "failed": 0, "last": []})
+            record["done" if done else "failed"] += 1
+            record["last"] = (record["last"] + [{"challenge": challenge, "done": done}])[-5:]
+
     def trivia_result(self, right):
         """A trivia answer judged: your record (shared, both of them know it)."""
         with self.lock:

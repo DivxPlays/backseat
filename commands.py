@@ -26,6 +26,8 @@ COMMANDS = [
                    r"(?:outfit|look|clothes)|new outfit|change clothes)"),
     ("wear", r"(?:wear|put on|change into|switch into|dress (?:up )?(?:in|as)|(?:switch|change) to)(?: your| the| that| my)? "
              r"(?P<what>.+?)(?: outfit| look| one)?"),
+    ("challenge", r"(?:(?:give|set|throw) me|i want|i need|(?:have |do )?you (?:have|got)|got) (?:a |an |another |a new )?"
+                  r"(?:challenge|bounty|dare)(?: for (?:me|this|the next|my next) (?:match|game|round))?|(?:challenge|dare) me"),
     ("switch", r"(?:(?:switch|change|swap|go)(?: back)? to|let me talk to|i want) (?:just |only )?(?P<who>.+?)(?: mode| only)?"),
     ("switch", r"(?P<who>both of you|duo mode)"),
 ]
@@ -65,7 +67,7 @@ def parse(text, outfits=(), characters=None):
     """(command, value) if the whole of `text` is a voice command, else None.
     outfits: the outfit names of the one being talked to; characters: {preset: the names they answer to} for switching.
     Commands: ("mute", seconds or None), ("unmute", None), ("vision", True/False), ("cost", None),
-    ("outfit", a name or None for a different one), ("switch", a preset or "both")."""
+    ("outfit", a name or None for a different one), ("switch", a preset or "both"), ("challenge", None)."""
     t = clean(text)
     for kind, pattern in COMMANDS:
         m = re.fullmatch(pattern, t)
@@ -79,7 +81,7 @@ def parse(text, outfits=(), characters=None):
                 n = float(g["n"]) if g["n"][0].isdigit() else WORDS[g["n"]]
                 return "mute", int(n * UNIT[g["unit"][0]])
             return "mute", None
-        if kind in ("unmute", "cost"):
+        if kind in ("unmute", "cost", "challenge"):
             return kind, None
         if kind.startswith("vision"):
             return "vision", kind == "vision on"

@@ -720,7 +720,10 @@ for text, outfits, want in [
         ("Put on your obsidian armor", V, ("outfit", "obsidian")), ("Switch to the desert one", V, ("outfit", "desert raider")),
         ("Switch to Micah.", V, ("switch", "mika")), ("Both of you.", V, ("switch", "both")), ("Go back to Vorn", M, ("switch", "vorn")),
         ("Shut up, you're wrong about that map.", V, None), ("How much did this game cost?", V, None), ("I want pizza", V, None),
-        ("Wear something cool", V, None), ("Switch to a better loadout", V, None)]:
+        ("Wear something cool", V, None), ("Switch to a better loadout", V, None),
+        ("Give me a challenge.", V, ("challenge", None)), ("Challenge me!", M, ("challenge", None)),
+        ("I want a challenge for the next match", V, ("challenge", None)), ("Got a dare for me?", M, ("challenge", None)),
+        ("That challenge was impossible", V, None)]:
     assert commands.parse(text, outfits, chars) == want, (text, commands.parse(text, outfits, chars), want)
 assert commands.duration(600) == "10 minutes" and commands.duration(3600) == "an hour" and commands.money(12.07) == "12 dollars and 7 cents"
 done = []
@@ -869,7 +872,7 @@ with tempfile.TemporaryDirectory() as d:
 asked, expected = [], []
 real_game = brain.minigame
 answers = iter(["5"] * 9)
-brain.minigame = lambda client, model, name, game, kind, about="", topic="", avoid=(): (asked.append((name, game, kind, model, list(avoid))),
+brain.minigame = lambda client, model, name, game, kind, about="", topic="", avoid=(): (asked.append((name, game, kind, model, list(avoid), topic)),
                                                          ({"mood": "smug", "line": f"{name} asks about {game}?", "answer": next(answers)}, 0.0005))[1]
 try:
     game_comp = SimpleNamespace(client=object(), names=["Vorn", "Mika"], partner={"PRESET": "mika"}, app=("cod4.exe", "Call of Duty 4", 1),
@@ -886,6 +889,15 @@ try:
     main.random.random = lambda: 0.9  # a dare
     main.Companion.minigame(game_comp)
     assert asked[-1][2:4] == ("dare", config.MODEL) and game_comp.dare["dare"] == "5" and len(expected) == 1  # (no answer to listen for)
+    level = next(k for k, v in main.BOUNTIES.items() if v[:2] == (game_comp.dare["bounty"], game_comp.dare["fine"]))
+    assert asked[-1][5].startswith(level) and f"+{game_comp.dare['bounty']} respect" in asked[-1][5]  # the bounty, in their line
+    main.Companion.minigame(game_comp)
+    assert asked[-1][2] == "trivia"  # one challenge at a time
+    game_comp.mem.d["trivia_asked"].pop()
+    settled, game_comp.settle_challenge = [], lambda done, dodged=False: settled.append((done, dodged))
+    main.Companion.minigame(game_comp, "Mika", "dare")  # "Hey Mika, give me a challenge" (with one still open: dodged)
+    assert asked[-1][0] == "Mika" and asked[-1][2] == "dare" and game_comp.dare["who"] == "Mika" and settled == [(False, True)]
+    game_comp.dare = None
     # with a profile: an answer that isn't in it is made up, so it asks again; answers already asked are passed on
     game_comp.mem.game_profile = lambda key: {"name": "Call of Duty 4: Modern Warfare", "profile": "Maps: Crash, Backlot."}
     main.random.random, answers, game_comp.trivia = (lambda: 0.1), iter(["Shipment", "Backlot"]), None
@@ -896,6 +908,24 @@ try:
     assert game_comp.trivia is None and len(asked) == n + 3  # three made-up answers: no question at all
 finally:
     brain.minigame, main.random.random = real_game, real_random
+
+# challenges: whoever set it pays the bounty when it's done and takes the fine when it's failed or dodged; a record is kept
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    m.d["respect"] = 50
+    ch = SimpleNamespace(names=["Vorn", "Mika"], preset_of=lambda i: ("vorn", "mika")[i], mem=m, dodged="",
+                         dare={"dare": "win on Crash", "who": "Vorn", "at": 0, "bounty": 8, "fine": 4})
+    main.Companion.settle_challenge(ch, True)
+    assert ch.dare is None and m.d["respect"] == 58 and not ch.dodged
+    with m.lock:
+        m.mind("mika")["respect"] = 30
+    ch.dare = {"dare": "knife only", "who": "Mika", "at": 0, "bounty": 12, "fine": 6}
+    main.Companion.settle_challenge(ch, False, dodged=True)  # time ran out: Mika's fine, and she rubs it in next
+    assert m.mind("mika")["respect"] == 24 and m.d["respect"] == 58 and "knife only" in ch.dodged and "Mika" in ch.dodged
+    assert m.d["challenges"] == {"done": 1, "failed": 1, "last": [{"challenge": "win on Crash", "done": True},
+                                                                  {"challenge": "knife only", "done": False}]}
+assert brain.SCHEMA["properties"]["challenge"]["enum"] == ["none", "done", "failed"] and brain.QUIET_REPLY["challenge"] == "none"
+assert "challenge:" in config.RULES and "no proof" in config.RULES
 
 # game profiles: which game is in front (Steam, your list, Windows' Game Bar, a launcher folder, or fullscreen); each is
 # looked up once (or again when old, or on request)
@@ -955,10 +985,12 @@ try:
     brain.minigame(None, "m", "Mika", "CoD4", "trivia", "Maps: Crash, Backlot.")
     brain.minigame(None, "m", "Vorn", "CoD4", "dare")
     brain.minigame(None, "m", "Mika", "CoD4", "trivia", "Maps: Crash, Backlot.", "map", ["Crash"])
+    brain.minigame(None, "m", "Vorn", "CoD4", "dare", "", "brutal (bounty: +12 respect if they do it, -6 if they fail)")
 finally:
     brain._ask = real_ask
 assert "Maps: Crash, Backlot." in prompts[0] and "What you know" not in prompts[1]  # trivia from the profile, when there is one
 assert "one map named" in prompts[2] and "already asked): Crash" in prompts[2] and "already asked" not in prompts[0]
+assert "Make it brutal (bounty: +12" in prompts[3] and "say the bounty" in prompts[3]
 
 # coaching: this week against last from the stats (today included), a report at most weekly, and the page
 import coaching  # noqa: E402
@@ -1155,6 +1187,11 @@ wl.hear("You look pretty today.")
 wl.flush(force=True)
 assert heard_duo[-1] == "Hey Mika, You look pretty today.", heard_duo
 assert main.addressed(heard_duo[-1], {"Vorn": VORN_NAMES, "Mika": ["mika", "micah"]}) == "Mika"
+# the Discord ear hearing their own line come back through the call is not a friend talking
+mine = ["Player: hey", "You (Mika): Ooh, Vorn, don't be mean, he's trying so hard, bless his tiny fingers."]
+assert main.echo("Hey Vorn, don't be mean. He's trying so hard.", mine)
+assert not main.echo("Hey Vorn, what's the best gun on Crash?", mine) and not main.echo("Hey Vorn.", mine)
+assert not main.echo("Hey Mika, he's trying so hard", ["Player: he's trying so hard"])  # (the player's words don't count)
 # interrupting: talk over him and he pauses to listen; he carries on if it wasn't to him, stops for good if it was
 import senses  # noqa: E402
 
@@ -1192,6 +1229,12 @@ try:
     for _ in range(6):
         deaf.take(loud)
     assert not voice.paused() and deaf.speech == []
+    voice.stop()  # the line just ended, but its tail is still coming through the call: still deaf for ECHO_TAIL
+    deaf.take(loud)
+    assert not voice.busy() and deaf.speech == []
+    deaf.deaf_until = time.monotonic() - 0.01  # later: a friend talking is heard again
+    deaf.take(loud)
+    assert len(deaf.speech) == 1
 finally:
     senses.sd.play, senses.sd.stop = real_sd
 

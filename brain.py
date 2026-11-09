@@ -26,8 +26,9 @@ SCHEMA = {
         "game_note": {"type": "string"},
         "killer": {"type": "string"},
         "lore": {"type": "string"},
+        "challenge": {"type": "string", "enum": ["none", "done", "failed"]},
     },
-    "required": ["mood", "line", "event", "respect", "save_moment", "remember", "game_note", "killer", "lore"],
+    "required": ["mood", "line", "event", "respect", "save_moment", "remember", "game_note", "killer", "lore", "challenge"],
     "additionalProperties": False,
 }
 PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50)}  # $ per million tokens
@@ -43,7 +44,7 @@ def cost(model, usage):
 REPORT_SCHEMA = {"type": "object", "properties": {"report": {"type": "string"}}, "required": ["report"], "additionalProperties": False}
 WEB_SEARCH = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 2}]
 QUIET_REPLY = {"mood": "disgusted", "line": "Hmph. Not worth my breath.", "event": "none", "respect": "same",
-               "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": ""}
+               "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": "", "challenge": "none"}
 
 
 SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the player and their friends want it raw and asked for it. "
@@ -226,9 +227,9 @@ MINIGAME_SCHEMA = {"type": "object", "properties": {"mood": SCHEMA["properties"]
 
 
 def minigame(client, model, name, game, kind, about="", topic="", avoid=()):
-    """A mini-game for a menu or queue, from `name`: a trivia question about `game` (answer: the right answer) or a dare
-    for their next match (answer: the dare, plainly). about: their profile of the game; topic: what to ask about;
-    avoid: answers already asked. Returns (reply, dollars)."""
+    """A mini-game for a menu or queue, from `name`: a trivia question about `game` (answer: the right answer) or a
+    challenge for their next match (answer: the challenge, plainly). about: their profile of the game; topic: what to ask
+    about, or the challenge's difficulty and bounty; avoid: answers already asked. Returns (reply, dollars)."""
     if kind == "trivia":
         ask = (f"Mini-game while the player sits in a menu. As {name}, in character, ask them one short trivia question about "
                f"{game} (or about gaming in general if you don't know {game} well), under 25 words. Pick a question with one "
@@ -237,10 +238,14 @@ def minigame(client, model, name, game, kind, about="", topic="", avoid=()):
             ask += (f" Ask about one {topic or 'fact'} named in what you know about {game} below, and make the answer exactly "
                     f"that name, word for word as written there; nothing made up, nothing about order or rankings: {about}")
         if avoid:
-            ask += " Don't ask anything whose answer is one of these (already asked): " + ", ".join(avoid) + "."
+            ask += (" Don't ask anything whose answer is one of these (already asked): " if kind == "trivia" else
+                    " Something different from these (set before): ") + "; ".join(avoid) + "."
     else:
-        ask = (f"Mini-game while the player sits in a menu. As {name}, in character, dare them to do one specific thing in "
-               f"their next match of {game}, under 20 words. answer: the dare itself, short and plain (to check it later).")
+        ask = (f"Mini-game while the player sits in a menu. As {name}, in character, set them a challenge for their next match "
+               f"of {game}: one thing they control (not the map or mode: matchmaking may pick those) that you'll be able to check "
+               "on their screen, best on the scoreboard or results screen at the end (win it, a number of kills, more kills "
+               f"than deaths, top of the scoreboard, a weapon or rule they stick to all match). Make it {topic or 'fair'}, and "
+               "say the bounty in your line. Under 30 words. answer: the challenge itself, short and plain (to check it later).")
         if about:
             ask += f" What you know about {game} (use its real maps, weapons or modes): {about}"
     return _ask(client, model, [{"type": "text", "text": ask}], MINIGAME_SCHEMA)

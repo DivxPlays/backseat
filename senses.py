@@ -276,8 +276,10 @@ class WakeListener:
         self.speaking = False  # someone is mid-sentence right now
         self.interrupts = False  # your mic (not a loopback, which hears his own voice): talking over him pauses him
         self.speech, self.silent, self.voiced = [], 0, 0  # the stretch of talking being heard: chunks, quiet ones at the end, loud ones
+        self.deaf_until = 0.0  # a loopback hears their own voice: deaf while they talk and ECHO_TAIL after
 
     INTERRUPT_AFTER = 4  # 0.1 s chunks of your voice over his before he pauses to listen (a cough or a click doesn't)
+    ECHO_TAIL = 1.0  # s: the end of their line still arriving (audio latency, chunks queued during a transcription)
 
     def active(self):
         """True while someone is talking to him (so he doesn't start a comment over them)."""
@@ -302,7 +304,9 @@ class WakeListener:
         """One 0.1 s chunk of sound: collect talking, pause him if you talk over him, transcribe after a pause."""
         self.speaking = bool(self.speech)
         self.flush()
-        if self.ears.recording or (self.voice.busy() and not self.interrupts):  # push-to-talk; his own voice on a loopback
+        if self.voice.busy() and not self.interrupts:
+            self.deaf_until = time.monotonic() + self.ECHO_TAIL
+        if self.ears.recording or time.monotonic() < self.deaf_until:  # push-to-talk; his own voice on a loopback
             self.speech, self.silent, self.voiced = [], 0, 0
             return
         loud = float(np.sqrt(np.mean(chunk * chunk))) > config.WAKE_LEVEL

@@ -7,7 +7,6 @@
 
 ### Gameplay
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
-- **Challenges and bounties:** "Get 3 headshots this match": tracked, rewarded with respect or affection, roasted when failed.
 - **Accurate stats from the game itself:** kills and deaths from game logs or Steam where possible, instead of guessing from screenshots.
 
 ### Social
@@ -24,6 +23,8 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Challenges and bounties: one thing for your next match they can check on screen, with a bounty (easy, hard, brutal) paid by whoever set it, a fine when you fail or dodge it, settled from your screen, and a record. Ask for one any time ("give me a challenge").
+- Fixes: the Discord ear no longer takes their own voices for a friend talking; test scripts can't pop up a crash box or write to companion.log.
 - Game profiles: each game looked up once with a web search (modes, maps, weapons, good play) and used in comments, hints, trivia and dares; trivia now from Sonnet, checked against the profile, no repeats. Games are found anywhere, not just Steam: Windows' Game Bar list, launcher folders, or fullscreen.
 - Mini-games in menus: trivia about your game (answer without the wake word, judged in character, a record kept) and dares for your next match.
 - Ragdoll throws with screams: they flail, spin, bounce, land in a heap and get up; and they scream when thrown.

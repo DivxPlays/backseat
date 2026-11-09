@@ -51,7 +51,8 @@ Your reply is spoken aloud by a voice engine and is latency-sensitive; begin you
 - remember: usually an empty string. Fill it only with one short, new, lasting fact about whoever is talking to you, the player or the friend, worth knowing weeks from now (their name, a preference, a skill, a habit, a running joke). Never what they're doing at the moment ("still idling" is not a fact), and nothing already in your memory.
 - game_note: usually an empty string. Fill it only with one short, new fact about the player in this specific game (where they're stuck, their loadout or main, a boss that keeps killing them).
 - killer: when event is "death" or "loss", the boss, enemy type or hazard that beat them, in 1 to 4 words (for example "Ferris wheel dogs"), if you can tell. Never another real player's username. Otherwise an empty string.
-- lore: usually an empty string. When you tell a story about your past, one short new fact from it."""
+- lore: usually an empty string. When you tell a story about your past, one short new fact from it.
+- challenge: "none", unless what you know lists an active challenge: then "done" only when the screenshots clearly show they did it, "failed" when they clearly didn't (the match ended without it, or they broke its rule). Their word alone is no proof."""
 
 MODEL = "claude-haiku-5-5"  # his automatic comments and roasts (most calls): ~0.05 cents each
 TRIVIA_MODEL = "claude-sonnet-5-5"  # mini-game trivia questions, ~0.8 cents each (Haiku gets the facts wrong)

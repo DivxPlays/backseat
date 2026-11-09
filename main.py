@@ -21,18 +21,21 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 APP, VERSION, AUTHOR = "Backseat", "1.2.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
-logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+RUNNING = __name__ == "__main__"  # (imported by the self-checks or make_images.py: no log file, no crash box)
+if RUNNING:
+    logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 for noisy in ("httpx", "httpx2", "huggingface_hub", "faster_whisper", "comtypes"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def _crash(*exc):  # he runs without a console, so a crash must be visible somewhere
     logging.critical("crash", exc_info=exc)
-    ctypes.windll.user32.MessageBoxW(None, f"{exc[1]!r}\n\nDetails are in companion.log next to main.py.", "Vorn crashed", 0x10)
+    ctypes.windll.user32.MessageBoxW(None, f"{exc[1]!r}\n\nDetails are in companion.log next to main.py.", f"{APP} crashed", 0x10)
 
 
-sys.excepthook = _crash
-threading.excepthook = lambda a: logging.critical("thread crash", exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+if RUNNING:
+    sys.excepthook = _crash
+    threading.excepthook = lambda a: logging.critical("thread crash", exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
 
 import anthropic  # noqa: E402
 import keyboard  # noqa: E402
@@ -100,6 +103,9 @@ CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one
 CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
 PROFILE_AGE = 90  # days before a game profile is looked up again
 GAME_GAP, ANSWER_TIME = 480, 20
+BOUNTIES = {"easy": (5, 2, "a decent match does it"), "hard": (8, 4, "it takes a good match"),  # challenges: respect won
+            "brutal": (12, 6, "only their best match does it")}  # if done, lost if failed or dodged; how hard
+CHALLENGE_TIME = 1800  # s: a challenge not done by then was dodged
 TRIVIA_TOPICS = ("map", "mode", "campaign level or mission", "class or character", "weapon", "map", "fact")  # (picked at random)  # mini-games: at most every 8 minutes; how long the mic takes your trivia answer
 MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
@@ -113,6 +119,14 @@ def repeats(line, recent):
     words = re.findall(r"[a-z']+", line.lower())
     return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower())).ratio() > 0.6
                for said in recent[-8:] if said.startswith("You"))
+
+
+def echo(heard, recent):
+    """True when what the Discord ear heard is mostly one of their own recent lines ("You: ..." / "You (Mika): ...")
+    coming back through the call's audio, not a friend talking."""
+    words = set(re.findall(r"[a-z']+", heard.lower())) - {"hey", "hay", "hi", "a", "ok", "okay", "oh", "ooh"}
+    return len(words) >= 2 and any(len(words & set(re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower()))) >= 0.7 * len(words)
+                                   for said in recent[-8:] if said.startswith("You"))
 
 
 def addressed(text, wake_of):
@@ -643,7 +657,8 @@ class Companion:
         self.coached = ""  # a new weekly coaching report's headline, for the greeting
         self.screams = {}  # {character index: [(audio, text)]}, ready before anyone gets thrown
         self.menu_at, self.last_game = -999.0, time.monotonic()  # mini-games: when they last saw a menu, and last played
-        self.trivia = self.dare = None  # the trivia question waiting for your answer; the dare for your next match
+        self.trivia = self.dare = None  # the trivia question waiting for your answer; the challenge for your next match
+        self.dodged = ""  # a challenge that ran out, for their next line
         self.profiling = set()  # games already queued for a lookup this session
         self.last_game_seen = None  # (key, name): for tray > Look up this game again (the tray itself takes the front)
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
@@ -730,6 +745,16 @@ class Companion:
         """The preset of the character at position i on screen (0: the current one, 1: duo mode's partner)."""
         return config.PRESET if i == 0 else self.partner["PRESET"]
 
+    def settle_challenge(self, done, dodged=False):
+        """The challenge is over: its bounty goes to (done) or its fine comes from (failed, dodged) whoever set it."""
+        c, self.dare = self.dare, None
+        i = self.names.index(c["who"]) if c["who"] in self.names else 0
+        self.mem.challenge_result(self.preset_of(i), c["dare"], done, c["bounty"] if done else c["fine"])
+        logging.info("challenge %s: %s", "done" if done else "dodged" if dodged else "failed", c["dare"])
+        if dodged:
+            self.dodged = (f' (They never did {c["who"]}\'s challenge, "{c["dare"]}": time ran out, so {c["who"]} takes '
+                           f"{c['fine']} respect for dodging it. {c['who']} rubs it in.)")
+
     def current_game(self):
         """(key, name) of the game in front (a Steam game by its Steam name), or None when it isn't a game."""
         exe, title, _ = self.app
@@ -761,20 +786,26 @@ class Companion:
             self.mem.save()
         logging.info("game profile for %s ($%.4f): %s", name, spent, text)
 
-    def minigame(self):
+    def minigame(self, who=None, kind=None):
         """In a menu: one of them asks you a trivia question about your game (the mic then takes your answer for
-        ANSWER_TIME s, no wake word) or dares you to do something in your next match."""
+        ANSWER_TIME s, no wake word) or sets you a challenge with a bounty for your next match (only one at a time).
+        who and kind="dare": you asked one of them for a challenge."""
         if self.client is None or (config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET):
             return
-        i = random.randrange(len(self.names))
-        who, game = self.names[i], self.app[1] or app_name(*self.app[:2])
-        kind = "trivia" if random.random() < 0.7 else "dare"
+        who = who if who in self.names else random.choice(self.names)
+        game = self.app[1] or app_name(*self.app[:2])
+        kind = kind or ("trivia" if self.dare or random.random() < 0.6 else "dare")
+        level = random.choice(list(BOUNTIES))
+        bounty, fine, how = BOUNTIES[level]
+        terms = f"{level}: {how} (bounty: +{bounty} respect if they do it, -{fine} if they fail)"
         known = self.mem.game_profile(app_name(*self.app[:2]))
         about, asked = (known["profile"] if known else ""), self.mem.d.setdefault("trivia_asked", [])
+        if kind == "dare":  # (not the same challenge again)
+            asked = [r["challenge"] for r in self.mem.d.get("challenges", {}).get("last", [])]
         for _ in range(3):  # (a trivia answer has to be in their profile of the game, word for word, or it's asked again)
             model = config.TRIVIA_MODEL if kind == "trivia" else config.MODEL
             out, spent = brain.minigame(self.client, model, who, known["name"] if known else game, kind, about,
-                                        random.choice(TRIVIA_TOPICS), asked[-15:])
+                                        random.choice(TRIVIA_TOPICS) if kind == "trivia" else terms, asked[-15:])
             self.mem.spend(spent, "game")
             logging.info("mini-game %s ($%.4f) -> %s", kind, spent, out)
             if out and out["line"].strip() and (kind == "dare" or not about or out["answer"].lower() in about.lower()):
@@ -788,7 +819,10 @@ class Companion:
         self.recent = (self.recent + [said])[-12:]
         _, audio = self.speak(out["mood"], out["line"], "none", who)
         if kind == "dare":
-            self.dare = {"dare": out["answer"], "who": who, "at": time.monotonic()}
+            if self.dare:  # asked for a new one before finishing the last: that one was dodged
+                self.settle_challenge(False, dodged=True)
+            self.dare = {"dare": out["answer"], "who": who, "at": time.monotonic(), "bounty": bounty, "fine": fine}
+            self.bridge.note.emit(f"(challenge: {out['answer']}, +{bounty})")
             return
         self.trivia = {"q": out["line"], "a": out["answer"], "who": who, "until": time.monotonic() + ANSWER_TIME + 25}
         if audio is not None:
@@ -860,9 +894,12 @@ class Companion:
             self.jobs.put(("ask", text))
 
     def friend_heard(self, text, audio):
+        if text and echo(text, self.recent):
+            return logging.info("the Discord ear heard their own line, not a friend: %s", text)
         if text is None:
             self.bridge.note.emit("(listening to your friend...)")
         else:
+            logging.info("friend said: %s", text)
             self.jobs.put(("friend", (text, audio)))
 
     def who(self, text, clip):
@@ -952,6 +989,10 @@ class Companion:
             key = "vision on" if value else "vision off"
         elif kind == "cost":
             values = {"spent": commands.money(self.mem.spent())}
+        elif kind == "challenge":  # "give me a challenge": the one you asked sets it (their line is the reply)
+            self.recent.append(f"Player: {said}")
+            self.jobs.put(("minigame", (who, "dare")))
+            return True
         elif kind == "outfit":
             if dresser is None:
                 return False
@@ -1007,7 +1048,7 @@ class Companion:
                 return self.bridge.note.emit("(didn't catch that)")
             kind = "ask"
         if kind == "minigame":
-            return self.minigame()
+            return self.minigame(*(arg or ()))
         if kind == "profile":  # a game seen for the first time: look it up quietly in the background
             return self.profile(arg)
         if kind == "poke":  # you poked, grabbed or threw one of them (free): a quick line, unless it's gone stale
@@ -1085,6 +1126,8 @@ class Companion:
             situation += (f" {self.jealous} Bring it up in the greeting, in character: whoever was left out is jealous, "
                           "hurt or mocking about it.")
             self.jealous = ""
+        if self.dodged and kind not in ("start", "friend"):
+            situation, self.dodged = situation + self.dodged, ""
         trivia = self.trivia if kind == "ask" and self.trivia and time.monotonic() < self.trivia["until"] else None
         if trivia:
             situation += judge_note(trivia)
@@ -1137,7 +1180,8 @@ class Companion:
                     # the small local model only talks: it calls kills "wins" and misreads screens, so it doesn't keep score,
                     # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
                     # (it reads your memory, it doesn't write it); Claude does those
-                    out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="")
+                    out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="",
+                               challenge="none")
                     said, voice = (out["turns"][0] if alone else None), alone
                     while said and said["line"].strip() and len(out["turns"]) < min(lines, LOCAL_BANTER):  # they go back and forth
                         voice = brain.me() if voice is self.partner else self.partner  # each from their own head: own past only
@@ -1169,6 +1213,8 @@ class Companion:
             return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again
         before = self.mem.d["respect"]
         self.mem.record(app, out, friend=speaker)
+        if self.dare and out.get("challenge") in ("done", "failed"):  # (they paid out or collected in this very line)
+            self.settle_challenge(out["challenge"] == "done")
         for t in out.get("turns", []):  # duo mode: a story goes to whoever told it (the local model's turns have none)
             if t.get("speaker") in self.names:
                 self.mem.add_lore(t.get("lore", ""), None if t["speaker"] == config.NAME else self.partner["PRESET"])
@@ -1251,9 +1297,15 @@ class Companion:
         record = self.mem.d.get("trivia")
         if record and (record["right"] or record["wrong"]):  # mini-games
             text += f"\nTheir trivia record with you: {record['right']} right, {record['wrong']} wrong."
-        if self.dare and time.monotonic() - self.dare["at"] < 1200:
-            text += (f'\n{self.dare["who"]} dared them {fmt(time.monotonic() - self.dare["at"])} ago: "{self.dare["dare"]}". '
-                     "If you can see whether they did it, gloat or grudgingly admit it.")
+        if self.dare:
+            c = self.dare
+            text += (f'\nActive challenge from {c["who"]}, set {fmt(time.monotonic() - c["at"])} ago: "{c["dare"]}" (bounty: '
+                     f'+{c["bounty"]} respect from {c["who"]} if they do it, -{c["fine"]} if they fail). When you settle it, '
+                     f"{c['who']} pays out grudgingly or collects gleefully, in character.")
+        record = self.mem.d.get("challenges")
+        if record:
+            last = "; ".join(f'"{r["challenge"]}" ({"done" if r["done"] else "failed"})' for r in record["last"][-3:])
+            text += f"\nTheir challenge record: {record['done']} done, {record['failed']} failed. Latest: {last}."
         if self.season:  # a holiday or your birthday
             text += "\n" + self.season[1]
         return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
@@ -1393,6 +1445,8 @@ class Companion:
                 self.mem.tick(app_name(*self.app[:2]), dt, self.on_screen)
             if now - last_save > 30:
                 self.check_season()  # (midnight may have brought a holiday)
+                if self.dare and now - self.dare["at"] > CHALLENGE_TIME:
+                    self.settle_challenge(False, dodged=True)
                 game = self.current_game()
                 self.last_game_seen = game or self.last_game_seen
                 if game and self.profile_due(game):
