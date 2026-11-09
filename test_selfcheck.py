@@ -85,19 +85,18 @@ for mood in MOODS:
         v.step(1 / 30, 0.6)
     img = v.render()
     assert not img.isNull() and img.pixelColor(150, 150).alpha() == 255, mood
-# full body: every pose, gesturing to either side, stays inside his window (aura off: it's meant to spill)
-for mood in MOODS:
-    for toward in (1.0, -1.0):
-        v = Vorn()
-        v.toward = toward
-        v.set_mood(mood)
-        for _ in range(90):
-            v.step(1 / 30, 0.0)
-        v.p["aura"], v.flare_amt = 0.0, 0.0
-        img = v.render()
-        edges = [img.pixelColor(x, y).alpha() for x in (0, img.width() - 1) for y in range(0, img.height(), 2)]
-        edges += [img.pixelColor(x, 0).alpha() for x in range(img.width())]
-        assert max(edges) == 0, (mood, toward)
+# full body: every outfit and pose, gesturing to either side, stays inside his window (aura off: it's meant to spill)
+for mood, toward, outfit in [(m, t, o) for m in MOODS for t in (1.0, -1.0) for o in Vorn.OUTFITS]:
+    v = Vorn(outfit)
+    v.toward = toward
+    v.set_mood(mood)
+    for _ in range(90):
+        v.step(1 / 30, 0.0)
+    v.p["aura"], v.flare_amt = 0.0, 0.0
+    img = v.render()
+    edges = [img.pixelColor(x, y).alpha() for x in (0, img.width() - 1) for y in range(0, img.height(), 2)]
+    edges += [img.pixelColor(x, 0).alpha() for x in range(img.width())]
+    assert max(edges) == 0, (mood, toward, outfit)
 v.slump()
 for _ in range(30):
     v.step(1 / 30, 0.0)
@@ -227,9 +226,22 @@ with tempfile.TemporaryDirectory() as d:
 assert time_mood(__import__("datetime").datetime(2026, 11, 8, 3)).startswith("unhinged")
 assert [tier_for(r) for r in (0, 24, 25, 50, 75, 100)] == [0, 0, 1, 2, 3, 3]
 for tier in range(4):
-    v = Vorn()
-    v.tier = tier
-    assert not v.render().isNull()
+    for outfit in Vorn.OUTFITS:  # respect upgrades (and Bloodfire) on every outfit
+        v = Vorn(outfit)
+        v.tier = tier
+        v.bloodfire(5)
+        v.step(1.0, 0.0)
+        assert not v.render().isNull()
+# Vorn's outfits: the setting picks one, a wrong name picks at random, each looks different, Mika keeps her own
+looks = {o: Vorn(o) for o in Vorn.OUTFITS}
+for v in looks.values():
+    v.glance_at = v.turn_at = v.blink_at = 1e9
+    v.step(1.0, 0.0)
+renders = {o: bytes(v.render().constBits()) for o, v in looks.items()}
+assert len(set(renders.values())) == len(renders) == 5 and Vorn("nope").outfit in Vorn.OUTFITS
+saved_outfit, config.VORN_OUTFIT = config.VORN_OUTFIT, "obsidian"
+assert Vorn().outfit == "obsidian"
+config.VORN_OUTFIT = saved_outfit
 assert game_display([({"left": 0, "top": 0, "width": 10, "height": 10}, None), ({"left": 10, "top": 0, "width": 10, "height": 10}, None)], (15, 5)) == 1
 config.DUCK_TO, duck = 1.0, Ducker()
 duck.duck()

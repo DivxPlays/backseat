@@ -919,23 +919,22 @@ def main():
             cam_picks[key, value].triggered.connect(lambda _=False, k=key, v=value: set_camera(k, v))
         cam_menu.addSeparator()
     camera.start()
-    dresser = next((c for c in overlay.chars if hasattr(c, "outfit")), None)  # the character with outfits (Mika), solo or duo
-    if dresser:  # switch live
-        from mika import OUTFITS
-        outfits = menu.addMenu("Outfit")
+    for who, dresser in zip(overlay.names, overlay.chars):  # each one's wardrobe (both in duo mode), switched live
+        outfits = menu.addMenu("Outfit" if len(overlay.chars) == 1 else f"{who}'s outfit")
         choices = {}
 
-        def wear(name):
-            set_setting("OUTFIT", name)
-            dresser.outfit = name if name in OUTFITS else random.choice(sorted(OUTFITS))  # "random": pick one now too
+        def wear(name, dresser=dresser, choices=choices):
+            set_setting(dresser.OUTFIT_SETTING, name)
+            setattr(config, dresser.OUTFIT_SETTING, name)
+            dresser.outfit = name if name in dresser.OUTFITS else random.choice(sorted(dresser.OUTFITS))  # "random": one now too
             for n, action in choices.items():
                 action.setChecked(n == name)
 
-        for name in sorted(OUTFITS) + ["random"]:
+        for name in sorted(dresser.OUTFITS) + ["random"]:
             choices[name] = outfits.addAction("Surprise me (a new one each launch)" if name == "random" else name.title())
             choices[name].setCheckable(True)
-            choices[name].setChecked(name == config.OUTFIT)
-            choices[name].triggered.connect(lambda _=False, n=name: wear(n))
+            choices[name].setChecked(name == getattr(config, dresser.OUTFIT_SETTING))
+            choices[name].triggered.connect(lambda _=False, n=name, w=wear: w(n))
     menu.addAction("Settings...").triggered.connect(lambda: (settings.show(), settings.raise_(), settings.activateWindow()))
     boot = menu.addAction("Start with Windows (wakes up when a game starts)")
     boot.setCheckable(True)

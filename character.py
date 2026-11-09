@@ -13,6 +13,8 @@ import random
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QBrush, QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 
+import config
+
 BUST_W, BUST_H = 300, 340  # the bust part of the drawing (tray icon)
 MARGIN, TOP, FULL_H = 40, 24, 1000  # room beside him for raised arms and above his hair; feet at ~990
 FIT = 0.5  # full body at about the screen space the bust used
@@ -25,19 +27,48 @@ HAIR, HAIR_SH, HAIR_HI = QColor("#1d1b24"), QColor("#07060a"), QColor("#4b4f66")
 SCLERA = QColor("#f1e9df")
 IRIS, IRIS_SH = QColor("#2b2730"), QColor("#050406")  # black eyes; the white catchlight keeps them alive
 GEM = QColor("#d23a3a")
-STEEL, STEEL_SH, STEEL_HI = QColor("#454b58"), QColor("#1f232b"), QColor("#7a8396")
-BRONZE, BRONZE_SH = QColor("#c8893f"), QColor("#7a4a1a")
-FUR, FUR_SH, FUR_HI = QColor("#54453c"), QColor("#2b221d"), QColor("#8a7563")
-CAPE, CAPE_SH = QColor("#5e1016"), QColor("#2a0609")
 MOUTH, TONGUE = QColor("#3e0d12"), QColor("#a8414c")
 SCAR = QColor("#e0a48c")
 # upgrades he earns as your respect grows (see tier_for)
 GOLD, GOLD_SH = QColor("#f2c64d"), QColor("#9a6b12")
-STEEL_POLISH = QColor("#aab4c8")
 FUR_WHITE, FUR_WHITE_SH = QColor("#ebe7df"), QColor("#9c958a")
-SUIT, SUIT_SH = QColor("#2e2a35"), QColor("#16131a")  # dark undersuit: sleeves and legs
-GLOVE, GLOVE_HI = QColor("#3a302b"), QColor("#6a5a50")
 LEATHER, LEATHER_SH = QColor("#4a3226"), QColor("#24170f")
+
+# Vorn's outfits: colours as (main, shadow[, highlight]) plus the pieces he wears. Each one is the warlord's armour with changes.
+# plate: armour plates (chest, hips, knees, elbows, pauldrons); fore/shin: forearms and shins (default: the armour);
+# wraps: cloth wrapped around them; hem: where the cape ends (None: no cape); collar: fur, gorget, scarf or hood
+WARLORD = dict(plate=True, spikes=True, steel=("#454b58", "#1f232b", "#7a8396"), polish="#aab4c8", fore=None, shin=None,
+               wraps=False, trim=("#c8893f", "#7a4a1a"), suit=("#2e2a35", "#16131a"), legs=None, cape=("#5e1016", "#2a0609"),
+               hem=984, lining=None, tabard=("#5e1016", "#2a0609"), collar="fur", collar_c=("#54453c", "#2b221d", "#8a7563"),
+               gloves=("#3a302b", "#6a5a50"), boots=("#4a3226", "#24170f"))
+VORN_LOOKS = {
+    "warlord": {},
+    "obsidian": dict(steel=("#2a2830", "#0b0a0e", "#514c5a"), polish="#77727f", trim=("#b3202a", "#5a0c12"),
+                     cape=("#17151a", "#050407"), lining="#9e1b24", tabard=("#7a0f17", "#33060a"), collar="gorget",
+                     collar_c=("#2a2830", "#0b0a0e", "#514c5a"), gloves=("#1c1a1f", "#3d3a44"), boots=("#1a1719", "#08070a")),
+    "frostbound": dict(steel=("#8b95a6", "#4a5263", "#c9d2e0"), polish="#e8eef7", trim=("#7fd3ff", "#2f7fae"),
+                       suit=("#2a3142", "#141a26"), cape=("#1c2a4a", "#0b1226"), tabard=("#1c2a4a", "#0b1226"),
+                       collar_c=("#ebe7df", "#9c958a", "#ffffff"), gloves=("#4b5468", "#7d879d"), boots=("#3b4252", "#1c212b")),
+    "desert raider": dict(spikes=False, steel=("#7a5434", "#3e2a1a", "#a87a52"), polish="#c99a6a",
+                          fore=("#c9b48a", "#8a7552", "#e6d6b0"), shin=("#c9b48a", "#8a7552", "#e6d6b0"), wraps=True,
+                          trim=("#b08a3e", "#6a4e1c"), suit=("#5a4632", "#2e2318"), cape=("#b5662f", "#6a3416"), hem=650,
+                          tabard=("#c8642a", "#7a3412"), collar="scarf", collar_c=("#d8c79f", "#9c8a64", "#f0e4c4"),
+                          gloves=("#6b4a2e", "#9a7350"), boots=("#8a6a44", "#4a3620")),
+    "off-duty": dict(plate=False, spikes=False, fore=("#24222a", "#0c0b0f", "#3e3b48"), suit=("#24222a", "#0c0b0f"),
+                     legs=("#3b3f36", "#1e201b"), shin=("#3b3f36", "#1e201b", "#5a5f52"), trim=("#b3202a", "#5a0c12"),
+                     hem=None, tabard=None, collar="hood", collar_c=("#24222a", "#0c0b0f", "#3e3b48"),
+                     gloves=("#d9a27c", "#a8694c"), boots=("#2a2420", "#120e0c")),  # a hoodie, combat trousers, bare hands
+}
+
+
+def _outfit(changes):
+    o = {**WARLORD, **changes}
+    o["fore"], o["shin"], o["legs"] = o["fore"] or o["steel"], o["shin"] or o["steel"], o["legs"] or o["suit"]
+    return {k: tuple(map(QColor, v)) if isinstance(v, tuple) else QColor(v) if str(v).startswith("#") else v for k, v in o.items()}
+
+
+VORN_OUTFITS = {name: _outfit(changes) for name, changes in VORN_LOOKS.items()}
+COWL = [(66, 292), (74, 262), (96, 242), (124, 234), (150, 232), (176, 234), (204, 242), (226, 262), (234, 292), (150, 278)]
 
 
 def tier_for(respect):
@@ -153,7 +184,11 @@ FUR_EDGE = [(62, 270), (70, 250), (80, 258), (88, 238), (100, 250), (108, 230), 
 
 
 class Vorn:
-    def __init__(self):
+    OUTFITS, OUTFIT_SETTING = VORN_OUTFITS, "VORN_OUTFIT"  # his wardrobe and the setting that picks from it
+
+    def __init__(self, outfit=None):
+        outfit = outfit or getattr(config, self.OUTFIT_SETTING)
+        self.outfit = outfit if outfit in self.OUTFITS else random.choice(sorted(self.OUTFITS))  # "random": a new look each launch
         self.mood = "idle"
         self.p = dict(MOODS["idle"])
         self.t = 0.0
@@ -369,9 +404,22 @@ class Vorn:
             g.drawEllipse(P(x, y), 2.6 * (1 - ph) + 0.6, 2.6 * (1 - ph) + 0.6)
         g.restore()
 
+    @property
+    def kit(self):
+        """The current outfit: colours and pieces (see VORN_LOOKS)."""
+        return self.OUTFITS[self.outfit]
+
     def _cape(self, g):
-        """Floor-length cape behind him, with a ragged hem that sways."""
-        t = self.t
+        """Cape behind him (floor-length, or shorter in some outfits), with a ragged hem that sways."""
+        k, t = self.kit, self.t
+        if not k["hem"]:
+            return
+        g.save()
+        if k["hem"] < 984:  # a shorter cape: the long one squeezed up toward his shoulders, and a bit narrower
+            f = (k["hem"] - 256) / (984 - 256)
+            g.translate(150, 256)
+            g.scale(0.6 + 0.4 * f, f)
+            g.translate(-150, -256)
         hem = [(-22 + 344 * i / 10 + math.sin(t * 1.3 + i * 0.8) * 4, 984 - (30 if i % 2 else 0) + math.sin(t * 1.1 + i) * 3)
                for i in range(11)]
         cape = QPainterPath(P(52, 256))
@@ -380,16 +428,30 @@ class Vorn:
             cape.lineTo(P(*pt))
         cape.quadTo(P(296, 560), P(248, 256))
         cape.closeSubpath()
-        fill(g, cape, vgrad(256, 990, CAPE, CAPE_SH))
+        fill(g, cape, vgrad(256, 990, *k["cape"]))
         for x0, x1 in ((40, 6), (92, 70), (208, 230), (260, 294)):  # folds
             fold = QPainterPath(P(x0, 420))
             fold.quadTo(P((x0 + x1) / 2 + math.sin(t * 1.2 + x0) * 4, 700), P(x1, 950))
-            stroke(g, fold, alpha(CAPE_SH, 0.9), 3)
-        if self.tier >= 2:
+            stroke(g, fold, alpha(k["cape"][1], 0.9), 3)
+        for color, width in ((k["lining"], 7), (GOLD if self.tier >= 2 else None, 5)):  # coloured lining, then the gold upgrade
+            if color is None:
+                continue
             for a, c, b in (((52, 258), (4, 560), hem[0]), ((248, 258), (296, 560), hem[-1])):
                 edge = QPainterPath(P(*a))
                 edge.quadTo(P(*c), P(*b))
-                stroke(g, edge, GOLD, 5)
+                stroke(g, edge, color, width)
+        g.restore()
+
+    def _wraps(self, g, a, b, r, color):
+        """Cloth bands wrapped around a limb segment from a to b, r wide."""
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1.0
+        ux, uy, nx, ny = dx / n, dy / n, -dy / n, dx / n
+        for f in (0.12, 0.3, 0.48, 0.66, 0.84):
+            cx, cy = a[0] + dx * f, a[1] + dy * f
+            band = QPainterPath(P(cx + nx * r - ux * 7, cy + ny * r - uy * 7))
+            band.lineTo(P(cx - nx * r + ux * 7, cy - ny * r + uy * 7))
+            stroke(g, band, color, 2.2)
 
     def _limb(self, g, a, b, ra, rb, color, shade=None, ridge=None, width=2.2):
         """A tapered, round-ended segment from a (radius ra) to b (radius rb), cel-shaded on its right side."""
@@ -417,62 +479,119 @@ class Vorn:
             stroke(g, line, ridge, 2)
         return body
 
+    def _polish(self):
+        """His armour's highlight: polished once you've earned some respect."""
+        return self.kit["polish"] if self.tier >= 1 else self.kit["steel"][2]
+
+    def _trim(self):
+        """Trim colour (main, shadow): gold once you've earned some respect."""
+        return (GOLD, GOLD_SH) if self.tier >= 1 else self.kit["trim"]
+
     def _legs(self, g):
-        polished = STEEL_POLISH if self.tier >= 1 else STEEL_HI
-        trim = GOLD if self.tier >= 1 else BRONZE
+        k = self.kit
+        polished, trim = self._polish(), self._trim()[0]
         for side in (-1, 1):
             hip = (150 + side * 28, 540)
             sx, cy = side * math.sin(math.radians(7)), math.cos(math.radians(7))  # a wide, planted stance
             knee = (hip[0] + sx * 208, hip[1] + cy * 208)
             ankle = (knee[0] + sx * 186, knee[1] + cy * 186)
-            self._limb(g, hip, knee, 42, 30, SUIT, SUIT_SH)
-            self._limb(g, knee, ankle, 31, 23, STEEL, STEEL_SH, ridge=polished)
+            self._limb(g, hip, knee, 42, 30, *k["legs"])
+            self._limb(g, knee, ankle, 31, 23, k["shin"][0], k["shin"][1], ridge=polished if k["plate"] and not k["wraps"] else None)
+            if k["wraps"]:
+                self._wraps(g, knee, ankle, 28, k["shin"][1])
             self._cracks(g, [self._seam(knee, ankle, 22)])
             boot = poly(*[(ankle[0] + side * x, ankle[1] + y) for x, y in
                           ((-23, -14), (23, -14), (25, 30), (46, 38), (54, 50), (50, 58), (-24, 58), (-26, 30))])
-            fill(g, boot, vgrad(ankle[1] - 14, ankle[1] + 58, LEATHER, LEATHER_SH))
+            fill(g, boot, vgrad(ankle[1] - 14, ankle[1] + 58, *k["boots"]))
             sole = QPainterPath(P(ankle[0] - side * 24, ankle[1] + 54))
             sole.lineTo(P(ankle[0] + side * 50, ankle[1] + 54))
             stroke(g, sole, INK, 4)
+            if not k["plate"]:
+                continue
             cuff = poly((ankle[0] - 25, ankle[1] - 16), (ankle[0] + 25, ankle[1] - 16), (ankle[0] + 25, ankle[1] - 4), (ankle[0] - 25, ankle[1] - 4))
             fill(g, cuff, trim, 1.6)
             kneecap = QPainterPath()
             kneecap.addEllipse(P(*knee), 32, 26)
-            fill(g, kneecap, vgrad(knee[1] - 24, knee[1] + 24, polished, STEEL_SH))
-            spike = poly((knee[0] - 7, knee[1] - 4), (knee[0] + sx * 6, knee[1] - 34), (knee[0] + 7, knee[1] - 4))
-            fill(g, spike, vgrad(knee[1] - 34, knee[1], STEEL_HI, STEEL), 1.6)
+            fill(g, kneecap, vgrad(knee[1] - 24, knee[1] + 24, polished, k["steel"][1]))
+            if k["spikes"]:
+                spike = poly((knee[0] - 7, knee[1] - 4), (knee[0] + sx * 6, knee[1] - 34), (knee[0] + 7, knee[1] - 4))
+                fill(g, spike, vgrad(knee[1] - 34, knee[1], k["steel"][2], k["steel"][0]), 1.6)
+
+    def _sigil(self, g, cx, cy):
+        """His emblem: a disc with three claw slashes."""
+        sigil = QPainterPath()
+        sigil.addEllipse(P(cx, cy), 17, 17)
+        fill(g, sigil, vgrad(cy - 17, cy + 17, *self._trim()), 2)
+        for i in (-1, 0, 1):
+            c = QPainterPath(P(cx - 6 + i * 8, cy - 11))
+            c.quadTo(P(cx - 1 + i * 8, cy - 1), P(cx + 4 + i * 8, cy + 11))
+            stroke(g, c, INK, 2.6)
+
+    def _hoodie(self, g):
+        """Off-duty: a hoodie instead of armour, with a pocket, drawstrings and his sigil."""
+        main, shade, hi = self.kit["fore"]
+        body = QPainterPath(P(80, 270))
+        body.lineTo(P(220, 270))
+        body.quadTo(P(238, 400), P(230, 530))
+        body.lineTo(P(70, 530))
+        body.quadTo(P(62, 400), P(80, 270))
+        fill(g, body, vgrad(270, 530, main, shade))
+        g.save()
+        g.setClipPath(body)
+        fill(g, poly((150, 262), (240, 262), (240, 540), (150, 540)), alpha(shade, 0.45), 0)  # cel shadow
+        g.restore()
+        hem = QPainterPath()
+        hem.addRoundedRect(68, 512, 164, 24, 8, 8)
+        fill(g, hem, vgrad(512, 536, hi, shade), 2)
+        pocket = poly((106, 438), (194, 438), (204, 504), (96, 504))
+        fill(g, pocket, alpha(hi, 0.35), 2)
+        for x0, x1 in ((140, 134), (160, 166)):  # drawstrings
+            s = QPainterPath(P(x0, 276))
+            s.quadTo(P((x0 + x1) / 2, 310), P(x1, 338))
+            stroke(g, s, QColor("#d9d4de"), 2.4)
+            tip = QPainterPath()
+            tip.addRoundedRect(x1 - 3, 336, 6, 12, 2, 2)
+            fill(g, tip, QColor("#d9d4de"), 1.2)
+        self._sigil(g, 150, 388)
+        self._cracks(g, CHEST_CRACKS)
 
     def _torso(self, g):
+        k = self.kit
+        if not k["plate"]:
+            return self._hoodie(g)
         tier = self.tier
-        trim = GOLD if tier >= 1 else BRONZE
+        trim = self._trim()
+        steel, steel_sh, steel_hi = k["steel"]
         sw = math.sin(self.t * 1.4) * 3
-        tabard = poly((128, 500), (172, 500), (180 + sw, 700), (150 + sw, 726), (120 + sw, 700))
-        fill(g, tabard, vgrad(500, 726, CAPE, CAPE_SH))
-        if tier >= 2:
-            for a, b in (((128, 504), (120 + sw, 698)), ((172, 504), (180 + sw, 698))):
-                edge = QPainterPath(P(*a))
-                edge.lineTo(P(*b))
-                stroke(g, edge, GOLD, 3)
+        if k["tabard"]:
+            tabard = poly((128, 500), (172, 500), (180 + sw, 700), (150 + sw, 726), (120 + sw, 700))
+            fill(g, tabard, vgrad(500, 726, *k["tabard"]))
+            if tier >= 2:
+                for a, b in (((128, 504), (120 + sw, 698)), ((172, 504), (180 + sw, 698))):
+                    edge = QPainterPath(P(*a))
+                    edge.lineTo(P(*b))
+                    stroke(g, edge, GOLD, 3)
         for side in (-1, 1):  # hip armor plates
             m = (lambda pts: pts) if side < 0 else mirror
             for pts in ([(80, 496), (100, 498), (92, 574), (74, 562)], [(98, 498), (138, 500), (134, 596), (88, 586)]):
                 plate = poly(*m(pts))
-                fill(g, plate, vgrad(496, 596, STEEL_HI, STEEL_SH))
+                fill(g, plate, vgrad(496, 596, steel_hi, steel_sh))
             for rx, ry in m([(108, 512), (126, 513)]):
                 g.setPen(pen(INK, 1))
-                g.setBrush(QBrush(trim))
+                g.setBrush(QBrush(trim[0]))
                 g.drawEllipse(P(rx, ry), 2.6, 2.6)
-        fill(g, poly((106, 420), (194, 420), (198, 500), (102, 500)), SUIT)
-        for i, y in enumerate((430, 451, 472)):  # segmented belly plates
+        fill(g, poly((106, 420), (194, 420), (198, 500), (102, 500)), k["suit"][0])
+        band_c = (k["fore"][2], k["fore"][1]) if k["wraps"] else (steel_hi, steel_sh)  # cloth wraps or belly plates
+        for i, y in enumerate((430, 451, 472)):
             band = QPainterPath()
             band.addRoundedRect(102 + i * 2, y, 96 - i * 4, 24, 6, 6)
-            fill(g, band, vgrad(y, y + 24, STEEL_HI, STEEL_SH), 1.8)
+            fill(g, band, vgrad(y, y + 24, *band_c), 1.8)
         belt = QPainterPath()
         belt.addRoundedRect(96, 484, 108, 22, 4, 4)
         fill(g, belt, vgrad(484, 506, LEATHER, LEATHER_SH), 2)
         buckle = QPainterPath()
         buckle.addRoundedRect(136, 480, 28, 30, 5, 5)
-        fill(g, buckle, vgrad(480, 510, trim, GOLD_SH if tier >= 1 else BRONZE_SH), 2)
+        fill(g, buckle, vgrad(480, 510, *trim), 2)
         plate = QPainterPath(P(82, 276))
         plate.lineTo(P(150, 260))
         plate.lineTo(P(218, 276))
@@ -482,10 +601,10 @@ class Vorn:
         plate.quadTo(P(126, 452), P(102, 438))
         plate.quadTo(P(86, 428), P(78, 400))
         plate.quadTo(P(68, 340), P(82, 276))
-        fill(g, plate, vgrad(260, 450, STEEL, STEEL_SH))
+        fill(g, plate, vgrad(260, 450, steel, steel_sh))
         g.save()
         g.setClipPath(plate)
-        fill(g, poly((150, 262), (240, 262), (240, 460), (150, 460)), alpha(STEEL_SH, 0.55), 0)  # cel shadow
+        fill(g, poly((150, 262), (240, 262), (240, 460), (150, 460)), alpha(steel_sh, 0.55), 0)  # cel shadow
         g.restore()
         pecs = QPainterPath(P(96, 350))
         pecs.quadTo(P(124, 376), P(150, 360))
@@ -493,14 +612,8 @@ class Vorn:
         stroke(g, pecs, alpha(INK, 0.55), 2)
         ridge = QPainterPath(P(150, 266))
         ridge.lineTo(P(150, 446))
-        stroke(g, ridge, STEEL_HI, 2)
-        sigil = QPainterPath()
-        sigil.addEllipse(P(150, 308), 17, 17)
-        fill(g, sigil, vgrad(291, 325, *((GOLD, GOLD_SH) if tier >= 1 else (BRONZE, BRONZE_SH))), 2)
-        for i in (-1, 0, 1):  # three claw slashes
-            c = QPainterPath(P(144 + i * 8, 297))
-            c.quadTo(P(149 + i * 8, 307), P(154 + i * 8, 319))
-            stroke(g, c, INK, 2.6)
+        stroke(g, ridge, steel_hi, 2)
+        self._sigil(g, 150, 308)
         self._cracks(g, CHEST_CRACKS)
 
     def _seam(self, a, b, r):
@@ -531,13 +644,15 @@ class Vorn:
     def _arms(self, g):
         pose = self.pose()
         near = 1 if self.toward > 0 else -1  # the gesturing arm, on the side of his bubble
-        polished = STEEL_POLISH if self.tier >= 1 else STEEL_HI
-        trim = GOLD if self.tier >= 1 else BRONZE
+        k = self.kit
+        polished, trim = self._polish(), self._trim()[0]
         arm = {side: ((s[0], s[1] - 24), *rest) for side, (s, *rest) in self.arm_points().items()}  # sleeves start under the pauldron
 
         def forearm(side):
             _, elbow, wrist, dx, dy = arm[side]
-            self._limb(g, elbow, wrist, 26, 21, STEEL, STEEL_SH, ridge=polished)
+            self._limb(g, elbow, wrist, 26, 21, k["fore"][0], k["fore"][1], ridge=polished if k["plate"] and not k["wraps"] else None)
+            if k["wraps"]:
+                self._wraps(g, elbow, wrist, 24, k["fore"][1])
             self._cracks(g, [self._seam(elbow, wrist, 18)])
             band = QPainterPath(P(wrist[0] - dy * 22 - dx * 14, wrist[1] + dx * 22 - dy * 14))
             band.lineTo(P(wrist[0] + dy * 22 - dx * 14, wrist[1] - dx * 22 - dy * 14))
@@ -557,15 +672,16 @@ class Vorn:
             hand(side)
             forearm(side)
         for side in (-near, near):
-            self._limb(g, arm[side][0], arm[side][1], 31, 25, SUIT, SUIT_SH)
-        for side in (-1, 1):
+            self._limb(g, arm[side][0], arm[side][1], 31, 25, *k["suit"])
+        for side in (-1, 1) if k["plate"] else ():
             elbow = arm[side][1]
             cop = QPainterPath()
             cop.addEllipse(P(*elbow), 22, 21)
-            fill(g, cop, vgrad(elbow[1] - 21, elbow[1] + 21, polished, STEEL_SH))
+            fill(g, cop, vgrad(elbow[1] - 21, elbow[1] + 21, polished, k["steel"][1]))
 
     def _hand(self, g, kind, side):
-        """Gloved hand at the wrist, fingers toward local +y."""
+        """Gloved (or, off-duty, bare) hand at the wrist, fingers toward local +y."""
+        GLOVE, GLOVE_HI = self.kit["gloves"]  # noqa: N806 (the outfit's glove colours)
         if kind == "open":
             for i, ang in enumerate((-16, -5, 6, 17)):
                 r = math.radians(ang)
@@ -629,7 +745,7 @@ class Vorn:
             stroke(g, crack, alpha(EMBER_CORE, b), 2.4)
 
     def _body(self, g):
-        """Neck and fur collar (the armor is in _torso)."""
+        """Neck and collar: fur, an iron gorget, a scarf or a hood, by outfit (the armor is in _torso)."""
         neck = poly((126, 178), (124, 232), (108, 254), (192, 254), (176, 232), (174, 178))
         fill(g, neck, SKIN)
         fill(g, poly((124, 182), (176, 182), (176, 214), (150, 228), (124, 212)), SKIN_SH, 0)  # under-jaw shadow
@@ -638,14 +754,40 @@ class Vorn:
             m = QPainterPath(P(x0, 216))
             m.lineTo(P(x1, 246))
             stroke(g, m, alpha(SKIN_SH, 0.8), 1.6)
-        fur = poly(*FUR_EDGE, (234, 292), (150, 278), (66, 292))
-        white = self.tier >= 2
-        fill(g, fur, vgrad(230, 292, *((FUR_WHITE, FUR_WHITE_SH) if white else (FUR, FUR_SH))))
-        for i in range(1, len(FUR_EDGE) - 1, 2):
-            x, y = FUR_EDGE[i]
-            tuft = QPainterPath(P(x, y + 4))
-            tuft.lineTo(P(x + (3 if x > 150 else -3), y + 18))
-            stroke(g, tuft, FUR_WHITE_SH if white else FUR_HI, 1.6)
+        collar, (main, shade, hi) = self.kit["collar"], self.kit["collar_c"]
+        if collar == "fur":
+            fur = poly(*FUR_EDGE, (234, 292), (150, 278), (66, 292))
+            if self.tier >= 2:  # the white-fur upgrade
+                main, shade, hi = FUR_WHITE, FUR_WHITE_SH, FUR_WHITE_SH
+            fill(g, fur, vgrad(230, 292, main, shade))
+            for i in range(1, len(FUR_EDGE) - 1, 2):
+                x, y = FUR_EDGE[i]
+                tuft = QPainterPath(P(x, y + 4))
+                tuft.lineTo(P(x + (3 if x > 150 else -3), y + 18))
+                stroke(g, tuft, hi, 1.6)
+            return
+        fill(g, poly(*COWL), vgrad(232, 292, hi if collar == "gorget" else main, shade))
+        if collar == "gorget":  # iron collar: a ridge, a trim edge and rivets
+            ridge = QPainterPath(P(84, 268))
+            ridge.quadTo(P(150, 244), P(216, 268))
+            stroke(g, ridge, alpha(INK, 0.6), 2)
+            edge = QPainterPath(P(66, 292))
+            edge.lineTo(P(150, 278))
+            edge.lineTo(P(234, 292))
+            stroke(g, edge, self._trim()[0], 3.5)
+            for rx, ry in ((96, 262), (124, 252), (176, 252), (204, 262)):
+                g.setPen(pen(INK, 1))
+                g.setBrush(QBrush(self._trim()[0]))
+                g.drawEllipse(P(rx, ry), 2.6, 2.6)
+        elif collar == "scarf":  # cloth folds
+            for a, b in (((100, 248), (112, 284)), ((150, 236), (150, 276)), ((200, 248), (188, 284))):
+                fold = QPainterPath(P(*a))
+                fold.lineTo(P(*b))
+                stroke(g, fold, shade, 2.2)
+        else:  # the hood, down around his neck
+            opening = QPainterPath(P(108, 252))
+            opening.quadTo(P(150, 276), P(192, 252))
+            stroke(g, opening, shade, 3)
 
     def _head(self, g):
         p = self.d
@@ -837,24 +979,28 @@ class Vorn:
         g.drawPath(m)
 
     def _shoulders(self, g):
+        k = self.kit
+        if not k["plate"]:  # off-duty: no pauldrons
+            return
+        steel, steel_sh, steel_hi = k["steel"]
         for side in (-1, 1):
             m = (lambda pts: pts) if side < 0 else mirror
-            for base_a, tip, base_b in SPIKES:
-                fill(g, poly(*m([base_a, tip, base_b])), vgrad(200, 250, STEEL_HI, STEEL))
+            for base_a, tip, base_b in SPIKES if k["spikes"] else ():
+                fill(g, poly(*m([base_a, tip, base_b])), vgrad(200, 250, steel_hi, steel))
             plate = poly(*m(PAULDRON))
-            fill(g, plate, vgrad(238, 314, STEEL_POLISH if self.tier >= 1 else STEEL_HI, STEEL_SH))
+            fill(g, plate, vgrad(238, 314, self._polish(), steel_sh))
             g.save()
             g.setClipPath(plate)
-            fill(g, poly(*m([(60, 290), (130, 250), (130, 330), (60, 330)])), alpha(STEEL_SH, 0.6), 0)
+            fill(g, poly(*m([(60, 290), (130, 250), (130, 330), (60, 330)])), alpha(steel_sh, 0.6), 0)
             self._cracks(g, [m(c) for c in PAULDRON_CRACKS])
             g.restore()
             rim = QPainterPath(P(*m([(24, 268)])[0]))
             for pt in m([(56, 246), (100, 248), (114, 266)]):
                 rim.lineTo(P(*pt))
-            stroke(g, rim, GOLD if self.tier >= 1 else BRONZE, 3)
+            stroke(g, rim, self._trim()[0], 3)
             for rx, ry in m([(40, 268), (66, 256), (94, 258)]):
                 g.setPen(pen(INK, 1))
-                g.setBrush(QBrush(BRONZE))
+                g.setBrush(QBrush(k["trim"][0]))
                 g.drawEllipse(P(rx, ry), 2.6, 2.6)
 
 

@@ -12,6 +12,10 @@ An animated, full-body character in the corner of your screen: Vorn the warlord,
 
 ![Vorn in his moods and in Bloodfire](docs/images/vorn.png)
 
+**Vorn's outfits**: Warlord, Obsidian, Frostbound, Desert Raider and Off-Duty.
+
+![Vorn's five outfits](docs/images/vorn-outfits.png)
+
 **Mika**: her four outfits (gothic, hoodie, jacket, jersey), then Lovesick.
 
 ![Mika in her four outfits and in Lovesick](docs/images/mika.png)
@@ -130,8 +134,8 @@ Screenshots go to Anthropic's API, which means whatever is on your screen, inclu
 
 **Characters:** each character is a preset in `presets/` (name, personality, voice, look, wake word, power-up). Switch in tray > Character (he restarts). Each character has their own memory of you: respect, notes, pinned facts, long-term profile, past, game scores and grudges, friends and battle reports. Shared: your time stats and the API spending (so your budget stays right). Settings > Character edits the current one.
 
-- **Vorn:** the warlord. Power-up: Bloodfire.
-- **Mika:** an original yandere gamer girl with long pink hair, pink eyes and a cat-ear gaming headset. Sweet and adoring on the surface, obsessively possessive underneath: jealous of your other games, apps and friends, and she takes your deaths personally. Her respect meter is her affection. Her voice is Alpha (Japanese-accented English, on your PC). Say "Hey Mika". Her power-up is **Lovesick**: the light leaves her eyes, a shadow falls over her face and dark hearts rise around her. Outfits (tray > Outfit, switches live): gamer jacket, cozy hoodie, gothic dress, esports jersey, or "Surprise me" for a new one each launch.
+- **Vorn:** the warlord. Power-up: Bloodfire. Outfits (tray > Outfit, switches live): **Warlord** (his steel armour and crimson cape), **Obsidian** (black plate, red-lined cape, iron gorget), **Frostbound** (silver armour, white fur, navy cape), **Desert Raider** (leather, cloth wraps, a half-cape), **Off-Duty** (a hoodie with his sigil, combat trousers), or "Surprise me" for a new one each launch. The respect upgrades (gold trim, white fur, war-crown) show on every outfit.
+- **Mika:** an original yandere gamer girl with long pink hair, pink eyes and a cat-ear gaming headset. Sweet and adoring on the surface, obsessively possessive underneath: jealous of your other games, apps and friends, and she takes your deaths personally. Her respect meter is her affection. Her voice is Alpha (Japanese-accented English, on your PC). Say "Hey Mika". Her power-up is **Lovesick**: the light leaves her eyes, a shadow falls over her face and dark hearts rise around her. Outfits (tray > Outfit, switches live; in duo mode each has their own outfit menu): gamer jacket, cozy hoodie, gothic dress, esports jersey, or "Surprise me" for a new one each launch.
 - **Both (duo mode):** tray > Character > **Both**. Vorn and Mika stand side by side and react together: each comment is a quick 2-3 line exchange where one is hard on you, the other takes your side in their own way, and they snipe at each other. Each line plays in its own voice with the right mouth moving; the shared bubble shows who's talking. Say "Hey Vorn" or "Hey Mika" (with or without a pause before the question): only the one you called answers, and the other stays quiet and just makes a face of their own (ask Mika about her day and Vorn won't tell you about his). "Hey Mika, remember that ..." pins the fact in Mika's memory. Each moves in their own rhythm, never in lockstep. The character you had selected keeps the memory; they both read what the other remembers, and each one's stories stay their own (Mika never borrows Vorn's conquests). With the free local model, one of them comments and most of the time the other fires back at them; the small model mixes up two characters, so each line is written separately and only sees its own speaker's past. They roast each other without ever telling each other's stories. The Discord camera shows both, lip-synced.
 
 Right-click the tray icon > **Settings...** to change his name, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Only the settings you changed are stored in `settings.json`, so improvements to the defaults in `config.py` still reach you; **Restore Defaults** deletes it.

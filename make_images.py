@@ -19,7 +19,7 @@ for key, value in config._DEFAULTS.items():
     setattr(config, key, value)
 config.DUO, config.CAMERA_BACKGROUND = True, "dark"
 import main  # noqa: E402
-from character import Vorn  # noqa: E402
+from character import VORN_LOOKS, Vorn  # noqa: E402
 from mika import OUTFITS, Mika  # noqa: E402
 from senses import Voice  # noqa: E402
 
@@ -61,14 +61,17 @@ def lineup(chars, name, scale=1.2):
 
 def main_images():
     OUT.mkdir(parents=True, exist_ok=True)
-    pose(Vorn(), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-vorn.png"))
+    pose(Vorn("warlord"), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-vorn.png"))
     pose(Mika("jacket"), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-mika.png"))
-    lineup([pose(Vorn(), m) for m in ("idle", "smug", "angry", "laugh")] + [pose(Vorn(), "angry", power=True)], "vorn.png")
+    lineup([pose(Vorn("warlord"), m) for m in ("idle", "smug", "angry", "laugh")] + [pose(Vorn("warlord"), "angry", power=True)],
+           "vorn.png")
+    looks = dict(zip(VORN_LOOKS, ("idle", "smug", "angry", "disgusted", "laugh")))
+    lineup([pose(Vorn(o), looks[o]) for o in VORN_LOOKS], "vorn-outfits.png")
     moods = dict(zip(sorted(OUTFITS), ("smug", "laugh", "idle", "angry")))
     lineup([pose(Mika(o), moods[o]) for o in sorted(OUTFITS)] + [pose(Mika("jacket"), "smug", power=True)], "mika.png")
 
     overlay = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)  # duo mode, as on your screen
-    overlay.chars[1].outfit = "jacket"
+    overlay.chars[0].outfit, overlay.chars[1].outfit = "warlord", "jacket"
     for c in overlay.chars:
         pose(c)
     overlay.show_line("smug", "Nine minutes in the menu, sweetie? Pick a game before I pick one for you.", None, "none", "Mika")

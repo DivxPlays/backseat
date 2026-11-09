@@ -5,12 +5,10 @@ Her power-up is "Lovesick": the light leaves her eyes, a shadow falls over her f
 Same drawing coordinates as Vorn: 300 wide around x=150, feet near FULL_H.
 """
 import math
-import random
 
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QRadialGradient
 
-import config
 from character import FULL_H, GOLD, INK, P, Vorn, alpha, fill, mirror, mix, pen, poly, stroke, vgrad
 
 SKIN, SKIN_SH, BLUSH = QColor("#ffe3d3"), QColor("#f0b49c"), QColor("#ff8fb1")
@@ -43,10 +41,7 @@ def heart(cx, cy, s):
 class Mika(Vorn):
     SHOULDER, UPPER, FORE = (92, 248), 112, 100
 
-    def __init__(self, outfit=None):
-        super().__init__()
-        outfit = outfit or config.OUTFIT
-        self.outfit = outfit if outfit in OUTFITS else random.choice(sorted(OUTFITS))  # "random": a new look each launch
+    OUTFITS, OUTFIT_SETTING = OUTFITS, "OUTFIT"  # her wardrobe and the setting that picks from it (Vorn.__init__ chooses)
 
     # ---------------------------------------------------------------- drawing
     def draw(self, g):

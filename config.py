@@ -8,6 +8,7 @@ WAKE_NAMES = ["vorn", "vorne", "vern", "born", "bourne", "vaughn", "vaughan", "v
 POWER = "Bloodfire"  # the character's power-up form (from the preset)
 DUO = False  # both characters on screen together (tray > Character > Both)
 OUTFIT = "random"  # Mika's outfit: "jacket", "hoodie", "gothic", "jersey", or "random" (a new one each launch)
+VORN_OUTFIT = "random"  # Vorn's: "warlord", "obsidian", "frostbound", "desert raider", "off-duty", or "random"
 
 # Who the character is (from the preset). {name} = their name.
 PERSONA = """You are {name}, a battle-scarred warlord who conquered eleven worlds and now, to your eternal disgust, lives in a small window in the corner of the player's screen. You watch their screen and talk to them out loud.
