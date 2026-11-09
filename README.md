@@ -66,7 +66,7 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 | F4 | shut-up mode: he keeps watching and keeping score, but only talks when you talk to him |
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
 | Ctrl+click on them | poke: they flinch and react (a different line for the head, and more annoyed the more you poke). Free |
-| Ctrl+drag them, let go | throw: they fly, bounce off the screen's edges, complain, then glide back to their spot. Free |
+| Ctrl+drag them, let go | throw: the one you grab flies (in duo mode the other stays put), bounces off the screen's edges, complains, then glides back to their spot. Free |
 | tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, switch Character, open Settings, turn on Start with Windows, see About (version and who made it), or quit |
 
 **Interrupting:** talk over them and they stop mid-sentence to listen. If you were talking to them ("Hey Vorn, ..."), they drop the rest of what they were saying (and the rest of a duo exchange) and answer you; if you were talking to someone else or just laughing, they carry on from where they stopped. A cough or a click doesn't count (it takes about half a second of your voice). Holding F8 cuts them off right away. It needs a headset, so their voice doesn't reach your mic; with speakers, turn it off in Settings > Behavior > Interrupting.

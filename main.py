@@ -199,6 +199,27 @@ def set_autostart(on):
                 pass
 
 
+class Flyer(QWidget):
+    """One character thrown out of the overlay, in a window of their own (in duo mode the other one stays put)."""
+
+    def __init__(self, char, at):
+        super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.char = char
+        self.resize(int(CW * config.SCALE), int(CH * config.SCALE))
+        self.move(at)
+        set_clickthrough(self, True)  # the overlay keeps the mouse while you drag
+        self.show()
+
+    def paintEvent(self, _):
+        g = QPainter(self)
+        g.setRenderHint(QPainter.Antialiasing)
+        g.scale(config.SCALE, config.SCALE)
+        self.char.paint(g)
+        g.end()
+
+
 class Overlay(QWidget):
     poked = Signal(int, str, bool)  # Ctrl+click or a throw: (which one, "poke"/"poke head"/"poke annoyed"/"grabbed"/"thrown", say a line)
     GRAVITY, HEAD = 2600, 115  # thrown: px/s² of fall; pokes above this (drawing units) are on the head
@@ -219,7 +240,7 @@ class Overlay(QWidget):
         self.pokeable = False  # Ctrl held: clicks on them land on them instead of your game
         self.grab = None  # Ctrl+drag: [which one, grab offset, recent (time, position) for the throw's speed, dragged yet]
         self.flight = None  # thrown: [vx, vy] in px/s while they fly
-        self.home, self.home_at = None, 0.0  # where they glide back to after a throw, and when they start
+        self.flyer, self.home_at = None, 0.0  # the thrown one's own window (see Flyer), and when they head home
         self.pokes, self.jolts, self.last_said, self.thrown_by = deque(maxlen=12), {}, 0.0, 0
         self.span = CW * config.SCALE * len(self.chars)  # how wide the characters are together
         self.resize(int(BUBBLE_W + self.span), int(CH * config.SCALE) + 26)  # + a strip under their feet for the cost tag
@@ -259,7 +280,7 @@ class Overlay(QWidget):
     def mousePressEvent(self, e):
         if self.moving:
             self.grab_at = e.globalPosition().toPoint() - self.pos()
-        elif self.pokeable and e.button() == Qt.LeftButton and self.char_at(e.position().x()) is not None and not self.flight:
+        elif self.pokeable and e.button() == Qt.LeftButton and self.char_at(e.position().x()) is not None and not self.flyer:
             p = e.globalPosition()
             self.grab = [self.char_at(e.position().x()), p.toPoint() - self.pos(), [(time.monotonic(), p)], False]
 
@@ -271,11 +292,12 @@ class Overlay(QWidget):
             p = e.globalPosition()
             if not dragged and (p - trail[0][1]).manhattanLength() > 12:  # a drag, not a poke: grabbed
                 self.grab[3] = dragged = True
-                self.home = self.home or self.pos()
+                self.flyer, self.thrown_by = Flyer(self.chars[i], self.slot(i)), i  # out of the overlay, into your hand
+                self.grab[1] = offset = trail[0][1].toPoint() - self.slot(i)
                 self.chars[i].set_mood("surprised")
                 self.react(i, "grabbed")
             if dragged:
-                self.move(p.toPoint() - offset)
+                self.flyer.move(p.toPoint() - offset)
             self.grab[2] = (trail + [(time.monotonic(), p)])[-6:]
 
     def mouseReleaseEvent(self, e):
@@ -287,7 +309,7 @@ class Overlay(QWidget):
             return self.poke(i, e.position().y())
         (t0, p0), (t1, p1) = trail[0], trail[-1]
         dt = max(t1 - t0, 1 / 60)
-        self.flight, self.thrown_by = [(p1.x() - p0.x()) / dt, (p1.y() - p0.y()) / dt], i  # let go: thrown at that speed
+        self.flight = [(p1.x() - p0.x()) / dt, (p1.y() - p0.y()) / dt]  # let go: thrown at that speed
 
     def poke(self, i, y):
         """Ctrl+click: they flinch, and say something (more annoyed the more you poke)."""
@@ -307,33 +329,42 @@ class Overlay(QWidget):
             self.last_said = time.monotonic()
         self.poked.emit(i, what, speak)
 
+    def slot(self, i):
+        """Where character i stands in the overlay, on the screen."""
+        return self.pos() + QPoint(int((0 if self.left else BUBBLE_W) + i * CW * config.SCALE), 0)
+
     def fly(self, now, dt):
         """Thrown: gravity and bounces off the screen's edges; once they land they complain, then glide home."""
+        w = self.flyer
+        if not w:
+            return
         if self.flight:
             vx, vy = self.flight[0], self.flight[1] + self.GRAVITY * dt
-            x, y = self.x() + vx * dt, self.y() + vy * dt
-            geo = (QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()).availableGeometry()
-            if x < geo.left() or x + self.width() > geo.right():
-                x, vx = min(max(x, geo.left()), geo.right() - self.width()), -vx * 0.6
+            x, y = w.x() + vx * dt, w.y() + vy * dt
+            geo = (QApplication.screenAt(w.geometry().center()) or QApplication.primaryScreen()).availableGeometry()
+            if x < geo.left() or x + w.width() > geo.right():
+                x, vx = min(max(x, geo.left()), geo.right() - w.width()), -vx * 0.6
             if y < geo.top():
                 y, vy = geo.top(), -vy * 0.5
-            if y + self.height() > geo.bottom():
-                y, vy, vx = geo.bottom() - self.height(), -vy * 0.45, vx * 0.85
-            self.move(int(x), int(y))
+            if y + w.height() > geo.bottom():
+                y, vy, vx = geo.bottom() - w.height(), -vy * 0.45, vx * 0.85
+            w.move(int(x), int(y))
             self.flight = [vx, vy]
-            if y + self.height() >= geo.bottom() - 1 and abs(vy) < 160 and abs(vx) < 80:  # landed
+            if y + w.height() >= geo.bottom() - 1 and abs(vy) < 160 and abs(vx) < 80:  # landed
                 self.flight, self.home_at = None, now + 2.5
                 self.chars[self.thrown_by].set_mood("angry")
                 self.chars[self.thrown_by].pop = 1.0
                 self.react(self.thrown_by, "thrown", force=True)
-        elif self.home and now > self.home_at and not self.grab:  # back to their spot
-            dx, dy = self.home.x() - self.x(), self.home.y() - self.y()
+        elif not self.grab and now > self.home_at:  # back to their spot, then back into the overlay
+            home = self.slot(self.thrown_by)
+            dx, dy = home.x() - w.x(), home.y() - w.y()
             if abs(dx) + abs(dy) < 16:  # the last few pixels: snap (whole-pixel steps would stall short of it)
-                self.move(self.home)
-                self.home = None
+                w.close()
+                w.deleteLater()
+                self.flyer = None
             else:
                 k = 1 - math.exp(-dt * 5)
-                self.move(int(self.x() + dx * k), int(self.y() + dy * k))
+                w.move(int(w.x() + dx * k), int(w.y() + dy * k))
 
     def show_line(self, mood, line, audio, event="none", who=""):
         self.speaking = self.names.index(who) if who in self.names else 0
@@ -380,6 +411,8 @@ class Overlay(QWidget):
             self.pokeable = want
             set_clickthrough(self, not want)
         self.fly(now, dt)
+        if self.flyer:
+            self.flyer.update()
         if self.ducker.saved and not self.voice.busy():
             self.ducker.restore()
         if self.voice.paused():
@@ -407,6 +440,8 @@ class Overlay(QWidget):
             g.setFont(QFont("Segoe UI", 10, QFont.Bold))
             g.drawText(QRectF(12, 8, BUBBLE_W, 40), Qt.TextWordWrap, f"Drag me anywhere.\n{config.KEY_MOVE.upper()} to lock.")
         for i, char in enumerate(self.chars):
+            if self.flyer and i == self.thrown_by:
+                continue  # out of the overlay, flying in their own window
             g.save()
             e = time.monotonic() - self.jolts.get(i, -9)
             jolt = math.sin(e * 55) * 7 * (1 - e / 0.35) if e < 0.35 else 0.0  # poked: a quick jolt

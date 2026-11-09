@@ -875,18 +875,21 @@ for step in range(1, 5):  # a quick flick up and to the left
     time.sleep(0.01)
     duo.mouseMoveEvent(mouse(QEvent.MouseMove, x0 + 30 - 25 * step, 300 - 20 * step, home))
 duo.mouseReleaseEvent(mouse(QEvent.MouseButtonRelease, x0 + 30 - 100, 300 - 80, home))
-assert said[-1][1] == "grabbed" and duo.flight and duo.flight[0] < 0 and duo.home == home
+assert said[-1][1] == "grabbed" and duo.flight and duo.flight[0] < 0 and duo.flyer and duo.thrown_by == 0
+assert duo.pos() == home  # only the one you grabbed flies: the overlay (and the other one) stays put
 t = 1000.0
 for _ in range(2000):  # fly, bounce, land
     t += 1 / 60
     duo.fly(t, 1 / 60)
     if not duo.flight:
         break
-assert not duo.flight and said[-1] == (0, "thrown", True) and duo.chars[0].mood == "angry"
-for _ in range(600):  # wait, then glide home
+assert not duo.flight and said[-1] == (0, "thrown", True) and duo.chars[0].mood == "angry" and duo.pos() == home
+for _ in range(600):  # wait, then glide home and step back into the overlay
     t += 1 / 60
     duo.fly(t, 1 / 60)
-assert duo.pos() == home and duo.home is None
+    if not duo.flyer:
+        break
+assert duo.flyer is None and duo.pos() == home
 config.DUO, config.PRESET, config.NAME, config.CHARACTER, config.PERSONA = saved_duo
 assert brain.partner() is None or config.DUO
 heard_duo = []
