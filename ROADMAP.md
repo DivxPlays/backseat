@@ -4,6 +4,27 @@
 
 Nothing yet: 2.0.0 shipped everything that was planned (see Done).
 
+## Ideas for 2.1.0 (not decided: pick the ones you want)
+
+GitHub issues land in Planned with their number. No issues yet (checked 2026-11-09).
+
+### Squad and clips
+- **Report a problem:** tray > Report a problem opens a pre-filled GitHub issue (version and the error, with names, paths and keys stripped), so friends can report bugs straight into this roadmap.
+- **"Clip that!":** say it (or press a key) and they save the last 30 seconds right then and roast it into the Hall of Shame.
+- **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
+- **Shareable clips:** an .mp4 with them and their roast burned in, ready to send (needs ffmpeg, a download).
+
+### Characters
+- **Pick any duo partner:** pair any two characters, created ones included (today a created character pairs only with Vorn).
+- **Milestones:** 50/100/500 hours together, a month since you met, a first-launch anniversary, each celebrated.
+- **More holidays:** Lunar New Year, Valentine's outfits, St. Patrick's, Easter, Thanksgiving.
+- **Power-up colours** for created characters, and their **own outfit choice** instead of sharing Vorn's or Mika's.
+
+### Quality
+- **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
+- **Fresher greetings:** most greetings open the same way ("X minutes idling in Claude..."); vary what they open with.
+- **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
+
 ## Not planned
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
