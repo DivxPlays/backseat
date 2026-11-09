@@ -12,6 +12,7 @@ Built and self-checked, but not yet seen working on a real day:
 - Auto-clips in a real game (the Game Bar key, the clip on the highlights page).
 - Steam stats with a real Steam Web API key.
 - The squad leaderboard with friends on a real Discord call.
+- 2.1.0: "Clip that!" and clips through Medal in a real game, a milestone party, and Report a problem opening a real issue.
 
 ## Ideas for 2.1.0 (not decided: pick the ones you want)
 
