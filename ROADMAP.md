@@ -15,7 +15,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
-- Auto-clips: a Hall of Shame moment in a game saves the last 30 seconds through Windows Game Bar's "Record what happened" (or NVIDIA Instant Replay), and the highlights page plays the clip with their roast over its end. No downloads.
+- Auto-clips: a Hall of Shame moment in a game saves the last 30 seconds through Windows Game Bar's "Record what happened" (or NVIDIA Instant Replay), and the highlights page plays the clip with their roast over its end and them standing in the corner of it with their line. No downloads.
 - Frame-rate guard: with the free local model, a game keeping the GPU 90%+ busy gets its comments from Claude Haiku instead, so the local model never takes frames (NVIDIA, via nvidia-smi; adjustable, 0 = off).
 - Squad leaderboard: weekly shame points for your Discord friends (deaths, fails and epic plays seen on screen or told, their talk roasted or praised), standings when asked, and last week's worst player award announced when a friend first talks that week.
 - Character creator: your own character on Vorn's or Mika's body (name, who they are, voice, power-up, hair, eye, skin and outfit colours, live preview); Claude writes their full personality, misheard names and their own voice-command lines (about 6 cents). Colours for Vorn and Mika too; created characters travel with Export memory.

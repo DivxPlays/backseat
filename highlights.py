@@ -22,6 +22,12 @@ h1 span { color:var(--gold); }
 .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:18px; }
 figure { margin:0; background:var(--card); border:1px solid #3a2e33; border-radius:14px; overflow:hidden; }
 figure img, figure video { display:block; width:100%; height:auto; background:#000; }
+.clip { position:relative; }
+.clip .who { position:absolute; right:3%; bottom:0; width:auto; height:88%; opacity:0; transition:opacity .25s; pointer-events:none;
+             filter:drop-shadow(0 0 6px #000a); }
+.clip .bubble { position:absolute; right:22%; top:6%; max-width:60%; margin:0; padding:6px 10px; border-radius:12px; background:#f1e9df;
+                color:#1b1418; font-size:14px; font-weight:600; line-height:1.3; opacity:0; transition:opacity .25s; pointer-events:none; }
+.clip.talking .who, .clip.talking .bubble { opacity:1; }
 figcaption { padding:12px 16px 4px; }
 figcaption q { display:block; font-weight:600; quotes:"\\201C" "\\201D"; }
 .when { display:block; color:var(--dim); font-size:13px; margin-bottom:4px; }
@@ -31,10 +37,13 @@ audio { width:calc(100% - 32px); margin:8px 16px 16px; }
 
 
 SYNC = """<script>
-// a clip plays with the roast laid over its end: the roast starts so it finishes with the clip
+// a clip plays with the roast laid over its end: the roast starts so it finishes with the clip, and the one roasting
+// stands over the clip with their line while it plays
 document.querySelectorAll("figure video").forEach(v => {
-  const a = v.parentElement.querySelector("audio");
+  const a = v.closest("figure").querySelector("audio"), clip = v.parentElement;
   if (!a) return;
+  a.addEventListener("play", () => clip.classList.add("talking"));
+  a.addEventListener("pause", () => clip.classList.remove("talking"));
   a.preload = "auto";
   const start = () => Math.max(0, v.duration - (a.duration || 4) - 1);
   v.addEventListener("timeupdate", () => {
@@ -67,8 +76,10 @@ def build(d, folder):
         when = datetime.fromisoformat(e["when"]).strftime("%a %b %d, %I:%M %p")
         audio = f'<audio controls preload="none" src="{quote(e["clip"])}"></audio>' if e.get("clip") and (folder / e["clip"]).exists() else ""
         video = e.get("video") and Path(e["video"]).exists()  # auto-clips: the moment itself, with the roast over its end
-        shot = (f'<video controls preload="metadata" poster="{quote(e["file"])}" src="{Path(e["video"]).as_uri()}"></video>' if video
-                else f'<img src="{quote(e["file"])}" alt="" loading="lazy">')
+        who = (f'<img class="who" src="{quote(e["who"])}" alt=""><p class="bubble">{html.escape(e["caption"])}</p>'
+               if e.get("who") and (folder / e["who"]).exists() else "")  # them, over the clip while they roast it
+        shot = (f'<div class="clip"><video controls preload="metadata" poster="{quote(e["file"])}" src="{Path(e["video"]).as_uri()}">'
+                f'</video>{who}</div>' if video else f'<img src="{quote(e["file"])}" alt="" loading="lazy">')
         cards.append(f'<figure>{shot}<figcaption>'
                      f'<span class="when">{html.escape(when)} &middot; {html.escape(e.get("game", ""))}</span>'
                      f'<q>{html.escape(e["caption"])}</q></figcaption>{audio}</figure>')

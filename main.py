@@ -1274,6 +1274,7 @@ class Companion:
             shame = save_moment(shot[2], self.focus, turns[0][2], HALL)
             if config.CLIP_KEY and self.current_game():  # auto-clips: the last 30 seconds of the game, too
                 threading.Thread(target=self.capture_clip, args=(shame.name,), daemon=True).start()
+                self.portrait(shame, turns[0][0], turns[0][1])
         if out.get("event") == "loss" and kind != "breakdown" and not self.muted and time.monotonic() - self.last_breakdown > 180:
             self.last_breakdown = time.monotonic()
             self.jobs.put(("breakdown", None))
@@ -1393,6 +1394,25 @@ class Companion:
         self.mem.save()
         logging.info("folded %d old notes into the long-term profile ($%.4f)", len(old), spent)
 
+    def portrait(self, shot, who, mood):
+        """Auto-clips: a picture of `who` (the one who roasted the moment) in that mood and their outfit, next to the
+        screenshot (" who.png"), for the highlights page to stand over the clip. A fresh drawing: the one on screen is
+        busy animating."""
+        i = self.names.index(who) if who in self.names else 0
+        build, colors = (config.CHARACTER, config.COLORS) if i == 0 else (self.partner["CHARACTER"], self.partner.get("COLORS"))
+        char = make_character(build, colors)
+        if i < len(self.dressers):
+            char.outfit = self.dressers[i].outfit
+        char.tier = tier_for(self.mem.d["respect"])
+        char.glance_at = char.turn_at = 1e9  # facing front
+        char.set_mood(mood)
+        for _ in range(5):
+            char.step(1.0, 0.0)
+        try:
+            char.render(0.8).save(str(shot.with_name(f"{shot.stem} who.png")))
+        except Exception:
+            logging.warning("couldn't draw them for the clip", exc_info=True)
+
     def capture_clip(self, moment):
         """Auto-clips: press the capture tool's "save what just happened" key (CLIP_KEY) and give the video it saves to this
         Hall of Shame moment (a screenshot's name). The video stays where the tool put it (your Videos folder)."""
@@ -1419,7 +1439,8 @@ class Companion:
         if clip:
             save_clip(clip, audio)
         self.mem.add_hall({"file": path.name, "clip": clip.name if clip else None, "caption": line, "game": game,
-                           "when": datetime.now().isoformat(timespec="minutes"), "video": self.videos.pop(path.name, None)})
+                           "when": datetime.now().isoformat(timespec="minutes"), "video": self.videos.pop(path.name, None),
+                           "who": who.name if (who := path.with_name(f"{path.stem} who.png")).exists() else None})
         self.mem.save()
         logging.info("hall of shame: %s", path)
 

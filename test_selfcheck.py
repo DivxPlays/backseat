@@ -289,7 +289,20 @@ with tempfile.TemporaryDirectory() as d:
         main.keyboard.send, main.new_clip, main.videos_folder = real_send, real_new, real_folder
     page = highlights.build(m.d, hall).read_text(encoding="utf-8")
     assert "<video" in page and (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").as_uri() in page
-    assert 'poster="a%20b.jpg"' in page and "a.play()" in page
+    assert 'poster="a%20b.jpg"' in page and "a.play()" in page and 'class="who"' not in page  # (no picture of them yet)
+    # them over the clip: a fresh drawing of whoever roasted it (their build, colours, outfit and mood), shown with their line
+    drawer = SimpleNamespace(names=["Vorn", "Mika"], partner={"CHARACTER": "mika", "COLORS": {"hair": "#ffffff"}},
+                             dressers=[SimpleNamespace(outfit="obsidian"), SimpleNamespace(outfit="maid")], mem=m)
+    main.Companion.portrait(drawer, hall / "a b.jpg", "Mika", "laugh")
+    drawn = Image.open(hall / "a b who.png")
+    assert drawn.size == (int(main.CW * 0.8), int(main.CH * 0.8)) and drawn.getchannel("A").getextrema()[1] == 255
+    m.d["hall"][-1]["who"] = "a b who.png"
+    page = highlights.build(m.d, hall).read_text(encoding="utf-8")
+    assert 'class="clip"' in page and 'src="a%20b%20who.png"' in page and '<p class="bubble">Grenade, meet feet.</p>' in page
+    assert 'classList.add("talking")' in page
+    filer = SimpleNamespace(videos={}, mem=m)
+    main.Companion.hall_entry(filer, hall / "a b.jpg", "Again.", "G", None)  # hall_entry finds the picture by name
+    assert m.d["hall"][-1]["who"] == "a b who.png"
     (videos / "Captures" / "CoD4 2026-11-09 01-30-00.mp4").unlink()
     assert "<video" not in highlights.build(m.d, hall).read_text(encoding="utf-8")
 
