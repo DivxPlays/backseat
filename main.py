@@ -195,10 +195,11 @@ def preset_name(preset):
         return preset.title()
 
 
-def minigame_due(now, menu_at, last_game):
+def minigame_due(now, menu_at, last_game, in_game=True):
     """Time for a mini-game? You're in a menu (seen in the last 90 s) and there hasn't been one for GAME_GAP; checked
     every second, so a small chance each time makes it start after a while, not the moment you open a menu."""
-    return now - menu_at < 90 and now - last_game > GAME_GAP and random.random() < 0.02
+    return in_game and now - menu_at < 90 and now - last_game > GAME_GAP and random.random() < 0.02  # (never on the desktop:
+    # the free model calls it a "menu")
 
 
 def judge_note(trivia):
@@ -1715,7 +1716,7 @@ class Companion:
             talking_to_him = self.ears.recording or any(listener.active() for listener in self.listeners)
             if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or talking_to_him or quiet < config.LOOK_COOLDOWN:
                 continue
-            if not (self.muted or self.paused) and minigame_due(now, self.menu_at, self.last_game):  # sitting in a menu
+            if not (self.muted or self.paused) and minigame_due(now, self.menu_at, self.last_game, self.current_game() is not None):
                 self.last_game = now
                 self.jobs.put(("minigame", None))
                 continue

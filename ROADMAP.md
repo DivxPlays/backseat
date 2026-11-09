@@ -4,17 +4,6 @@
 
 Nothing yet: 2.0.0 shipped everything that was planned (see Done).
 
-## Known issues (next hotfix, 2.0.3)
-
-Found in companion.log on 2026-11-09. No GitHub issues yet.
-
-- **Crash when the audio device is busy or gone for a moment.** Playing a line raised "Device unavailable" (twice on
-  2026-11-08: a headset reconnecting or the default device switching) and took the whole app down. It should skip the
-  sound (or retry the default device) and keep the subtitles.
-- **Mini-games outside games.** The free local model calls the desktop a "menu", so trivia was asked while you were in
-  Claude ("Which company created the Claude AI assistant?", Mario, the Windows tray icon), each about 0.8 cents. They
-  should only start when a game is in front.
-
 ## Not yet tested in real use
 
 Built and self-checked, but not yet seen working on a real day:
@@ -51,6 +40,10 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+
+2.1.0 (in progress):
+- Fix: a sound device dropping out (a headset reconnecting) no longer crashes the app: the default device plays the line, or it shows as subtitles.
+- Fix: mini-games start only while a game is in front, never on the desktop or in other apps.
 
 2.0.0 (2026-11-09):
 - Accurate stats from Steam: real kills, deaths and wins this session for games with Steam stats (CS2, TF2, Left 4 Dead 2...), with your own Steam Web API key; read every 2 minutes while such a game is in front.

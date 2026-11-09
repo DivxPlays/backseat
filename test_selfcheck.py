@@ -953,6 +953,7 @@ main.random.random = lambda: 0.0  # (the chance always hits)
 try:
     assert main.minigame_due(1000, 950, 0) and not main.minigame_due(1000, 800, 0)  # in a menu lately, or not
     assert not main.minigame_due(1000, 950, 700)  # one 5 minutes ago: too soon
+    assert not main.minigame_due(1000, 950, 0, in_game=False)  # a "menu" on the desktop or in Claude: no quiz about Windows
 finally:
     main.random.random = real_random
 note = main.judge_note({"q": "What's the M40A3's magazine size?", "a": "5", "who": "Vorn"})
@@ -1801,6 +1802,33 @@ for n in range(int(1200 * 15)):  # 20 minutes of a comment every 25 s (8 s of ta
         sync_prev[k] = c.act
 together = sum(1 for a in sync_starts[0] if any(abs(a - b) < 0.8 for b in sync_starts[1]))
 assert len(sync_starts[0]) > 30 and together / len(sync_starts[0]) < 0.28, (together, len(sync_starts[0]))
+
+# the audio device busy or gone for a moment: the default device instead, or no sound (subtitles only), never a crash
+real_sd = (senses.sd.play, senses.sd.stop)
+tried = []
+
+
+def flaky(audio, rate, device=None):
+    tried.append(device)
+    if device is not None:
+        raise senses.sd.PortAudioError("Error opening OutputStream: Device unavailable [PaErrorCode -9985]")
+
+
+senses.sd.stop = lambda *a, **k: None
+saved_out, config.VOICE_DEVICE = config.VOICE_DEVICE, ""
+real_find = senses.find_device
+try:
+    senses.find_device = lambda name, kind: 7  # (a chosen device that's gone)
+    senses.sd.play = flaky
+    flaky_voice = Voice()
+    assert flaky_voice.play(np.zeros(2400, np.float32)) > 0 and tried == [7, None] and flaky_voice.busy()  # the default one
+    def dead(*a, **k):
+        raise senses.sd.PortAudioError("Device unavailable")
+    senses.sd.play = dead
+    assert flaky_voice.play(np.zeros(2400, np.float32)) == 0.0 and not flaky_voice.busy()  # nothing plays: no crash
+finally:
+    senses.sd.play, senses.sd.stop = real_sd
+    senses.find_device, config.VOICE_DEVICE = real_find, saved_out
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

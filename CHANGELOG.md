@@ -3,6 +3,16 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## 2.1.0 (not released yet)
+
+### Fixed
+- **A crash when the sound device dropped out.** A headset reconnecting or Windows switching its default device made
+  playing a line fail with "Device unavailable", and that took the whole app down. Now the line plays on Windows' default
+  device instead, or, if no device will play right then, shows as subtitles without sound.
+- **Mini-games outside games.** The free local model sometimes calls the desktop a "menu", so trivia started while you
+  were in other apps (questions about Windows or the app you had open). Mini-games now start only while a game is in
+  front.
+
 ## 2.0.2 Beta (2026-11-09)
 
 A hotfix.

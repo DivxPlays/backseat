@@ -526,17 +526,39 @@ class Voice:
         snd = miniaudio.decode(mp3, output_format=miniaudio.SampleFormat.FLOAT32, nchannels=1, sample_rate=SR)
         return np.frombuffer(snd.samples, dtype=np.float32).copy()
 
+    @staticmethod
+    def _stop():
+        try:
+            sd.stop()
+        except sd.PortAudioError:
+            pass
+
+    @staticmethod
+    def _out(audio):
+        """Play on the voice device, else Windows' default one; False when neither opens right now (a headset
+        reconnecting, the default device switching): then there's no sound, never a crash."""
+        for device in dict.fromkeys((find_device(config.VOICE_DEVICE, "output"), None)):
+            try:
+                sd.play(audio, SR, device=device)
+                return True
+            except sd.PortAudioError as e:
+                logging.warning("couldn't play on %s: %s", "the default device" if device is None else f"device {device}", e)
+        return False
+
     def play(self, audio, effect=False):
-        """Start playing (effect: a sound effect, not a line); returns the duration in seconds."""
-        sd.stop()
+        """Start playing (effect: a sound effect, not a line); returns the duration in seconds (0 when no device would
+        play it: the subtitles still show)."""
+        self._stop()
         self._audio, self._t0, self._held, self.effect = audio, time.monotonic(), None, effect
         self._track = mouth_track(audio)  # a few milliseconds for a 5 s line
-        sd.play(audio, SR, device=find_device(config.VOICE_DEVICE, "output"))  # a VoiceMeeter input puts him in your calls
+        if not self._out(audio):
+            self._audio = None
+            return 0.0
         return len(audio) / SR
 
     def stop(self):
         """Stop for good (push-to-talk, or you said his name over him): the rest of the line and exchange are dropped."""
-        sd.stop()
+        self._stop()
         self._audio, self._held, self.cut = None, None, True
 
     def pause(self):
@@ -545,7 +567,7 @@ class Voice:
             return False
         at = int((time.monotonic() - self._t0) * SR)
         self._held = (self._audio, max(0, at - SR // 4))  # carry on a quarter second back: restarting mid-word is jarring
-        sd.stop()
+        self._stop()
         self._audio = None
         return True
 
@@ -558,7 +580,8 @@ class Voice:
         if held:
             audio, at = held
             self._audio, self._t0 = audio, time.monotonic() - at / SR  # level() and busy() keep counting from the line's start
-            sd.play(audio[at:], SR, device=find_device(config.VOICE_DEVICE, "output"))
+            if not self._out(audio[at:]):
+                self._audio = None
 
     def busy(self):
         return self._audio is not None and time.monotonic() - self._t0 < len(self._audio) / SR
