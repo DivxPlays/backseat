@@ -60,7 +60,10 @@ def publish():
     run("git", "fetch", "-q", "origin")
     if run("git", "rev-parse", "HEAD") != run("git", "rev-parse", "origin/main"):
         sys.exit("Push first: GitHub's main must be this commit.")
-    trailer = HERE / "dist" / "trailer.mp4"  # (make_trailer.py: re-render it first when they or their features changed)
+    trailer = HERE / "dist" / "trailer.mp4"  # (a feature release re-renders it first; a hotfix keeps the last one)
+    if not trailer.exists():  # the last release's, so the README's link to the latest release's trailer keeps working
+        subprocess.run([GH, "release", "download", "--repo", "DivxPlays/backseat", "--pattern", "trailer.mp4", "--dir",
+                        str(trailer.parent)], cwd=HERE, capture_output=True)
     files = [str(HERE / "dist" / "Backseat.zip"), str(HERE / "dist" / "Install-Backseat.bat")] + ([str(trailer)] if trailer.exists() else [])
     run(GH, "release", "create", f"v{version}", *files,
         "--title", f"Backseat {pretty(version)}", "--notes-file", str(notes), "--target", run("git", "rev-parse", "HEAD"), "--latest")
