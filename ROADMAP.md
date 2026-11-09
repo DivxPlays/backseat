@@ -13,6 +13,7 @@
 - **Game profiles:** per-game knowledge (maps, weapons, perks) for sharper hints.
 
 ### Social
+- **Spotify:** they notice what you're listening to and comment on it (your taste, a song on repeat, music instead of playing). Read from the Spotify app on your PC (its window title or Windows' media controls), so no Spotify login.
 - **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
 
 ### Interaction
