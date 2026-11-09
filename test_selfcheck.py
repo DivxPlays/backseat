@@ -376,7 +376,9 @@ with mock.patch.object(senses.sd, "query_devices", lambda: fake_devices), \
         mock.patch.object(senses.sd, "query_hostapis", lambda: [{"name": "MME"}, {"name": "Windows WASAPI"}]):
     assert senses.find_device("Microphone (HyperX Cloud Alpha 2 Wireless Chat)", "input") == 0  # MME cut the name
     assert senses.find_device("voicemeeter aux input", "output") == 1 and senses.find_device("Voicemeeter Out B2", "input") == 2
+    logging.disable(logging.CRITICAL)  # the miss below is on purpose: keep its warning out of his real log
     assert senses.find_device("", "input") is None and senses.find_device("Voicemeeter AUX Input", "input") is None
+    logging.disable(logging.NOTSET)
     assert senses.device_names("output") == ["Voicemeeter AUX Input (VB-Audio Voicemeeter VAIO)"]
 for said, name in (("remember my voice, I'm Mike.", "Mike"), ("Learn my voice. My name is Sam", "Sam"),
                    ("remember my voice please, it's Tess", "Tess"), ("save my voice: Raj", "Raj"), ("remember my voice", None)):
