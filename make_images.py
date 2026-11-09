@@ -57,6 +57,17 @@ def backdrop(imgs, name, pad=16):
     out.save(str(OUT / name))
 
 
+def acting(char, name, mood="idle"):
+    """A character in the middle of one of their idle animations."""
+    pose(char, mood)
+    char.IDLES = {**type(char).IDLES, name: {**type(char).IDLES[name], "time": 100}}  # held mid-play
+    char.act, char.act_t0 = name, char.t - 50
+    char.afk = char.was_afk = name == "nod off"
+    for _ in range(45):
+        char.step(1 / 30, 0.0)
+    return char
+
+
 def lineup(chars, name, scale=1.2):
     backdrop([c.render(scale) for c in chars], name)
 
@@ -74,6 +85,8 @@ def main_images():
     anime = ("maid", "shrine maiden", "magical girl", "yukata", "netrunner", "track suit")
     lineup([pose(Mika(o), m) for o, m in zip(anime, ("smug", "laugh", "idle", "smug", "angry", "laugh"))], "mika-anime.png")
     lineup([pose(Mika(o), m) for o, m in zip(MIKA_UNLOCKS, ("idle", "laugh", "smug", "laugh"))], "mika-unlockables.png")
+    lineup([acting(Vorn("warlord"), n) for n in ("stretch", "crack knuckles", "inspect gauntlet", "power stance", "nod off")]
+           + [acting(Mika("jacket"), n) for n in ("wave", "heart hands", "adjust headset", "twirl hair")], "idle.png", scale=1.0)
     seasons = []
     for holiday, weather in (("halloween", "bats"), ("christmas", "snow")):  # each pair in their holiday's weather
         character.WEATHER = weather

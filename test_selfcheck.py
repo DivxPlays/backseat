@@ -98,6 +98,37 @@ for mood, toward, outfit in [(m, t, o) for m in MOODS for t in (1.0, -1.0) for o
     edges = [img.pixelColor(x, y).alpha() for x in (0, img.width() - 1) for y in range(0, img.height(), 2)]
     edges += [img.pixelColor(x, 0).alpha() for x in range(img.width())]
     assert max(edges) == 0, (mood, toward, outfit)
+# idle animations: each character's own plus the shared ones, all inside the window in every outfit, either way round
+from mika import Mika as _Mika  # noqa: E402
+
+assert {"crack knuckles", "power stance"} <= set(Vorn.IDLES) and {"wave", "heart hands"} <= set(_Mika.IDLES) and "wave" not in Vorn.IDLES
+for cls in (Vorn, _Mika):
+    for name, act in cls.IDLES.items():
+        for outfit in cls.OUTFITS:
+            for toward in (1.0, -1.0):
+                c = cls(outfit)
+                calm = {k: v for k, v in act.get("face", {}).items() if k != "aura"}  # (an aura is meant to spill)
+                c.toward, c.IDLES = toward, {**cls.IDLES, name: {**act, "time": 100, "face": calm}}  # held mid-play
+                c.act, c.act_t0, c.afk = name, c.t - 50, bool(act.get("afk"))
+                c.was_afk = c.afk
+                for _ in range(40):
+                    c.step(1 / 30, 0.0)
+                c.p["aura"], c.flare_amt = 0.0, 0.0
+                img = c.render()
+                edges = [img.pixelColor(x, y).alpha() for x in (0, img.width() - 1) for y in range(0, img.height(), 3)]
+                edges += [img.pixelColor(x, 0).alpha() for x in range(0, img.width(), 2)]
+                assert c.act == name and max(edges) == 0, (cls.__name__, name, outfit, toward)
+c = Vorn("warlord")  # they start by themselves while idle, and stop for anything else
+c.idle_at = c.t
+c.step(1 / 30, 0.0)
+assert c.act and c.act != "nod off"  # (only while you're away)
+c.set_mood("angry")
+c.step(1 / 30, 0.0)
+assert c.act is None
+c.set_mood("idle")
+c.idle_at, c.talk = c.t, 0.5  # talking: no idle animation
+c.step(1 / 30, 0.0)
+assert c.act is None
 v.slump()
 for _ in range(30):
     v.step(1 / 30, 0.0)

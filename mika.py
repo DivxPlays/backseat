@@ -9,7 +9,7 @@ import math
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QRadialGradient
 
-from character import FULL_H, GOLD, INK, P, Vorn, alpha, fill, heart, mirror, mix, pen, poly, stroke, vgrad
+from character import FULL_H, GOLD, IDLES, INK, P, Vorn, alpha, fill, heart, mirror, mix, pen, poly, stroke, vgrad
 
 SKIN, SKIN_SH, BLUSH = QColor("#ffe3d3"), QColor("#f0b49c"), QColor("#ff8fb1")
 HAIR, HAIR_SH, HAIR_HI, HAIR_DEEP = QColor("#ff8cc6"), QColor("#e0559c"), QColor("#ffd0e8"), QColor("#b8327a")
@@ -61,6 +61,15 @@ OUTFITS = {
                        stripe="#ff8fb1", sock_top=680, shoes="#ff8fb1", shoe_trim="#ffffff", chest_bow=True, pattern="#ff8fb1"),
 }
 HOLIDAY = {"halloween": "pumpkin", "christmas": "holly"}
+# her own idle animations, on top of the shared ones (see character.IDLES)
+MIKA_IDLES = {
+    "adjust headset": dict(time=2.4, pose=((110, -155, "open", 0.65), None), front=True, head=(-2, 0, -5), face=dict(open=-0.3)),
+    "twirl hair": dict(time=3.0, pose=((-10, 165, "point", 0.6), None), front=True, wiggle=("near", 10, 3), head=(2, 0, 6),
+                       face=dict(smile=0.4)),
+    "wave": dict(time=2.4, pose=((30, 170, "open", 1.0), None), wiggle=("near", 18, 2.5), face=dict(smile=0.6, lift=0.3)),
+    "heart hands": dict(time=2.8, pose=((-10, -140, "open", 0.8), (-10, -140, "open", 0.8)), face=dict(happy=0.6), effect="hearts"),
+    "bounce": dict(time=1.8, face=dict(happy=0.8, smile=0.3)),  # a happy little bounce
+}
 UNLOCKS = {"night owl": ("hours", 10), "idol": ("talks", 100), "crimson": ("streak", 7), "sweetheart": ("respect", 100)}
 
 
@@ -69,6 +78,8 @@ class Mika(Vorn):
 
     OUTFITS, OUTFIT_SETTING = OUTFITS, "OUTFIT"  # her wardrobe and the setting that picks from it (Vorn.__init__ chooses)
     UNLOCKS, HOLIDAY = UNLOCKS, HOLIDAY
+    IDLES = {**IDLES, **MIKA_IDLES}  # the shared ones and her own
+    HAND = 1.35
     earned = set()  # her own (not Vorn's)
 
     # ---------------------------------------------------------------- drawing
@@ -99,14 +110,17 @@ class Mika(Vorn):
         self._back_hair(g)
         self._legs(g, o)
         g.translate(0, breath * 1.2 + 14 * p["slump"] + 3 * p["happy"] * abs(math.sin(t * 16)))
-        head = (math.sin(t * 34) * 1.4 * p["happy"] + 3 * self.turn,
-                -self.talk * 1.6 + breath * 0.6 - 3 * p["happy"] + 10 * p["slump"],
-                p["tilt"] + math.sin(t * 0.8) * 1.2)
+        ax, ay, atilt = self.idle_head()
+        head = (math.sin(t * 34) * 1.4 * p["happy"] + 3 * self.turn + ax,
+                -self.talk * 1.6 + breath * 0.6 - 3 * p["happy"] + 10 * p["slump"] + ay,
+                p["tilt"] + math.sin(t * 0.8) * 1.2 + atilt)
         self._lower(g, o)
         self._top(g, o)
         self._arms(g)
         self._neck(g, o)
         self._in_head(g, head, self._head)
+        self.front_hand(g)
+        self.idle_effect(g)
         g.restore()
 
     def _in_head(self, g, head, draw):
@@ -358,7 +372,7 @@ class Mika(Vorn):
             g.save()
             g.translate(*wrist)
             g.rotate(math.degrees(math.atan2(-dx, dy)))
-            g.scale(1.35, 1.35)
+            g.scale(self.HAND, self.HAND)
             self._hand(g, pose[side][2], side)
             g.restore()
             wide = o.get("sleeves") == "wide"  # kimono sleeves: loose and hanging below the arm

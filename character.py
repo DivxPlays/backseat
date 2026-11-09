@@ -11,7 +11,7 @@ import math
 import random
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
+from PySide6.QtGui import QBrush, QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 
 import config
 
@@ -128,6 +128,27 @@ POSES = {
     "point":    ((18, 172, "point", 1.0), (28, -45, "fist", 1.0)),  # lecturing finger, other fist on hip
     "slump":    ((3, 1, "open", 1.0), (3, 1, "open", 1.0)),
 }
+# Idle animations: while they're idle and quiet, one plays every 6-14 s. Each character adds their own (VORN_IDLES here,
+# MIKA_IDLES in mika.py). time: seconds. pose: arms as in POSES (bubble-side arm, other arm; None keeps the mood's).
+# wiggle: (which forearm "near", "far" or "both", degrees, times a second). head: (dx, dy, tilt) at full; dx, tilt and a
+# face "look" lean toward your screen. face: added to the face (see MOODS). slump: shoulders drop. look: head turns side
+# to side. effect: "zzz", "hearts" or "glint" drawn around them. afk: only while you're away. All ease in and out.
+IDLES = {
+    "stretch": dict(time=2.8, pose=((160, 175, "open", 0.85), (160, 175, "open", 0.85)), head=(0, -6, 0), face=dict(happy=0.8)),
+    "look around": dict(time=3.4, look=True),
+    "sigh": dict(time=2.4, head=(0, 6, 3), face=dict(open=-0.45, lift=0.3), slump=0.4),
+    "lean in": dict(time=2.8, head=(10, 3, 6), face=dict(lift=0.5, look=0.9)),  # a closer look at your screen
+    "nod off": dict(time=5.5, head=(0, 12, 9), face=dict(open=-1.0, smile=-0.1), effect="zzz", afk=True),
+}
+VORN_IDLES = {
+    "crack knuckles": dict(time=2.4, pose=((-8, -100, "fist", 0.75), (-8, -95, "fist", 0.75)), wiggle=("both", 5, 7),
+                           face=dict(smirk=0.5, brow=0.3)),
+    "inspect gauntlet": dict(time=3.0, pose=((8, -170, "open", 0.8), None), front=True, head=(3, 4, 5), face=dict(look=1.0, open=-0.2),
+                             effect="glint"),
+    "power stance": dict(time=2.4, pose=((13, 9, "fist", 1.0), (13, 9, "fist", 1.0)), wiggle=("both", 3, 9), head=(0, -4, 0),
+                         face=dict(smile=0.3, brow=0.4, aura=0.6)),  # fists clenched, trembling with power
+    "dust off": dict(time=2.2, pose=(None, (-30, -150, "open", 0.8)), wiggle=("far", 14, 5), head=(-2, 2, -5), face=dict(brow=0.3)),
+}
 MOOD_POSE = {"idle": "idle", "smug": "crossed", "angry": "fist", "laugh": "hips", "surprised": "startled", "disgusted": "point"}
 SHOULDER = (58, 296)  # where his left arm starts under the pauldron (the right one is mirrored)
 UPPER, FORE = 135, 122  # arm segment lengths
@@ -225,6 +246,8 @@ class Vorn:
     OUTFITS, OUTFIT_SETTING = VORN_OUTFITS, "VORN_OUTFIT"  # his wardrobe and the setting that picks from it
     UNLOCKS = VORN_UNLOCKS  # the ones you have to earn
     HOLIDAY = VORN_HOLIDAY  # the ones for a holiday
+    IDLES = {**IDLES, **VORN_IDLES}  # what he does while idle: the shared ones and his own
+    HAND = 1.5  # hand size
     earned = set()  # which of those you've earned (set from memory at startup; "random" only picks from what you have)
 
     def __init__(self, outfit=None):
@@ -245,6 +268,7 @@ class Vorn:
         self.afk = False  # set by the overlay: you've stopped touching keyboard and mouse
         self.toward = -1.0  # which way the rest of your screen is (-1 left, 1 right)
         self.yawn_t0, self.yawn_at, self.was_afk = t - 10, t, False
+        self.act, self.act_t0, self.last_act, self.idle_at = None, t, None, t + random.uniform(4, 12)  # idle animations
         self.turn, self.turn_at, self.turn_until = 0.0, t + random.uniform(8, 30), 0.0
         self.roll_t0 = t - 10
         self.flare_amt = 0.0
@@ -253,6 +277,72 @@ class Vorn:
         self.blood, self.blood_until = 0.0, t - 1  # Bloodfire: current strength 0..1, and until when it burns
         self.arms = {side: [*POSES["idle"][0][:2], POSES["idle"][0][3]] for side in (-1, 1)}  # current upper, forearm, length
         self.d = self._effective()
+
+    def idle_now(self):
+        """(the idle animation playing, how far it has eased in 0..1), or (None, 0)."""
+        act = self.IDLES.get(self.act) if self.act else None
+        if not act:
+            return None, 0.0
+        u = (self.t - self.act_t0) / act["time"]
+        return act, max(0.0, min(1.0, u / 0.18, (1 - u) / 0.18))
+
+    def idle_head(self):
+        """(dx, dy, tilt) an idle animation adds to the head."""
+        act, e = self.idle_now()
+        if not act:
+            return 0.0, 0.0, 0.0
+        if act.get("look"):  # looking around: side to side
+            sw = math.sin((self.t - self.act_t0) * 2.2)
+            return 5 * sw * e, 0.0, -4 * sw * e
+        side = 1 if self.toward > 0 else -1
+        dx, dy, tilt = act.get("head", (0, 0, 0))
+        return dx * side * e, dy * e, tilt * side * e
+
+    def front_hand(self, g):
+        """Idle animations with front=True: the near hand again, on top of the head (on the headset, in the hair)."""
+        act, e = self.idle_now()
+        if not act or not act.get("front") or e < 0.6:
+            return
+        near = 1 if self.toward > 0 else -1
+        _, _, wrist, dx, dy = self.arm_points()[near]
+        g.save()
+        g.translate(*wrist)
+        g.rotate(math.degrees(math.atan2(-dx, dy)))
+        g.scale(self.HAND, self.HAND)
+        self._hand(g, self.pose()[near][2], near)
+        g.restore()
+
+    def idle_effect(self, g):
+        """What some idle animations add around them: floating Zzz, rising hearts, a glint on his gauntlet."""
+        act, e = self.idle_now()
+        kind = act.get("effect") if act else None
+        if not kind or e < 0.05:
+            return
+        t, side = self.t - self.act_t0, (1 if self.toward > 0 else -1)
+        g.save()
+        g.setPen(Qt.NoPen)
+        if kind == "zzz":
+            g.setFont(QFont("Segoe UI", 16, QFont.Bold))
+            for k in range(3):
+                ph = (t * 0.55 + k / 3) % 1
+                g.setPen(alpha(QColor("white"), (1 - ph) * e))
+                g.save()
+                g.translate(150 + side * (44 + ph * 30), 95 - ph * 60)  # (stays inside their window)
+                g.scale(0.8 + ph * 0.9, 0.8 + ph * 0.9)
+                g.drawText(QPointF(0, 0), "Z")
+                g.restore()
+        elif kind == "hearts":
+            for k in range(6):
+                ph = (t * 0.7 + k / 6) % 1
+                fill(g, heart(150 + math.sin(k * 2.1 + ph * 6) * 26, 300 - ph * 170, 6 + k % 3), alpha(QColor("#ff4f8b"), (1 - ph) * e), 0)
+        elif kind == "glint":  # a four-point star flashing on the raised hand
+            near = 1 if self.toward > 0 else -1
+            x, y = self.arm_points()[near][2]
+            s = (8 + 6 * abs(math.sin(t * 7))) * e
+            g.setBrush(QBrush(QColor(255, 250, 220, int(230 * e))))
+            for w, h in ((s, s * 0.22), (s * 0.22, s)):
+                g.drawPath(poly((x - w, y - 14), (x, y - 14 - h), (x + w, y - 14), (x, y - 14 + h)))
+        g.restore()
 
     @classmethod
     def wardrobe(cls):
@@ -283,6 +373,9 @@ class Vorn:
         """{side: (upper, forearm, hand)} the arms are heading for, from his mood (or the slump)."""
         name = "slump" if self.slumping() > 0.5 else MOOD_POSE.get(self.mood, "idle")
         near, far = POSES[name]
+        act, e = self.idle_now()
+        if act and act.get("pose") and e > 0.25:  # an idle animation moves the arms
+            near, far = act["pose"][0] or near, act["pose"][1] or far
         bubble = 1 if self.toward > 0 else -1  # the arm that gestures is on the side of your screen and his bubble
         return {bubble: near, -bubble: far}
 
@@ -322,6 +415,15 @@ class Vorn:
         self.was_afk = self.afk
         if self.afk and self.t >= self.yawn_at:
             self.yawn_t0, self.yawn_at = self.t, self.t + random.uniform(12, 20)
+        busy = self.mood != "idle" or self.talk > 0.03 or self.slumping() > 0 or self.blood > 0.05 or self.flare_amt > 0
+        if self.act and (busy or self.t - self.act_t0 > self.IDLES[self.act]["time"]):  # done, or something came up
+            self.act, self.idle_at = None, self.t + random.uniform(6, 14)
+        elif not self.act and not busy and self.t >= self.idle_at:  # time for an idle animation
+            pool = [n for n, a in self.IDLES.items() if n != self.last_act and (self.afk or not a.get("afk"))]
+            if self.afk and "nod off" in pool and random.random() < 0.5:
+                pool = ["nod off"]
+            self.act = self.last_act = random.choice(pool)
+            self.act_t0 = self.t
         if self.t >= self.turn_at:  # now and then he glances over at the rest of your screen
             self.turn_until, self.turn_at = self.t + 1.6, self.t + random.uniform(18, 40)
         self.turn += ((self.toward if self.t < self.turn_until else 0.0) - self.turn) * (1 - math.exp(-dt * 6))
@@ -347,6 +449,14 @@ class Vorn:
         a = math.pi * rp
         p["roll_x"], p["roll_y"] = (-math.cos(a) * 6, -math.sin(a) * 6) if 0 <= rp <= 1 else (0.0, 0.0)
         p["blood"] = self.blood
+        act, e = self.idle_now()
+        if act:  # an idle animation's face
+            side = 1 if self.toward > 0 else -1
+            for k, v in act.get("face", {}).items():
+                p[k] += v * e * (side if k == "look" else 1)
+            if act.get("look"):
+                p["look"] += math.sin((self.t - self.act_t0) * 2.2) * 1.2 * e
+            p["open"] = max(0.0, p["open"])
         p["aura"] = max(p["aura"], self.blood)
         sl = self.slumping()  # ashamed: heavy lids, brows up, mouth down
         p["slump"] = sl
@@ -406,10 +516,11 @@ class Vorn:
         self._cape(g)
         self._legs(g)
         g.translate(0, breath * 1.4 + 14 * p["slump"] + 3 * p["happy"] * abs(math.sin(t * 18)))  # breathing, slumping, laughing
+        ax, ay, atilt = self.idle_head()
         head = (
-            math.sin(t * 36) * 1.6 * p["happy"] + math.sin(t * 61) * 0.8 * p["aura"] + 3 * self.turn,
-            -self.talk * 2.0 + breath * 0.8 - 3 * p["happy"] + 10 * p["slump"],
-            p["tilt"] + math.sin(t * 0.7) * 1.0,
+            math.sin(t * 36) * 1.6 * p["happy"] + math.sin(t * 61) * 0.8 * p["aura"] + 3 * self.turn + ax,
+            -self.talk * 2.0 + breath * 0.8 - 3 * p["happy"] + 10 * p["slump"] + ay,
+            p["tilt"] + math.sin(t * 0.7) * 1.0 + atilt,
         )
         self._in_head(g, head, self._back_hair)
         self._torso(g)
@@ -417,6 +528,8 @@ class Vorn:
         self._body(g)
         self._in_head(g, head, self._head)
         self._shoulders(g)
+        self.front_hand(g)
+        self.idle_effect(g)
         g.restore()
 
     def _in_head(self, g, head, draw):
@@ -730,9 +843,14 @@ class Vorn:
     def arm_points(self):
         """{side: (shoulder, elbow, wrist, forearm dx, forearm dy)} for the current pose; side -1 = left, 1 = right."""
         near = 1 if self.toward > 0 else -1  # the gesturing arm, on the side of the bubble
+        act, e = self.idle_now()
         arm = {}
         for side in (-1, 1):
             upper, fore, length = self.arms[side]
+            if act and act.get("wiggle"):  # waving, twirling, cracking knuckles...
+                which, amount, rate = act["wiggle"]
+                if which == "both" or (which == "near") == (side == near):
+                    fore += math.sin(self.t * 2 * math.pi * rate) * amount * e
             if side == near and self.mood == "angry":
                 fore += (math.sin(self.t * 32) + 1) * 2  # shaking fist (only inward: outward it left his window)
             sx, sy = self.SHOULDER if side < 0 else (BUST_W - self.SHOULDER[0], self.SHOULDER[1])
@@ -764,7 +882,7 @@ class Vorn:
             g.save()
             g.translate(*wrist)
             g.rotate(math.degrees(math.atan2(-dx, dy)))  # local +y runs along the forearm, out of the wrist
-            g.scale(1.5, 1.5)
+            g.scale(self.HAND, self.HAND)
             self._hand(g, pose[side][2], side)
             g.restore()
 
