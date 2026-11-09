@@ -40,7 +40,7 @@ import config  # noqa: E402
 import highlights  # noqa: E402
 import transfer  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
-from character import H as CH, W as CW, Vorn, tier_for  # noqa: E402
+from character import H as CH, HEAD_Y, W as CW, Vorn, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
 from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow  # noqa: E402
@@ -123,11 +123,13 @@ class Overlay(QWidget):
         self.text, self.shown, self.cps, self.hide_at = "", 0.0, 40.0, 0.0
         self.moving, self.grab_at = False, QPoint()
         self.left = "left" in config.CORNER  # True = bubble on his right
-        self.resize(int(BUBBLE_W + CW * config.SCALE), int(CH * config.SCALE))
+        self.resize(int(BUBBLE_W + CW * config.SCALE), int(CH * config.SCALE) + 26)  # + a strip under his feet for the cost tag
         geo = QApplication.primaryScreen().availableGeometry()
         x, y = (geo.left() if self.left else geo.right() - self.width() + 1), geo.bottom() - self.height() + 1
         if saved_pos and QApplication.screenAt(QPoint(saved_pos[0] + self.width() // 2, saved_pos[1] + self.height() // 2)):
             x, y, self.left = saved_pos  # where you locked him last time, if that display is still connected
+            geo = QApplication.screenAt(QPoint(x + self.width() // 2, y + self.height() // 2)).availableGeometry()
+            y = max(geo.top(), min(y, geo.bottom() - self.height() + 1))  # he's taller than when you saved the spot
         self.move(x, y)
         self.last = time.monotonic()
         self.timer = QTimer(self)  # the animation loop: face, lip-sync and subtitles all advance here
@@ -163,6 +165,8 @@ class Overlay(QWidget):
             self.char.flare()
         elif event == "menu":
             self.char.roll()
+        elif event == "loss":
+            self.char.slump()
         if audio is not None:
             self.ducker.duck()
         dur = self.voice.play(audio) if audio is not None else 0.0
@@ -230,7 +234,7 @@ class Overlay(QWidget):
         bw, bh = r.width() + 28, r.height() + 20
         s = config.SCALE
         x = CW * s + 14 if self.left else BUBBLE_W - bw - 14
-        y = max(4.0, 150 * s - bh / 2)
+        y = max(4.0, HEAD_Y * s - bh / 2)
         tip_x, base_x = (x - 16, x + 2) if self.left else (x + bw + 16, x + bw - 2)
         shape = QPainterPath()
         shape.addRoundedRect(QRectF(x, y, bw, bh), 14, 14)
@@ -614,7 +618,7 @@ def main():
     bridge.move.connect(toggle_move)
     bridge.awake.connect(overlay.show)
 
-    tray = QSystemTrayIcon(QIcon(QPixmap.fromImage(overlay.char.render(0.3))), app)
+    tray = QSystemTrayIcon(QIcon(QPixmap.fromImage(overlay.char.render(0.3, bust=True))), app)
     menu = QMenu()
     spend = menu.addAction("")
     spend.triggered.connect(open_costs)

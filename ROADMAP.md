@@ -1,10 +1,6 @@
 # Roadmap
 
-Planned, not built yet. Order: full body, then Bloodfire (it draws on top of the body), then the free local model, then Discord.
-
-## Full body
-- His whole body instead of the bust, scaled to fit about the space he uses now.
-- More animations: idle stance, arms crossed, pointing at you, laughing, slumping when you lose.
+Planned, not built yet. Order: Bloodfire, then the free local model, then Discord.
 
 ## Bloodfire (power-up form)
 - His own original form: his black hair ignites into dark-red flame, his eyes burn white, his armor cracks with molten light.
@@ -23,4 +19,5 @@ Planned, not built yet. Order: full body, then Bloodfire (it draws on top of the
 - Friends' questions come out of your monthly budget; consider sending them to Haiku.
 
 ## Done
+- Full body with poses by mood (crossed arms, fist, hands on hips, hands up, lecturing finger) and a slump when you lose.
 - Cheaper calls: web search only when asked (questions 4.6 -> 1.9 cents), smaller screenshots of displays without the game (comments 0.07 -> 0.05 cents). Prompt caching doesn't apply: the repeated part of a call is below the minimum length that can be cached.

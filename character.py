@@ -1,7 +1,11 @@
 """Warlord Vorn: an original character, drawn and animated live with QPainter (no image files).
 
-Serious anime bust with hard cel shading. Every face part is driven by numbers, so moods blend
-smoothly and the mouth lip-syncs to his voice.
+Serious anime style, full body, hard cel shading. Every face part and limb is driven by numbers, so
+moods and poses blend smoothly and the mouth lip-syncs to his voice.
+
+Drawing coordinates: the bust (head to chest) was designed 300 wide around x=150 with the chest at y~340;
+the full body continues down to FULL_H. The whole figure is drawn at FIT scale, and W x H is the logical
+canvas the overlay sees.
 """
 import math
 import random
@@ -9,7 +13,11 @@ import random
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QBrush, QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QRadialGradient
 
-W, H = 300, 340  # logical canvas; the overlay scales it
+BUST_W, BUST_H = 300, 340  # the bust part of the drawing (tray icon)
+MARGIN, TOP, FULL_H = 40, 24, 1000  # room beside him for raised arms and above his hair; feet at ~990
+FIT = 0.5  # full body at about the screen space the bust used
+W, H = int((BUST_W + 2 * MARGIN) * FIT), int((FULL_H + TOP) * FIT)  # logical canvas; the overlay scales it
+HEAD_Y = (140 + TOP) * FIT  # his eyes, for the speech bubble
 
 INK = QColor("#1b1418")
 SKIN, SKIN_SH = QColor("#d9a27c"), QColor("#a8694c")
@@ -27,6 +35,9 @@ SCAR = QColor("#e0a48c")
 GOLD, GOLD_SH = QColor("#f2c64d"), QColor("#9a6b12")
 STEEL_POLISH = QColor("#aab4c8")
 FUR_WHITE, FUR_WHITE_SH = QColor("#ebe7df"), QColor("#9c958a")
+SUIT, SUIT_SH = QColor("#2e2a35"), QColor("#16131a")  # dark undersuit: sleeves and legs
+GLOVE, GLOVE_HI = QColor("#3a302b"), QColor("#6a5a50")
+LEATHER, LEATHER_SH = QColor("#4a3226"), QColor("#24170f")
 
 
 def tier_for(respect):
@@ -46,6 +57,22 @@ MOODS = {
     "surprised": dict(brow=-0.5, lift=1.0, lift_r=0.0, open=1.25, pupil=0.5, smile=0.0, smirk=0.0, mouth=0.45, teeth=0, happy=0, vein=0, look=0.0, tilt=2, aura=0.0),
     "disgusted": dict(brow=0.7, lift=0.0, lift_r=-0.4, open=0.45, pupil=0.9, smile=-0.35, smirk=-0.7, mouth=0.0, teeth=0, happy=0, vein=0, look=0.8, tilt=-3, aura=0.0),
 }
+
+# Arm poses: (arm on the bubble side, other arm), each (upper arm angle, forearm angle, hand, upper arm length).
+# Angles in degrees from straight down; positive swings outward, negative across the body, 180 is straight up.
+# Length below 1 is foreshortening: the elbow comes toward you.
+POSES = {
+    "idle":     ((9, 5, "fist", 1.0), (9, 5, "fist", 1.0)),
+    "crossed":  ((-4, -97, "fist", 0.72), (-4, -82, "fist", 0.72)),  # forearms stacked across the chest, the near one higher
+    "fist":     ((24, 175, "fist", 1.0), (14, 10, "fist", 1.0)),  # shaking a fist at you
+    "hips":     ((28, -45, "fist", 1.0), (28, -45, "fist", 1.0)),  # fists on hips
+    "startled": ((14, 173, "open", 0.9), (14, 173, "open", 0.9)),
+    "point":    ((18, 172, "point", 1.0), (28, -45, "fist", 1.0)),  # lecturing finger, other fist on hip
+    "slump":    ((3, 1, "open", 1.0), (3, 1, "open", 1.0)),
+}
+MOOD_POSE = {"idle": "idle", "smug": "crossed", "angry": "fist", "laugh": "hips", "surprised": "startled", "disgusted": "point"}
+SHOULDER = (58, 296)  # where his left arm starts under the pauldron (the right one is mirrored)
+UPPER, FORE = 135, 122  # arm segment lengths
 
 
 def P(x, y):
@@ -77,7 +104,7 @@ def poly(*pts):
 
 
 def mirror(pts):
-    return [(W - x, y) for x, y in pts]
+    return [(BUST_W - x, y) for x, y in pts]
 
 
 def vgrad(y0, y1, c0, c1):
@@ -132,7 +159,25 @@ class Vorn:
         self.roll_t0 = -10.0
         self.flare_amt = 0.0
         self.tier = 0  # set by the overlay from your respect score
+        self.slump_t0 = -100.0
+        self.arms = {side: [*POSES["idle"][0][:2], POSES["idle"][0][3]] for side in (-1, 1)}  # current upper, forearm, length
         self.d = self._effective()
+
+    def slump(self):
+        """Shoulders drop, arms hang, head down: you lost and he's ashamed of you."""
+        self.slump_t0 = self.t
+
+    def slumping(self):
+        """0..1: 4 seconds, easing in and out."""
+        e = self.t - self.slump_t0
+        return max(0.0, min(1.0, e / 0.4, (4.0 - e) / 0.8))
+
+    def pose(self):
+        """{side: (upper, forearm, hand)} the arms are heading for, from his mood (or the slump)."""
+        name = "slump" if self.slumping() > 0.5 else MOOD_POSE.get(self.mood, "idle")
+        near, far = POSES[name]
+        bubble = 1 if self.toward > 0 else -1  # the arm that gestures is on the side of your screen and his bubble
+        return {bubble: near, -bubble: far}
 
     def set_mood(self, mood):
         if mood in MOODS and mood != self.mood:
@@ -169,6 +214,10 @@ class Vorn:
             self.turn_until, self.turn_at = self.t + 1.6, self.t + random.uniform(18, 40)
         self.turn += ((self.toward if self.t < self.turn_until else 0.0) - self.turn) * (1 - math.exp(-dt * 6))
         self.flare_amt = max(0.0, self.flare_amt - dt / 2.5)
+        ka = 1 - math.exp(-dt * 7)
+        for side, (upper, fore, _, length) in self.pose().items():
+            for i, target in enumerate((upper, fore, length)):
+                self.arms[side][i] += (target - self.arms[side][i]) * ka
 
     def _effective(self):
         """Mood values plus the short-lived extras on top: yawns, glances, eye-rolls, aura flares."""
@@ -183,44 +232,71 @@ class Vorn:
         rp = (self.t - self.roll_t0) / 1.1
         a = math.pi * rp
         p["roll_x"], p["roll_y"] = (-math.cos(a) * 6, -math.sin(a) * 6) if 0 <= rp <= 1 else (0.0, 0.0)
+        sl = self.slumping()  # ashamed: heavy lids, brows up, mouth down
+        p["slump"] = sl
+        p["open"] *= 1 - 0.45 * sl
+        p["lift"] += 0.5 * sl
+        p["brow"] -= 0.6 * sl
+        p["smile"] -= 0.4 * sl
         return p
 
-    def render(self, scale=1.0):
-        img = QImage(int(W * scale), int(H * scale), QImage.Format_ARGB32_Premultiplied)
+    def render(self, scale=1.0, bust=False):
+        """The full body at W x H times scale, or just head and shoulders (bust=True, for the tray icon)."""
+        w, h = (BUST_W, BUST_H) if bust else (W, H)
+        img = QImage(int(w * scale), int(h * scale), QImage.Format_ARGB32_Premultiplied)
         img.fill(Qt.transparent)
         g = QPainter(img)
         g.scale(scale, scale)
-        self.paint(g)
+        if bust:
+            self.draw(g)
+        else:
+            self.paint(g)
         g.end()
         return img
 
     # ---------------------------------------------------------------- drawing
     def paint(self, g):
+        """Draw him into the logical W x H canvas."""
+        g.save()
+        g.scale(FIT, FIT)
+        g.translate(MARGIN, TOP)
+        self.draw(g)
+        g.restore()
+
+    def draw(self, g):
+        """Draw him in drawing coordinates (bust 300 wide around x=150, feet near FULL_H)."""
         p, t = self._effective(), self.t
         self.d = p  # what the face-part drawers read
         g.setRenderHint(QPainter.Antialiasing)
         breath = math.sin(t * 2 * math.pi / 3.8)
         s = 1 + 0.04 * self.pop ** 2
         g.save()
-        g.translate(W / 2, H)
+        g.translate(150, FULL_H)
         g.scale(s, s)
-        g.translate(-W / 2, -H)
+        g.translate(-150, -FULL_H)
         if self.tier >= 3:  # a constant golden glow once you've earned real respect
-            glow = QRadialGradient(P(150, 200), 170)
-            glow.setColorAt(0, alpha(GOLD, 0.3 + 0.06 * math.sin(t * 2)))
+            g.save()
+            g.translate(150, 480)
+            g.scale(0.42, 1.0)  # a round soft glow, squeezed to his tall shape
+            glow = QRadialGradient(P(0, 0), 520)
+            glow.setColorAt(0, alpha(GOLD, 0.32 + 0.06 * math.sin(t * 2)))
             glow.setColorAt(1, alpha(GOLD, 0))
             g.setPen(Qt.NoPen)
             g.setBrush(QBrush(glow))
-            g.drawEllipse(P(150, 200), 170, 170)
+            g.drawEllipse(P(0, 0), 520, 520)
+            g.restore()
         self._aura(g, p["aura"])
-        g.translate(0, breath * 1.4)
+        self._cape(g)
+        self._legs(g)
+        g.translate(0, breath * 1.4 + 14 * p["slump"] + 3 * p["happy"] * abs(math.sin(t * 18)))  # breathing, slumping, laughing
         head = (
             math.sin(t * 36) * 1.6 * p["happy"] + math.sin(t * 61) * 0.8 * p["aura"] + 3 * self.turn,
-            -self.talk * 2.0 + breath * 0.8 - 3 * p["happy"],
+            -self.talk * 2.0 + breath * 0.8 - 3 * p["happy"] + 10 * p["slump"],
             p["tilt"] + math.sin(t * 0.7) * 1.0,
         )
-        self._cape(g)
         self._in_head(g, head, self._back_hair)
+        self._torso(g)
+        self._arms(g)
         self._body(g)
         self._in_head(g, head, self._head)
         self._shoulders(g)
@@ -240,6 +316,10 @@ class Vorn:
         if a < 0.02:
             return
         t = self.t
+        g.save()  # drawn for the old bust height, stretched to his full height
+        g.translate(150, FULL_H)
+        g.scale(1.25, FULL_H / 345)
+        g.translate(-150, -345)
         glow = QRadialGradient(P(150, 190), 180)
         glow.setColorAt(0, alpha(QColor("#ff4a1a"), 0.45 * a))
         glow.setColorAt(1, alpha(QColor("#ff2a00"), 0))
@@ -265,14 +345,208 @@ class Vorn:
             y = 335 - ph * 320
             g.setBrush(QBrush(alpha(QColor("#ffd27a"), a * (1 - ph))))
             g.drawEllipse(P(x, y), 2.6 * (1 - ph) + 0.6, 2.6 * (1 - ph) + 0.6)
+        g.restore()
 
     def _cape(self, g):
-        fill(g, poly((52, 256), (2, 344), (298, 344), (248, 256)), vgrad(256, 344, CAPE, CAPE_SH))
+        """Floor-length cape behind him, with a ragged hem that sways."""
+        t = self.t
+        hem = [(-22 + 344 * i / 10 + math.sin(t * 1.3 + i * 0.8) * 4, 984 - (30 if i % 2 else 0) + math.sin(t * 1.1 + i) * 3)
+               for i in range(11)]
+        cape = QPainterPath(P(52, 256))
+        cape.quadTo(P(4, 560), P(*hem[0]))
+        for pt in hem[1:]:
+            cape.lineTo(P(*pt))
+        cape.quadTo(P(296, 560), P(248, 256))
+        cape.closeSubpath()
+        fill(g, cape, vgrad(256, 990, CAPE, CAPE_SH))
+        for x0, x1 in ((40, 6), (92, 70), (208, 230), (260, 294)):  # folds
+            fold = QPainterPath(P(x0, 420))
+            fold.quadTo(P((x0 + x1) / 2 + math.sin(t * 1.2 + x0) * 4, 700), P(x1, 950))
+            stroke(g, fold, alpha(CAPE_SH, 0.9), 3)
         if self.tier >= 2:
-            for a, b in (((52, 258), (4, 342)), ((248, 258), (296, 342))):
+            for a, c, b in (((52, 258), (4, 560), hem[0]), ((248, 258), (296, 560), hem[-1])):
+                edge = QPainterPath(P(*a))
+                edge.quadTo(P(*c), P(*b))
+                stroke(g, edge, GOLD, 5)
+
+    def _limb(self, g, a, b, ra, rb, color, shade=None, ridge=None, width=2.2):
+        """A tapered, round-ended segment from a (radius ra) to b (radius rb), cel-shaded on its right side."""
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / n, dx / n
+        if nx < 0:
+            nx, ny = -nx, -ny  # (nx, ny) points to the shaded right side
+        body = poly((a[0] + nx * ra, a[1] + ny * ra), (b[0] + nx * rb, b[1] + ny * rb),
+                    (b[0] - nx * rb, b[1] - ny * rb), (a[0] - nx * ra, a[1] - ny * ra))
+        for c, r in ((a, ra), (b, rb)):
+            cap = QPainterPath()
+            cap.addEllipse(P(*c), r, r)
+            body = body.united(cap)
+        fill(g, body, color, width)
+        if shade is not None:
+            g.save()
+            g.setClipPath(body)
+            fill(g, poly((a[0] + nx * ra * 0.25, a[1] + ny * ra * 0.25), (b[0] + nx * rb * 0.25, b[1] + ny * rb * 0.25),
+                         (b[0] + nx * rb * 2, b[1] + ny * rb * 2 + rb), (a[0] + nx * ra * 2, a[1] + ny * ra * 2 - ra)), alpha(shade, 0.7), 0)
+            g.restore()
+        if ridge is not None:
+            line = QPainterPath(P(a[0] - nx * ra * 0.2, a[1] - ny * ra * 0.2))
+            line.lineTo(P(b[0] - nx * rb * 0.2, b[1] - ny * rb * 0.2))
+            stroke(g, line, ridge, 2)
+        return body
+
+    def _legs(self, g):
+        polished = STEEL_POLISH if self.tier >= 1 else STEEL_HI
+        trim = GOLD if self.tier >= 1 else BRONZE
+        for side in (-1, 1):
+            hip = (150 + side * 28, 540)
+            sx, cy = side * math.sin(math.radians(7)), math.cos(math.radians(7))  # a wide, planted stance
+            knee = (hip[0] + sx * 208, hip[1] + cy * 208)
+            ankle = (knee[0] + sx * 186, knee[1] + cy * 186)
+            self._limb(g, hip, knee, 42, 30, SUIT, SUIT_SH)
+            self._limb(g, knee, ankle, 31, 23, STEEL, STEEL_SH, ridge=polished)
+            boot = poly(*[(ankle[0] + side * x, ankle[1] + y) for x, y in
+                          ((-23, -14), (23, -14), (25, 30), (46, 38), (54, 50), (50, 58), (-24, 58), (-26, 30))])
+            fill(g, boot, vgrad(ankle[1] - 14, ankle[1] + 58, LEATHER, LEATHER_SH))
+            sole = QPainterPath(P(ankle[0] - side * 24, ankle[1] + 54))
+            sole.lineTo(P(ankle[0] + side * 50, ankle[1] + 54))
+            stroke(g, sole, INK, 4)
+            cuff = poly((ankle[0] - 25, ankle[1] - 16), (ankle[0] + 25, ankle[1] - 16), (ankle[0] + 25, ankle[1] - 4), (ankle[0] - 25, ankle[1] - 4))
+            fill(g, cuff, trim, 1.6)
+            kneecap = QPainterPath()
+            kneecap.addEllipse(P(*knee), 32, 26)
+            fill(g, kneecap, vgrad(knee[1] - 24, knee[1] + 24, polished, STEEL_SH))
+            spike = poly((knee[0] - 7, knee[1] - 4), (knee[0] + sx * 6, knee[1] - 34), (knee[0] + 7, knee[1] - 4))
+            fill(g, spike, vgrad(knee[1] - 34, knee[1], STEEL_HI, STEEL), 1.6)
+
+    def _torso(self, g):
+        tier = self.tier
+        trim = GOLD if tier >= 1 else BRONZE
+        sw = math.sin(self.t * 1.4) * 3
+        tabard = poly((128, 500), (172, 500), (180 + sw, 700), (150 + sw, 726), (120 + sw, 700))
+        fill(g, tabard, vgrad(500, 726, CAPE, CAPE_SH))
+        if tier >= 2:
+            for a, b in (((128, 504), (120 + sw, 698)), ((172, 504), (180 + sw, 698))):
                 edge = QPainterPath(P(*a))
                 edge.lineTo(P(*b))
-                stroke(g, edge, GOLD, 4)
+                stroke(g, edge, GOLD, 3)
+        for side in (-1, 1):  # hip armor plates
+            m = (lambda pts: pts) if side < 0 else mirror
+            for pts in ([(80, 496), (100, 498), (92, 574), (74, 562)], [(98, 498), (138, 500), (134, 596), (88, 586)]):
+                plate = poly(*m(pts))
+                fill(g, plate, vgrad(496, 596, STEEL_HI, STEEL_SH))
+            for rx, ry in m([(108, 512), (126, 513)]):
+                g.setPen(pen(INK, 1))
+                g.setBrush(QBrush(trim))
+                g.drawEllipse(P(rx, ry), 2.6, 2.6)
+        fill(g, poly((106, 420), (194, 420), (198, 500), (102, 500)), SUIT)
+        for i, y in enumerate((430, 451, 472)):  # segmented belly plates
+            band = QPainterPath()
+            band.addRoundedRect(102 + i * 2, y, 96 - i * 4, 24, 6, 6)
+            fill(g, band, vgrad(y, y + 24, STEEL_HI, STEEL_SH), 1.8)
+        belt = QPainterPath()
+        belt.addRoundedRect(96, 484, 108, 22, 4, 4)
+        fill(g, belt, vgrad(484, 506, LEATHER, LEATHER_SH), 2)
+        buckle = QPainterPath()
+        buckle.addRoundedRect(136, 480, 28, 30, 5, 5)
+        fill(g, buckle, vgrad(480, 510, trim, GOLD_SH if tier >= 1 else BRONZE_SH), 2)
+        plate = QPainterPath(P(82, 276))
+        plate.lineTo(P(150, 260))
+        plate.lineTo(P(218, 276))
+        plate.quadTo(P(232, 340), P(222, 400))
+        plate.quadTo(P(214, 428), P(198, 438))
+        plate.quadTo(P(174, 452), P(150, 450))
+        plate.quadTo(P(126, 452), P(102, 438))
+        plate.quadTo(P(86, 428), P(78, 400))
+        plate.quadTo(P(68, 340), P(82, 276))
+        fill(g, plate, vgrad(260, 450, STEEL, STEEL_SH))
+        g.save()
+        g.setClipPath(plate)
+        fill(g, poly((150, 262), (240, 262), (240, 460), (150, 460)), alpha(STEEL_SH, 0.55), 0)  # cel shadow
+        g.restore()
+        pecs = QPainterPath(P(96, 350))
+        pecs.quadTo(P(124, 376), P(150, 360))
+        pecs.quadTo(P(176, 376), P(204, 350))
+        stroke(g, pecs, alpha(INK, 0.55), 2)
+        ridge = QPainterPath(P(150, 266))
+        ridge.lineTo(P(150, 446))
+        stroke(g, ridge, STEEL_HI, 2)
+        sigil = QPainterPath()
+        sigil.addEllipse(P(150, 308), 17, 17)
+        fill(g, sigil, vgrad(291, 325, *((GOLD, GOLD_SH) if tier >= 1 else (BRONZE, BRONZE_SH))), 2)
+        for i in (-1, 0, 1):  # three claw slashes
+            c = QPainterPath(P(144 + i * 8, 297))
+            c.quadTo(P(149 + i * 8, 307), P(154 + i * 8, 319))
+            stroke(g, c, INK, 2.6)
+
+    def _arms(self, g):
+        pose = self.pose()
+        near = 1 if self.toward > 0 else -1  # the gesturing arm, on the side of his bubble
+        polished = STEEL_POLISH if self.tier >= 1 else STEEL_HI
+        trim = GOLD if self.tier >= 1 else BRONZE
+        arm = {}
+        for side in (-1, 1):
+            upper, fore, length = self.arms[side]
+            if side == near and self.mood == "angry":
+                fore += math.sin(self.t * 32) * 4  # shaking fist
+            sx, sy = SHOULDER if side < 0 else (BUST_W - SHOULDER[0], SHOULDER[1])
+            a1, a2 = math.radians(upper), math.radians(fore)
+            elbow = (sx + side * math.sin(a1) * UPPER * length, sy + math.cos(a1) * UPPER * length)
+            dx, dy = side * math.sin(a2), math.cos(a2)
+            arm[side] = ((sx, sy - 24), elbow, (elbow[0] + dx * FORE, elbow[1] + dy * FORE), dx, dy)
+
+        def forearm(side):
+            _, elbow, wrist, dx, dy = arm[side]
+            self._limb(g, elbow, wrist, 26, 21, STEEL, STEEL_SH, ridge=polished)
+            band = QPainterPath(P(wrist[0] - dy * 22 - dx * 14, wrist[1] + dx * 22 - dy * 14))
+            band.lineTo(P(wrist[0] + dy * 22 - dx * 14, wrist[1] - dx * 22 - dy * 14))
+            stroke(g, band, trim, 4.5)
+
+        def hand(side):
+            _, _, wrist, dx, dy = arm[side]
+            g.save()
+            g.translate(*wrist)
+            g.rotate(math.degrees(math.atan2(-dx, dy)))  # local +y runs along the forearm, out of the wrist
+            g.scale(1.5, 1.5)
+            self._hand(g, pose[side][2], side)
+            g.restore()
+
+        # this order works for every pose: with arms crossed, each hand ends up tucked under the other arm's bicep
+        for side in (-near, near):  # hand first, so the wrist disappears into the armored cuff
+            hand(side)
+            forearm(side)
+        for side in (-near, near):
+            self._limb(g, arm[side][0], arm[side][1], 31, 25, SUIT, SUIT_SH)
+        for side in (-1, 1):
+            elbow = arm[side][1]
+            cop = QPainterPath()
+            cop.addEllipse(P(*elbow), 22, 21)
+            fill(g, cop, vgrad(elbow[1] - 21, elbow[1] + 21, polished, STEEL_SH))
+
+    def _hand(self, g, kind, side):
+        """Gloved hand at the wrist, fingers toward local +y."""
+        if kind == "open":
+            for i, ang in enumerate((-16, -5, 6, 17)):
+                r = math.radians(ang)
+                base = (-12 + i * 8, 20)
+                self._limb(g, base, (base[0] + math.sin(r) * -22, base[1] + math.cos(r) * 22), 4.6, 4.0, GLOVE, width=1.6)
+            self._limb(g, (side * 12, 8), (side * 30, 22), 5, 4.4, GLOVE, width=1.6)  # thumb toward his body
+            palm = QPainterPath()
+            palm.addRoundedRect(-16, -4, 32, 28, 9, 9)
+            fill(g, palm, GLOVE, 1.8)
+            return
+        if kind == "point":
+            self._limb(g, (side * 6, 22), (side * 6, 54), 5, 4.4, GLOVE, width=1.6)
+        fist = QPainterPath()
+        fist.addRoundedRect(-17, -4, 34, 32, 10, 10)
+        fill(g, fist, GLOVE, 1.8)
+        for x in (-8, 0, 8):  # knuckles
+            k = QPainterPath(P(x, 18))
+            k.lineTo(P(x, 26))
+            stroke(g, k, alpha(INK, 0.7), 1.3)
+        knuckles = QPainterPath(P(-13, 16))
+        knuckles.quadTo(P(0, 12), P(13, 16))
+        stroke(g, knuckles, GLOVE_HI, 1.6)
 
     def _back_hair(self, g):
         t = self.t
@@ -282,19 +556,7 @@ class Vorn:
         fill(g, back, vgrad(10, 110, HAIR, HAIR_SH))
 
     def _body(self, g):
-        plate = poly((76, 344), (82, 276), (150, 260), (218, 276), (224, 344))
-        fill(g, plate, vgrad(260, 344, STEEL, STEEL_SH))
-        fill(g, poly((150, 262), (218, 277), (224, 344), (150, 344)), alpha(STEEL_SH, 0.55), 0)  # cel shadow
-        ridge = QPainterPath(P(150, 266))
-        ridge.lineTo(P(150, 344))
-        stroke(g, ridge, STEEL_HI, 2)
-        sigil = QPainterPath()
-        sigil.addEllipse(P(150, 308), 17, 17)
-        fill(g, sigil, vgrad(291, 325, *((GOLD, GOLD_SH) if self.tier >= 1 else (BRONZE, BRONZE_SH))), 2)
-        for i in (-1, 0, 1):  # three claw slashes
-            c = QPainterPath(P(144 + i * 8, 297))
-            c.quadTo(P(149 + i * 8, 307), P(154 + i * 8, 319))
-            stroke(g, c, INK, 2.6)
+        """Neck and fur collar (the armor is in _torso)."""
         neck = poly((126, 178), (124, 232), (108, 254), (192, 254), (176, 232), (174, 178))
         fill(g, neck, SKIN)
         fill(g, poly((124, 182), (176, 182), (176, 214), (150, 228), (124, 212)), SKIN_SH, 0)  # under-jaw shadow

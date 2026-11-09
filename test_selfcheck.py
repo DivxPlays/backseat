@@ -81,6 +81,24 @@ for mood in MOODS:
         v.step(1 / 30, 0.6)
     img = v.render()
     assert not img.isNull() and img.pixelColor(150, 150).alpha() == 255, mood
+# full body: every pose, gesturing to either side, stays inside his window (aura off: it's meant to spill)
+for mood in MOODS:
+    for toward in (1.0, -1.0):
+        v = Vorn()
+        v.toward = toward
+        v.set_mood(mood)
+        for _ in range(90):
+            v.step(1 / 30, 0.0)
+        v.p["aura"], v.flare_amt = 0.0, 0.0
+        img = v.render()
+        edges = [img.pixelColor(x, y).alpha() for x in (0, img.width() - 1) for y in range(0, img.height(), 2)]
+        edges += [img.pixelColor(x, 0).alpha() for x in range(img.width())]
+        assert max(edges) == 0, (mood, toward)
+v.slump()
+for _ in range(30):
+    v.step(1 / 30, 0.0)
+assert v.pose()[1][2] == "open" and v._effective()["slump"] == 1.0  # he slumps when you lose
+assert v.render(0.3, bust=True).size().toTuple() == (90, 102)  # tray icon: head and shoulders
 
 # the overlay's animation loop really runs: his face moves and the subtitles type out
 import sys  # noqa: E402

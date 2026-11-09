@@ -1,6 +1,6 @@
 # Vorn: your trash-talking gaming companion
 
-An animated warlord in the corner of your screen. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
+An animated, full-body warlord in the corner of your screen. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
 ## Setup
 
@@ -50,7 +50,8 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 - **Wake word:** the mic stays on and listens for "Hey Vorn". Everything is transcribed on your PC; nothing is sent anywhere until he hears his name. If game sound or music keeps setting him off, raise `WAKE_LEVEL` or set `WAKE_WORD = False`.
 - **Post-match breakdowns:** after a loss, he goes over the last minute of screenshots and tells you what went wrong (at most every 3 minutes; uses the smart model, so roughly what a question costs).
 - **Grudge list:** he tracks which bosses and enemies kill you most in each game and throws it in your face.
-- **Evolving look:** his gear upgrades as your respect grows: polished armor and a gold sigil at 25, white fur and a gold-trimmed cape at 50, a war-crown and a golden glow at 75. His aura flares when he levels up.
+- **Full body and poses:** he stands in full armor and cape, and his arms follow his mood: relaxed when idle, arms crossed when smug, shaking a fist when angry, fists on hips when he laughs, hands thrown up when surprised, a lecturing finger when disgusted. He slumps in shame when you lose a match. Make him bigger or smaller in Settings > Size on screen.
+- **Evolving look:** his gear upgrades as your respect grows: polished armor and gold trim at 25, white fur and a gold-trimmed cape and tabard at 50, a war-crown and a golden glow at 75. His aura flares when he levels up.
 - **Moods by time of day:** grumpy in the morning, tactical in the afternoon, hyped in the evening, unhinged after 11 PM, extra smug on weekends.
 - **Lore:** during quiet moments he sometimes tells a story from his conquests. He remembers what he's told you and keeps it consistent.
 - **Voice clips:** every Hall of Shame screenshot gets a WAV of his roast next to it.
