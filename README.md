@@ -4,11 +4,21 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 
 ## Setup
 
-1. Get the code: `git clone https://github.com/DivxPlays/vorn` (private repo, so sign in to GitHub first), or download the ZIP from the repo page.
-2. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
-3. Paste it into a file named `api_key.txt` next to `main.py`. It is never uploaded to GitHub.
-4. Double-click `run.bat`. The first run installs everything (a few minutes).
-5. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
+1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
+2. Get the code: on the repo page (https://github.com/DivxPlays/vorn, private, so sign in first) click **Code > Download ZIP** and extract it, or `git clone` it.
+3. Double-click **Install Vorn.bat**. It:
+   - installs Python 3.12 if it's missing (through winget),
+   - puts him in `%LOCALAPPDATA%\Programs\Vorn`,
+   - installs everything he needs (a few minutes the first time),
+   - asks for your API key (kept only in `api_key.txt` on that PC, never uploaded),
+   - adds Vorn shortcuts to the Start menu and desktop, and starts him.
+
+   If Windows says the file came from the internet, click **More info > Run anyway**.
+4. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
+
+Running **Install Vorn.bat** from a newer download updates him; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall, turn off Start with Windows in his tray menu, quit him, then delete `%LOCALAPPDATA%\Programs\Vorn` and the two shortcuts.
+
+Working on his code instead? Put your key in `api_key.txt` in the code folder and double-click `run.bat`; it sets everything up there and starts him.
 
 ## Controls
 
@@ -79,7 +89,7 @@ The code, this README and [ROADMAP.md](ROADMAP.md) (planned features). Your API 
 ## Moving him to another PC
 
 1. On the old PC: tray > **Export memory...** saves one `.zip` with his memory, battle reports and the Hall of Shame.
-2. Set him up on the new PC (see Setup), then tray > **Import memory...** and pick the `.zip`. He backs up the memory he had there (`memory backup <date>.zip` in his folder) and restarts with yours.
+2. Install him on the new PC (see Setup), then tray > **Import memory...** and pick the `.zip`. He backs up the memory he had there (`memory backup <date>.zip` in his folder) and restarts with yours.
 
 Your settings and API key aren't in the export; set those up on the new PC.
 

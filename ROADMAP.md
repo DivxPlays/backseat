@@ -9,9 +9,6 @@ Planned, not built yet.
 - Foul-mouthed squad roasts: his own grudge list and running jokes for each friend, and he pits you against each other. No slurs.
 - Friends' questions come out of your monthly budget; consider sending them to Haiku.
 
-## Installer
-One setup file that installs him on another PC: Python, everything he needs, a Start menu shortcut, and a prompt for the API key.
-
 ## Full body
 A full-body character instead of the bust, with more animations: idle stance, arms crossed, pointing at you, laughing, slumping when you lose.
 
