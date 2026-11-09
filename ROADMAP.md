@@ -9,13 +9,14 @@
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
 - **Challenges and bounties:** "Get 3 headshots this match": tracked, rewarded with respect or affection, roasted when failed.
 - **Accurate stats from the game itself:** kills and deaths from game logs or Steam where possible, instead of guessing from screenshots.
-- **Coaching reports:** a weekly breakdown of your play, with real tips and progress charts.
 - **Game profiles:** per-game knowledge (maps, weapons, perks) for sharper hints.
 
 ### Social
 - **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
 
 ### Interaction
+- **Ragdoll throws:** when you throw them, their bodies follow physics: arms and legs flail, the cape and hair trail behind, they spin and tumble, land in a heap, and pick themselves up.
+- **Varied duo banter:** in duo mode, a random number of back-and-forth lines per exchange (sometimes a single jab, sometimes a real argument) instead of always 2-3.
 - **Mini-games in menus and queues:** trivia about your game, or a dare from the character.
 - **Sound effects:** Vorn's scoffs and grunts (real ones), Mika's giggles.
 
@@ -27,6 +28,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Coaching reports: weekly, this week against last with charts, and a verdict with 3 tips from their notes on your play (one call a week).
 - Spotify: they notice what you play (from the Spotify app's window), look a new song up with one web search (about 1 cent, remembered), and react now and then; repeats and your top artists too.
 - Idle animations: stretch, look around, sigh, lean in, nod off for both; knuckle cracks, gauntlet inspection, dusting off and a power stance for Vorn; waving, headset, hair twirl, heart hands and a bounce for Mika.
 - Click reactions: Ctrl+click pokes them (head or body, more annoyed the more you poke), Ctrl+drag throws them across the screen and they glide back.

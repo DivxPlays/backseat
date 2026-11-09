@@ -43,6 +43,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMenu, QMess
 import brain  # noqa: E402
 import commands  # noqa: E402
 import character  # noqa: E402
+import coaching  # noqa: E402
 import config  # noqa: E402
 import grudges  # noqa: E402
 import highlights  # noqa: E402
@@ -567,6 +568,7 @@ class Companion:
         self.local_down_until = 0.0  # after the local model fails, use Claude until then
         self.last_check = time.monotonic()  # free mode: when Claude last took a comment to keep score
         self.listening = music.Listening()  # Spotify: what's on, and repeats this session
+        self.coached = ""  # a new weekly coaching report's headline, for the greeting
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
@@ -876,8 +878,14 @@ class Companion:
         local = config.LOCAL_MODEL and kind in AUTO and kind != "breakdown" and time.monotonic() > self.local_down_until
         if level == 2 and kind in AUTO and not crossed and not local:
             return  # budget used up: he only answers when you talk to him (the free local model keeps going)
+        if kind == "coach":  # tray > coaching report: write this week's if it's due, then open the page
+            self.weekly_coaching()
+            with self.mem.lock:
+                path = coaching.build(self.mem.d, (self.mem.d.get("coaching") or [None])[-1], HALL)
+            return os.startfile(path)
         if kind == "start":
             self.write_battle_report()
+            self.coached = self.weekly_coaching()
         exe, title, _ = self.app
         app = app_name(exe, title)
         shot = None
@@ -902,6 +910,10 @@ class Companion:
             plays = self.listening.plays.get(tuple(arg), 1)
             situation = SITUATIONS["music"].format(song=arg[1], artist=arg[0]) + (
                 f" They've played it {plays} times this session: it's on repeat." if plays >= 3 else "")
+        if kind == "start" and self.coached:
+            situation += (f" Also: your weekly coaching report on them is ready (tray > coaching report). Its headline: "
+                          f'"{self.coached}". Mention it in a few words.')
+            self.coached = ""
         if kind == "start" and self.fresh_grudges:
             situation += (f" {self.fresh_grudges} Open with it, cold and in character, and make them work for forgiveness "
                           "(an apology ends it).")
@@ -1096,6 +1108,37 @@ class Companion:
                            "when": datetime.now().isoformat(timespec="minutes")})
         self.mem.save()
         logging.info("hall of shame: %s", path)
+
+    def weekly_coaching(self):
+        """Once a week (coaching.due): Claude writes a coaching report from both weeks' numbers and their notes on your
+        play. Kept in memory (the last 12); returns its headline, or "" when none was due."""
+        now = datetime.now()
+        with self.mem.lock:
+            if self.client is None or not coaching.due(self.mem.d, now):
+                return ""
+            d = self.mem.d
+            this = coaching.week_stats(d, now.date())
+            facts = coaching.summary(this, coaching.week_stats(d, now.date() - coaching.EVERY))
+            for app, _ in this["apps"][:4]:
+                g = d["games"].get(app, {})
+                if g.get("notes"):
+                    facts += f"\nYour notes on their play in {app}: " + "; ".join(g["notes"][-6:])
+                if g.get("grudges"):
+                    facts += f"\nWhat kills them most in {app}: " + ", ".join(f"{k} ({n})" for k, n in g["grudges"].items())
+            week = (now - coaching.EVERY).isoformat()
+            moments = [e["caption"] for e in d.get("hall", []) if e.get("when", "") >= week][-5:]
+            if moments:
+                facts += "\nTheir worst moments this week (Hall of Shame): " + "; ".join(moments)
+        report, spent = brain.coach(self.client, config.SMART_MODEL, facts)
+        self.mem.spend(spent, "report")
+        if not report:
+            return ""
+        report["made"] = now.isoformat(timespec="minutes")
+        with self.mem.lock:
+            self.mem.d["coaching"] = (self.mem.d.get("coaching", []) + [report])[-12:]
+        self.mem.save()
+        logging.info("weekly coaching report ($%.4f): %s", spent, report["headline"])
+        return report["headline"]
 
     def write_battle_report(self):
         """Report on the previous session, written at the next launch so it works even if the PC was shut down."""
@@ -1339,6 +1382,7 @@ def main():
     menu.addSeparator()
     menu.addAction("Open Hall of Shame").triggered.connect(lambda: (HALL.mkdir(exist_ok=True), os.startfile(HALL)))
     menu.addAction("Open this week's highlights").triggered.connect(weekly)
+    menu.addAction("Open coaching report").triggered.connect(lambda: comp.jobs.put(("coach", None)))
     menu.addAction("Open battle reports").triggered.connect(lambda: REPORTS.exists() and os.startfile(REPORTS))
     menu.addSeparator()
     menu.addAction("Memories (what they remember about you)...").triggered.connect(open_memories)

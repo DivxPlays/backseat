@@ -839,6 +839,49 @@ with tempfile.TemporaryDirectory() as d:
         brain.look_up_song = real_lookup
 assert "{song}" in main.SITUATIONS["music"] and "music" in main.AUTO
 
+# coaching: this week against last from the stats (today included), a report at most weekly, and the page
+import coaching  # noqa: E402
+from datetime import datetime  # noqa: E402
+
+day0 = datetime(2026, 11, 8, 12, 0)
+stats_d = {"days": {"2026-11-08": 3600, "2026-11-02": 1800, "2026-11-01": 999, "2026-10-28": 600},
+           "sessions": [{"start": "2026-11-07T23:30", "seconds": 5400, "apps": {"cod4.exe": 5000, "<script>.exe": 400},
+                         "events": {"death": 4, "win": 1}},
+                        {"start": "2026-11-08T02:10", "seconds": 600, "apps": {"cod4.exe": 600}, "events": {"loss": 1}},
+                        {"start": "2026-10-30T20:00", "seconds": 1200, "apps": {"chrome.exe": 1200}, "events": {"death": 9}}],
+           "characters": {"mika": {"sessions": [{"start": "2026-11-05T15:00", "seconds": 900, "apps": {"cod4.exe": 900},
+                                                 "events": {}}]}}, "games": {}, "hall": []}
+wk = coaching.week_stats(stats_d, day0.date())
+assert [f"{x:%d}" for x in wk["days"]] == ["02", "03", "04", "05", "06", "07", "08"] and wk["played"] == 5400  # Nov 1 is out
+assert wk["sessions"] == 3 and wk["events"] == {"death": 4, "win": 1, "loss": 1} and wk["late"] == 1  # (Mika's counts too)
+assert wk["apps"][0] == ("cod4.exe", 6500) and abs(sum(wk["hours"]) - 6900) < 1e-6
+assert wk["hours"][23] == 1800 and wk["hours"][0] == 3600 and wk["hours"][1] == 0  # 23:30 for 90 minutes runs past midnight
+lw = coaching.week_stats(stats_d, day0.date() - coaching.EVERY)
+assert lw["events"] == {"death": 9} and "This week: played" in coaching.summary(wk, lw)
+assert coaching.due(stats_d, day0) and not coaching.due({**stats_d, "coaching": [{"made": "2026-11-05T10:00"}]}, day0)
+assert not coaching.due({"days": {}, "sessions": []}, day0)  # nothing played: nothing to coach
+with tempfile.TemporaryDirectory() as d:
+    page = coaching.build(stats_d, {"headline": "Pathetic <week>.", "better": "b", "worse": "w", "tips": ["t1", "t2", "t3"]},
+                          Path(d), day0).read_text(encoding="utf-8")
+    assert "Pathetic &lt;week&gt;." in page and "&lt;script&gt;.exe" in page and "<script>" not in page and page.count("<svg") == 3
+    assert "No verdict yet" in coaching.build({"days": {}, "sessions": []}, None, Path(d), day0).read_text(encoding="utf-8")
+    real_coach = brain.coach
+    calls = []
+    brain.coach = lambda client, model, facts: (calls.append(facts), ({"headline": "H", "better": "b", "worse": "w", "tips": ["x"]}, 0.03))[1]
+    try:
+        real_preset, config.PRESET = config.PRESET, "vorn"
+        m = Memory(Path(d, "memory.json"))
+        m.d.update(days={datetime.now().date().isoformat(): 4000}, games={"cod4.exe": {"notes": ["rushes every corner"],
+                                                                                         "grudges": {"knife": 3}}})
+        m.session.update(start=datetime.now().isoformat(timespec="minutes"), seconds=4000, apps={"cod4.exe": 4000})
+        coach_comp = SimpleNamespace(mem=m, client=object())
+        assert main.Companion.weekly_coaching(coach_comp) == "H" and len(m.d["coaching"]) == 1
+        assert "rushes every corner" in calls[0] and "knife (3)" in calls[0]  # their notes on your play go in
+        assert main.Companion.weekly_coaching(coach_comp) == "" and len(calls) == 1  # once a week
+        config.PRESET = real_preset
+    finally:
+        brain.coach = real_coach
+
 # grudges: rage-quit after a loss, days of being ignored, too many "shut up"s; a respect hit once; an apology ends it
 import grudges  # noqa: E402
 from datetime import datetime, timedelta  # noqa: E402

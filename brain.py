@@ -200,6 +200,23 @@ def look_up_song(client, model, artist, song):
     return (out["note"].strip() if out else ""), spent
 
 
+COACH_SCHEMA = {"type": "object", "properties": {"headline": {"type": "string"}, "better": {"type": "string"},
+                                                 "worse": {"type": "string"}, "tips": {"type": "array", "items": {"type": "string"}}},
+                "required": ["headline", "better", "worse", "tips"], "additionalProperties": False}
+
+
+def coach(client, model, facts):
+    """The weekly coaching report from `facts` (both weeks' numbers and their notes on your play). Returns (report, dollars)."""
+    ask = (f"{facts}\n\nWrite this week's coaching report on the player, as yourself: in character, but genuinely useful, and "
+           "grounded only in the facts above (no made-up stats). headline: one savage sentence summing up their week. better: "
+           "one sentence on what improved (or that nothing did). worse: one sentence on what got worse. tips: exactly 3 "
+           "concrete, specific tips for next week (their games, habits, breaks), each under 25 words. No markdown.")
+    out, spent = _ask(client, model, [{"type": "text", "text": ask}], COACH_SCHEMA)
+    if out:
+        out["tips"] = [t.strip() for t in out["tips"] if t.strip()][:3]
+    return out, spent
+
+
 PROFILE_SCHEMA = {"type": "object", "properties": {"profile": {"type": "string"}}, "required": ["profile"], "additionalProperties": False}
 
 
