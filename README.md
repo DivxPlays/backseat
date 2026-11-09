@@ -51,6 +51,8 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
 | tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, switch Character, open Settings, turn on Start with Windows, see About (version and who made it), or quit |
 
+**Interrupting:** talk over them and they stop mid-sentence to listen. If you were talking to them ("Hey Vorn, ..."), they drop the rest of what they were saying (and the rest of a duo exchange) and answer you; if you were talking to someone else or just laughing, they carry on from where they stopped. A cough or a click doesn't count (it takes about half a second of your voice). Holding F8 cuts them off right away. It needs a headset, so their voice doesn't reach your mic; with speakers, turn it off in Settings > Behavior > Interrupting.
+
 ### Voice commands (free)
 
 These are handled on your PC, instantly and without an API call, and confirmed in character. Say them after "Hey Vorn" or "Hey Mika" (or hold F8, or type them with F9). Only a sentence that is just the command counts: "shut up, you're wrong about that map" still goes to Claude.

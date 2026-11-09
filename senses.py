@@ -274,6 +274,10 @@ class WakeListener:
         self.keep_name = False  # duo mode: keep "Hey Mika" in the question, so only the one you called answers
         self.called = ""  # that "Hey Mika", for the question being collected
         self.speaking = False  # someone is mid-sentence right now
+        self.interrupts = False  # your mic (not a loopback, which hears his own voice): talking over him pauses him
+        self.speech, self.silent, self.voiced = [], 0, 0  # the stretch of talking being heard: chunks, quiet ones at the end, loud ones
+
+    INTERRUPT_AFTER = 4  # 0.1 s chunks of your voice over his before he pauses to listen (a cough or a click doesn't)
 
     def active(self):
         """True while someone is talking to him (so he doesn't start a comment over them)."""
@@ -287,26 +291,42 @@ class WakeListener:
             source = sd.InputStream(samplerate=16000, channels=1, dtype="float32", blocksize=1600,  # 0.1 s chunks
                                     device=find_device(self.device, "input"), callback=lambda data, *_: self.q.put(data[:, 0].copy()))
         with source:
-            speech, silent = [], 0
             while True:
                 try:
                     chunk = self.q.get(timeout=0.3)
                 except queue.Empty:
                     chunk = np.zeros(1600, np.float32)  # a source with nothing to say still lets questions finish
-                self.speaking = bool(speech)
-                self.flush()
-                if self.voice.busy() or self.ears.recording:  # ignore his own voice and push-to-talk
-                    speech, silent = [], 0
-                    continue
-                loud = float(np.sqrt(np.mean(chunk * chunk))) > config.WAKE_LEVEL
-                if loud or speech:
-                    speech.append(chunk)
-                    silent = 0 if loud else silent + 1
-                if speech and (silent >= 7 or len(speech) >= 300):  # a 0.7 s pause (or 30 s) ends a stretch of talking
-                    audio = np.concatenate(speech)
-                    speech, silent = [], 0
-                    if len(audio) > 16000 * 0.5:
-                        self.hear(self.ears.transcribe(audio, prompt=f"Hey {config.NAME}."), audio)
+                self.take(chunk)
+
+    def take(self, chunk):
+        """One 0.1 s chunk of sound: collect talking, pause him if you talk over him, transcribe after a pause."""
+        self.speaking = bool(self.speech)
+        self.flush()
+        if self.ears.recording or (self.voice.busy() and not self.interrupts):  # push-to-talk; his own voice on a loopback
+            self.speech, self.silent, self.voiced = [], 0, 0
+            return
+        loud = float(np.sqrt(np.mean(chunk * chunk))) > config.WAKE_LEVEL
+        if loud or self.speech:
+            self.speech.append(chunk)
+            self.silent, self.voiced = (0 if loud else self.silent + 1), self.voiced + loud
+        if self.interrupts and self.voiced >= self.INTERRUPT_AFTER and self.voice.busy():
+            self.voice.pause()  # you're talking over him: he stops mid-sentence to listen
+        if self.speech and (self.silent >= 7 or len(self.speech) >= 300):  # a 0.7 s pause (or 30 s) ends a stretch of talking
+            audio = np.concatenate(self.speech)
+            self.speech, self.silent, self.voiced = [], 0, 0
+            try:
+                if len(audio) > 16000 * 0.5:
+                    self.hear(self.ears.transcribe(audio, prompt=f"Hey {config.NAME}."), audio)
+            finally:
+                self.settle()
+
+    def settle(self):
+        """After you talked over him: he stops for good if it was to him ("Hey Vorn, ..."), else carries on."""
+        if self.voice.paused():
+            if self.pending is not None:
+                self.voice.stop()
+            else:
+                self.voice.resume()
 
     def _loopback(self, speaker):
         """Feed what `speaker` plays into the listener, in 0.1 s chunks at 16 kHz."""
@@ -362,6 +382,8 @@ class Voice:
     def __init__(self):
         self._audio = None
         self._t0 = 0.0
+        self._held = None  # paused mid-line because you started talking: (audio, where to carry on)
+        self.cut = False  # stop() was called: whoever is waiting on a line drops the rest of the exchange
         self._kokoro = None
         self._lock = threading.Lock()
 
@@ -409,13 +431,35 @@ class Voice:
     def play(self, audio):
         """Start playing; returns the duration in seconds."""
         sd.stop()
-        self._audio, self._t0 = audio, time.monotonic()
+        self._audio, self._t0, self._held = audio, time.monotonic(), None
         sd.play(audio, SR, device=find_device(config.VOICE_DEVICE, "output"))  # a VoiceMeeter input puts him in your calls
         return len(audio) / SR
 
     def stop(self):
+        """Stop for good (push-to-talk, or you said his name over him): the rest of the line and exchange are dropped."""
+        sd.stop()
+        self._audio, self._held, self.cut = None, None, True
+
+    def pause(self):
+        """Stop mid-line because you started talking, keeping the place for resume(). True if he was talking."""
+        if not self.busy():
+            return False
+        at = int((time.monotonic() - self._t0) * SR)
+        self._held = (self._audio, max(0, at - SR // 4))  # carry on a quarter second back: restarting mid-word is jarring
         sd.stop()
         self._audio = None
+        return True
+
+    def paused(self):
+        return self._held is not None
+
+    def resume(self):
+        """Carry on where pause() left off (you weren't talking to him)."""
+        held, self._held = self._held, None
+        if held:
+            audio, at = held
+            self._audio, self._t0 = audio, time.monotonic() - at / SR  # level() and busy() keep counting from the line's start
+            sd.play(audio[at:], SR, device=find_device(config.VOICE_DEVICE, "output"))
 
     def busy(self):
         return self._audio is not None and time.monotonic() - self._t0 < len(self._audio) / SR

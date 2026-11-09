@@ -705,6 +705,46 @@ wl.hear("You look pretty today.")
 wl.flush(force=True)
 assert heard_duo[-1] == "Hey Mika, You look pretty today.", heard_duo
 assert main.addressed(heard_duo[-1], {"Vorn": VORN_NAMES, "Mika": ["mika", "micah"]}) == "Mika"
+# interrupting: talk over him and he pauses to listen; he carries on if it wasn't to him, stops for good if it was
+import senses  # noqa: E402
+
+real_sd = (senses.sd.play, senses.sd.stop)
+senses.sd.play = senses.sd.stop = lambda *a, **k: None  # no real sound in a test
+try:
+    said_to_him, heard_now = [], [""]
+    ears = SimpleNamespace(recording=False, transcribe=lambda audio, prompt=None: heard_now[0])
+    voice = Voice()
+    mic = WakeListener(ears, voice, lambda text, audio: said_to_him.append(text))
+    mic.WAKE, mic.interrupts = WakeListener.pattern(["vorn"]), True
+    loud, hush = np.full(1600, 0.2, np.float32), np.zeros(1600, np.float32)
+
+    def talk_over(words, chunks=6):
+        """He's mid-line; you say `words` for `chunks` tenths of a second, then go quiet."""
+        heard_now[0] = words
+        voice.cut = False
+        voice.play(np.zeros(senses.SR * 5, np.float32))
+        voice._t0 -= 1.0  # a second into his line
+        for _ in range(chunks):
+            mic.take(loud)
+        paused = voice.paused()
+        for _ in range(7):
+            mic.take(hush)
+        return paused
+
+    assert not talk_over("cough", chunks=2) and voice.busy()  # a cough: he doesn't even pause
+    assert talk_over("Ha ha ha.") and voice.busy() and not voice.paused() and not voice.cut  # you laughed: he carried on
+    assert abs((time.monotonic() - voice._t0) - 0.75) < 0.1  # from a quarter second before where he stopped
+    assert talk_over("Hey Vorn, shut up.") and not voice.busy() and voice.cut  # you called him: he stopped for good
+    mic.flush(force=True)
+    assert said_to_him == ["shut up."], said_to_him
+    deaf = WakeListener(ears, voice, lambda text, audio: said_to_him.append(text))  # the Discord loopback hears his own voice
+    voice.play(np.zeros(senses.SR * 5, np.float32))
+    for _ in range(6):
+        deaf.take(loud)
+    assert not voice.paused() and deaf.speech == []
+finally:
+    senses.sd.play, senses.sd.stop = real_sd
+
 # two on screen never look like copies: the listener makes a different face, and their idle motion is out of step
 assert all(main.REACT[m] != m for m in main.REACT if m != "idle")
 assert main.make_character("vorn").t != main.make_character("vorn").t

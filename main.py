@@ -262,7 +262,10 @@ class Overlay(QWidget):
             char.step(dt, level if i == self.speaking else 0.0)  # only the one talking moves their mouth
         if self.ducker.saved and not self.voice.busy():
             self.ducker.restore()
-        self.shown += dt * self.cps
+        if self.voice.paused():
+            self.hide_at += dt  # they stopped mid-sentence to listen to you: the subtitles wait too
+        else:
+            self.shown += dt * self.cps
         if self.text and now > self.hide_at:
             self.text = ""
             for char in self.chars:
@@ -420,7 +423,9 @@ class Companion:
             return
         self.started = self.awake = True
         if config.WAKE_WORD:  # the mic only opens once he's awake
-            self.listeners.append(WakeListener(self.ears, self.voice, self.wake_heard, config.MIC_DEVICE))
+            mic = WakeListener(self.ears, self.voice, self.wake_heard, config.MIC_DEVICE)
+            mic.interrupts = config.INTERRUPT and not (config.MIC_DEVICE or "").startswith("loopback:")  # a loopback hears him
+            self.listeners.append(mic)
         if config.FRIENDS_DEVICE and listen_source_ok(config.FRIENDS_DEVICE):  # his ear on your friends' voices (a mic or a loopback)
             # (never on a missing device: the fallback would be your own mic, and he'd hear you twice)
             self.listeners.append(WakeListener(self.ears, self.voice, self.friend_heard, config.FRIENDS_DEVICE))
@@ -684,17 +689,28 @@ class Companion:
             self.recent.append(said)
             self.mem.line(said)
         first = None
+        self.voice.cut = False
         for i, (who, mood, line) in enumerate(turns):
+            if self.voice.cut:  # you cut in ("Hey Vorn, ..." or the talk key): the rest of the exchange is dropped
+                break
             said = f"You ({who}): {line}" if len(self.names) > 1 else f"You: {line}"
             self.recent = (self.recent + [said])[-12:]
             self.mem.line(said)
             spoken, audio = self.speak(mood, line, event if i == 0 else "none", who)
             first = first or (spoken, audio)
             if i < len(turns) - 1 and audio is not None:
-                time.sleep(len(audio) / SR + 0.25)  # let them finish before the other one answers
-        if shame:
+                self.wait_spoken(audio)  # let them finish before the other one answers
+        if shame and first:
             self.hall_entry(shame, first[0], title or app, first[1])
         self.condense_memory()
+
+    def wait_spoken(self, audio):
+        """Until a line has played, plus any time they spent paused while you talked over them (up to 30 s)."""
+        end, held = time.monotonic() + len(audio) / SR + 0.25, 0.0
+        while time.monotonic() < end and not self.voice.cut:
+            time.sleep(0.05)
+            if self.voice.paused() and held < 30:
+                end, held = end + 0.05, held + 0.05
 
     def knowledge(self, app, title, exe, query="", alone=None):
         """What they know right now; `alone` (a preset: duo mode, local model) shows only that character's own past."""

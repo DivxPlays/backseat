@@ -21,7 +21,6 @@
 - **Squad leaderboard:** ranks your Discord friends by deaths and roast-worthiness, with a weekly "worst player" award read out loud.
 
 ### Interaction
-- **Interrupting:** talk over the character and they stop mid-sentence to listen.
 - **Click reactions:** poke them, drag and throw them, and they react.
 - **Mini-games in menus and queues:** trivia about your game, or a dare from the character.
 - **Real lip-sync:** mouth shapes that match each sound (Kokoro already gives word timing).
@@ -35,6 +34,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Interrupting: talk over them and they pause to listen; they stop for good if you called them, and carry on if you didn't.
 - Free voice commands: shut up (for a while), talk again, stop looking / look again, change or name an outfit, switch character or duo mode, and "how much have you cost me", handled on your PC with in-character replies.
 - Outfits for Vorn: Warlord, Obsidian, Frostbound, Desert Raider and Off-Duty, picked in tray > Outfit or new each launch.
 - Duo mode: Vorn and Mika side by side, each reaction a 2-3 line exchange in their own voices, lip-synced, on the overlay and the Discord camera; call one by name and only that one answers, and each keeps their own memories and past.

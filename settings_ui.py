@@ -125,11 +125,14 @@ class SettingsWindow(QDialog):
         w["WAKE_WORD"] = QCheckBox(f'Listen for "Hey {config.NAME}"')
         w["WAKE_WORD"].setChecked(config.WAKE_WORD)
         w["WAKE_LEVEL"] = _real(config.WAKE_LEVEL, 0.001, 0.5, 0.005, 3)
+        w["INTERRUPT"] = QCheckBox("Talk over them and they pause to listen (needs a headset)")
+        w["INTERRUPT"].setChecked(config.INTERRUPT)
         behave = self._page([("Seconds between comments", w["LOOK_COOLDOWN"]), ("Roast after this much silence", w["QUIET_ROAST"]),
                              ("Screen change that counts (lower = more comments)", w["CHANGE_THRESHOLD"]),
                              ("You're AFK after", w["AFK_AFTER"]), ("Nag to take a break after", w["BREAK_AFTER"]),
                              ("Bedtime nags from / until", bed_row), ("Minimum time between nags", w["NAG_EVERY"]),
-                             ("Wake word", w["WAKE_WORD"]), ("Mic loudness that counts as speech", w["WAKE_LEVEL"])])
+                             ("Wake word", w["WAKE_WORD"]), ("Mic loudness that counts as speech", w["WAKE_LEVEL"]),
+                             ("Interrupting", w["INTERRUPT"])])
 
         keys = []
         for name, label in KEYS:
