@@ -15,7 +15,7 @@ import tempfile
 import threading
 import time
 import winreg
-from collections import deque
+from collections import Counter, deque
 from ctypes import wintypes
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -158,6 +158,28 @@ def award_due(mem, today=None):
             return None
         mem.d["squad"]["announced"] = last
     return rows[0][0], rows
+
+
+TIME_TALK = re.compile(r"\b\d{1,2}(:\d\d)?\s?(am|pm|a\.m\.|p\.m\.)(?![a-z])|o'clock|\bthis hour\b|\bmidnight\b|\bmorning\b|\btonight\b", re.I)
+PLAIN = set("about again being could doing don't every going other really right their there these thing think those what's "
+            "where which while would you're that's".split())  # (common words: not pet words)
+
+
+def stale_note(said, keep=(), hour=False):
+    """For a line they start themselves: how they opened lately and the words they keep leaning on, so the next one starts
+    and sounds different, and (unless hour) no talk of the time. Left alone, dozens of lines opened the same way ("Ah, the
+    tinkerer..."), a third brought up the hour and one in nine said "pathetic"."""
+    mine = [s.split(": ", 1)[-1] for s in said if s.startswith("You")][-30:]
+    no_hour = "" if hour else " Don't mention the time or the hour this time."
+    if not mine:
+        return f" ({no_hour.strip()})" if no_hour else ""
+    opens = list(dict.fromkeys(" ".join(re.findall(r"[\w']+", m)[:3]) for m in reversed(mine)))[:8]  # (no punctuation:
+    # "Ah, the tinkerer." and "Ah, the tinkerer," are one opening)
+    counts = Counter(w for m in mine for w in set(re.findall(r"[a-z']{5,}", m.lower())))
+    pet = [w for w, n in counts.most_common(12) if n >= 3 and w not in PLAIN and w not in keep][:6]
+    return (" (To sound fresh: don't open the way you did lately (" + "; ".join(f'"{o}"' for o in opens)
+            + "), and don't start with the player's name."
+            + (" Words you've leaned on lately, use none of them: " + ", ".join(pet) + "." if pet else "") + no_hour + ")")
 
 
 def fresh_turns(turns, recent):
@@ -1329,6 +1351,11 @@ class Companion:
         if self.partner and not to:
             situation += (f" (This exchange runs {lines} line{'s' if lines > 1 else ''}"
                           + (": a real back-and-forth, they go at each other.)" if lines >= 4 else ".)"))
+        if kind in AUTO or kind == "start":  # lines they start themselves: a new opening, no pet words, the hour now and then
+            with self.mem.lock:
+                said = [s for x in self.mem.d["sessions"][-3:] for s in x.get("lines", [])][-60:]
+            hour = kind == "nag" or (random.random() < 0.25 and not any(TIME_TALK.search(s) for s in said[-8:] if s.startswith("You")))
+            situation += stale_note(said, set(re.findall(r"[a-z']{5,}", f"{title} {app} {' '.join(self.names)}".lower())), hour)
         if crossed:
             situation += " " + BUDGET_NEWS[level]
         # smarter free mode: the local model only talks, so every CHECK_EVERY minutes Claude (Haiku) takes the comment and

@@ -5,6 +5,12 @@ version's entry is also its release notes on GitHub.
 
 ## 2.1.0 (not released yet)
 
+### New
+- **Fresher lines.** Their automatic comments kept opening the same way ("Ah, the tinkerer...", "[your name], still
+  idling..."), a third brought up the hour and one in nine said "Pathetic". Now each one they start themselves is told
+  how they opened lately and the words they keep leaning on (from this session and the last two), and they bring up the
+  time only now and then. Tried on the free local model: "Pathetic" went from 4 of 6 lines to none.
+
 ### Fixed
 - **A crash when the sound device dropped out.** A headset reconnecting or Windows switching its default device made
   playing a line fail with "Device unavailable", and that took the whole app down. Now the line plays on Windows' default

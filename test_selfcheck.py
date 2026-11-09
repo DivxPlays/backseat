@@ -1830,6 +1830,18 @@ finally:
     senses.sd.play, senses.sd.stop = real_sd
     senses.find_device, config.VOICE_DEVICE = real_find, saved_out
 
+# fresher lines: a line they start themselves is told how they opened lately and the words they lean on, and the hour
+# stays out unless it's allowed
+stale = [f"You: Ah, the tinkerer, pathetic move number {i}." for i in range(4)] + ["Player: hello",
+                                                                                 "You (Mika): Pathetic again at 3 AM."]
+stale_said = main.stale_note(stale)
+assert stale_said.count('"Ah the tinkerer"') == 1 and '"Pathetic again at"' in stale_said and "pathetic" in stale_said
+assert "Don't mention the time" in stale_said and "Don't mention the time" not in main.stale_note(stale, hour=True)
+assert "tinkerer" not in main.stale_note(stale, keep={"tinkerer"}).split("leaned")[1] and "hello" not in stale_said
+assert main.stale_note([], hour=True) == "" and "Don't mention the time" in main.stale_note([])
+assert main.TIME_TALK.search("still here at 3 AM?") and main.TIME_TALK.search("it's 2:30am") and not main.TIME_TALK.search("I am done")
+assert "only now and then" in config.RULES
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

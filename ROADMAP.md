@@ -31,9 +31,6 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 
 ### Quality
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
-- **Fresher lines:** in the log, 46 automatic lines open with "[your name], still idling..." and 46 with "Ah, the tinkerer...",
-  34% mention the time ("at 3 AM") and 11% say "Pathetic". Vary their openings and topics (tell the model what they said
-  lately and what not to start with), and mention the hour now and then rather than every few lines.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
 
 ## Not planned
@@ -42,6 +39,7 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 ## Done
 
 2.1.0 (in progress):
+- Fresher lines: each automatic line is told their recent openings and pet words (this session and the last two) to avoid, and the hour comes up only now and then.
 - Fix: a sound device dropping out (a headset reconnecting) no longer crashes the app: the default device plays the line, or it shows as subtitles.
 - Fix: mini-games start only while a game is in front, never on the desktop or in other apps.
 
