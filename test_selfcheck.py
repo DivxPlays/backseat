@@ -1788,6 +1788,20 @@ try:
 finally:
     main.schtasks, main.set_run_entry, main.task_xml = real_schtasks, real_entry, real_xml
 
+# duo mode: after an exchange both settle at once, but each takes their own pause before an idle animation, so their
+# idles don't start together (before the fix about 40% did; by chance alone it's about 15%)
+sync_pair, sync_starts, sync_prev = [Vorn("warlord"), Mika("jacket")], [[], []], [None, None]
+for n in range(int(1200 * 15)):  # 20 minutes of a comment every 25 s (8 s of talk), at 15 steps a second
+    sync_t = n / 15
+    for k, c in enumerate(sync_pair):
+        c.set_mood("smug" if sync_t % 25 < 8 + 0.4 * k else "idle")
+        c.step(1 / 15, 0.0)
+        if c.act and c.act != sync_prev[k]:
+            sync_starts[k].append(sync_t)
+        sync_prev[k] = c.act
+together = sum(1 for a in sync_starts[0] if any(abs(a - b) < 0.8 for b in sync_starts[1]))
+assert len(sync_starts[0]) > 30 and together / len(sync_starts[0]) < 0.28, (together, len(sync_starts[0]))
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

@@ -273,7 +273,7 @@ class Vorn:
         self.pop = 0.0
         self.afk = False  # set by the overlay: you've stopped touching keyboard and mouse
         self.toward = -1.0  # which way the rest of your screen is (-1 left, 1 right)
-        self.yawn_t0, self.yawn_at, self.was_afk = t - 10, t, False
+        self.yawn_t0, self.yawn_at, self.was_afk, self.was_busy = t - 10, t, False, False
         self.act, self.act_t0, self.last_act, self.idle_at = None, t, None, t + random.uniform(4, 12)  # idle animations
         self.turn, self.turn_at, self.turn_until = 0.0, t + random.uniform(8, 30), 0.0
         self.roll_t0 = t - 10
@@ -422,6 +422,9 @@ class Vorn:
         if self.afk and self.t >= self.yawn_at:
             self.yawn_t0, self.yawn_at = self.t, self.t + random.uniform(12, 20)
         busy = self.mood != "idle" or self.talk > 0.03 or self.slumping() > 0 or self.blood > 0.05 or self.flare_amt > 0
+        if self.was_busy and not busy:  # back from talking: their own pause first (in duo mode both settle together, and
+            self.idle_at = self.t + random.uniform(2, 14)  # without it their idles started at once)
+        self.was_busy = busy
         if self.act and (busy or self.t - self.act_t0 > self.IDLES[self.act]["time"]):  # done, or something came up
             self.act, self.idle_at = None, self.t + random.uniform(6, 14)
         elif not self.act and not busy and self.t >= self.idle_at:  # time for an idle animation

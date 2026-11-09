@@ -28,8 +28,18 @@ def full_version(main_py):
 INSTALL = ("## Install\n\nDownload **Install-Backseat.bat** below and double-click it: it downloads the rest itself. Or download "
            "**Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. You need an Anthropic API key "
            "(console.anthropic.com); the installer asks for it. If Windows says the file came from the internet, click **More "
-           "info > Run anyway**. Already installed? Backseat updates itself (it asks first); your memory, settings, key, Hall of "
-           "Shame and characters stay as they are.\n\nProblems: [Issues](https://github.com/DivxPlays/backseat/issues).\n\n")
+           "info > Run anyway**.\n\n"
+           "## Updating\n\n"
+           "- **On 2.0.0 or newer:** Backseat checks GitHub for a new version once a day when it starts. When one is out, "
+           "Windows shows a notification and the tray icon's menu (right-click the icon by the clock) shows **Update to "
+           "x.y.z**: click it and say Yes. It closes, updates in a window you can watch and starts again. Your memory, "
+           "settings, API key, Hall of Shame and characters stay as they are. To check any time: right-click the tray icon > "
+           "**Check for updates...**\n"
+           "- **On 1.x, or not sure:** download **Install-Backseat.bat** below and double-click it. It updates your install "
+           "in place and keeps all of the above.\n"
+           "- **No update offered?** Settings > Brain & budget > Updates must be on. A copy made with `git clone` updates "
+           "with `git pull` instead.\n\n"
+           "Problems: [Issues](https://github.com/DivxPlays/backseat/issues).\n\n")
 
 
 def changelog(version, text):

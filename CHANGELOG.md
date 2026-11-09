@@ -3,6 +3,15 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## 2.0.2 Beta (2026-11-09)
+
+A hotfix.
+
+### Fixed
+- **In duo mode they did the same idle animations at the same time.** After each exchange both of them went quiet at
+  once and started their next idle together, often the same stretch or look-around. Now each takes their own pause after
+  talking (2 to 14 seconds), so they move on their own again.
+
 ## 2.0.1 Beta (2026-11-09)
 
 A hotfix.
