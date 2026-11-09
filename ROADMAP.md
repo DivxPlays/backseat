@@ -33,6 +33,20 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
 
+## Bigger ideas (a later version)
+
+Added 2026-11-09 at your request. Not designed yet: each needs its own plan first.
+
+- **Cloud sync between PCs:** memory, settings, characters, the Hall of Shame and battle reports kept in step between your
+  PCs, instead of tray > Export memory and Import by hand. The cheapest route needs no server of ours: keep them in a
+  folder OneDrive, Google Drive or Dropbox already syncs, encrypted with a passphrase (memory.json holds personal notes),
+  and merge two PCs' memories when both changed (respect, hours, notes). Never the API key: each PC keeps its own.
+- **iOS and Android (very limited):** a phone can't watch your PC game the way he does on Windows (iOS allows no
+  overlays on other apps; Android allows them but needs screen-capture permission every session and would cost a lot of
+  battery), so it would be a companion app instead: talk to them by voice or text, see the Hall of Shame, stats, trivia
+  records and squad board, get their roasts as notifications while your PC plays, and mute or pause the PC copy from your
+  phone. Needs cloud sync first, and a way for the phone to reach your PC or the synced data.
+
 ## Not planned
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
