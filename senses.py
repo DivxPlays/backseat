@@ -363,6 +363,64 @@ class WakeListener:
             self.pending = None
 
 
+MOUTH_FPS = 50  # mouth shapes per second of speech
+
+
+def mouth_track(audio, sr=SR):
+    """How the mouth moves through a line, every 1/50 s: rows of (open 0..1, wide -1 round .. 1 wide, teeth 0 or 1).
+    Read from the sound itself, so it works for every voice: silence closes the lips (also on m, b, p), hiss shows the
+    teeth (s, f, sh), and the vowel's resonances (formants, found by linear prediction) tell open "ah" from round "oo"
+    and wide "ee". Each line is measured against its own range, so a high voice and a deep one both work."""
+    rate, order = sr // 2, 12  # 12 kHz is plenty: the formants that shape the lips are below 4 kHz
+    x = audio[: len(audio) // 2 * 2].reshape(-1, 2).mean(axis=1)
+    hop, win = rate // MOUTH_FPS, int(rate * 0.03)
+    if len(x) < win * 2:
+        return np.zeros((0, 3), np.float32)
+    frames = np.lib.stride_tricks.sliding_window_view(x, win)[::hop]
+    n = len(frames)
+    loud = np.sqrt((frames ** 2).mean(axis=1))
+    full = np.lib.stride_tricks.sliding_window_view(audio, win * 2)[::hop * 2][:n] * np.hanning(win * 2)
+    spec = np.abs(np.fft.rfft(full, axis=1)) ** 2
+    freqs = np.fft.rfftfreq(win * 2, 1 / sr)
+    hiss = spec[:, freqs >= 4000].sum(1) / (spec[:, (freqs >= 250) & (freqs < 3200)].sum(1) + 1e-12)
+    n = len(hiss)
+    emph = np.append(x[0], x[1:] - 0.94 * x[:-1])  # pre-emphasis lifts the higher formants
+    f = np.lib.stride_tricks.sliding_window_view(emph, win)[::hop][:n] * np.hamming(win)
+    r = np.stack([(f[:, : win - k] * f[:, k:]).sum(1) for k in range(order + 1)], axis=1)
+    a, err = np.zeros((n, order + 1)), r[:, 0] + 1e-12  # Levinson-Durbin, all frames at once
+    a[:, 0] = 1
+    for i in range(1, order + 1):
+        k = -(r[:, i] + (a[:, 1:i] * r[:, i - 1:0:-1]).sum(1)) / err
+        a[:, 1:i + 1] = a[:, 1:i + 1] + k[:, None] * a[:, i - 1::-1][:, :i]
+        err = err * (1 - k * k) + 1e-12
+    comp = np.zeros((n, order, order))  # the prediction polynomial's roots are the resonances
+    comp[:, 0, :] = -a[:, 1:]
+    comp[:, np.arange(1, order), np.arange(order - 1)] = 1
+    z = np.linalg.eigvals(comp)
+    hz, bw = np.angle(z) * rate / (2 * np.pi), -rate / np.pi * np.log(np.abs(z) + 1e-12)
+    hz = np.sort(np.where((z.imag > 0) & (hz > 200) & (bw < 500), hz, np.inf), axis=1)
+    f1, f2 = np.where(hz[:, 0] < 1100, hz[:, 0], np.inf), hz[:, 1]  # above 1100 Hz it missed the first one
+    level = np.clip(loud[:n] / (np.percentile(loud[:n], 95) + 1e-9), 0, 1)  # the line's loud parts, not one peak
+    vowel = (level > 0.12) & (hiss < 3) & np.isfinite(f1) & np.isfinite(f2)
+
+    def spread(v, least):  # 0..1 within this line's own range
+        if vowel.sum() < 3:
+            return np.full(n, 0.5)
+        lo, hi = np.percentile(v[vowel], [10, 90])
+        mid, half = (lo + hi) / 2, max(hi - lo, least) / 2
+        return np.clip((np.where(np.isfinite(v), v, mid) - (mid - half)) / (2 * half), 0, 1)
+
+    opened, front = spread(f1, 250), spread(f2, 600)
+    track = np.zeros((n, 3), np.float32)
+    track[:, 0] = np.where(vowel, level * (0.3 + 0.7 * opened), np.where(level > 0.12, 0.15 + 0.3 * level, 0))
+    wide = np.where(front >= 0.5, (front - 0.5) * 2, -(0.5 - front) * 2 * (1 - opened))  # round only when closed too: "oo", not "ah"
+    track[:, 1] = np.where(vowel, wide, np.where(level > 0.12, 0.4, 0))
+    track[:, 2] = (level > 0.12) & ((hiss >= 3) | vowel & (front > 0.75) & (opened < 0.4))
+    for col in (0, 1):  # a touch of smoothing: no 20 ms flicker
+        track[:, col] = np.convolve(track[:, col], [0.25, 0.5, 0.25], mode="same")
+    return track
+
+
 KOKORO = Path(__file__).with_name("models") / "kokoro"
 KOKORO_FILES = {"kokoro-v1.0.fp16-gpu.onnx": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/",
                 "voices-v1.0.bin": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"}
@@ -383,6 +441,7 @@ class Voice:
         self._audio = None
         self._t0 = 0.0
         self._held = None  # paused mid-line because you started talking: (audio, where to carry on)
+        self._track = None  # the playing line's mouth shapes
         self.cut = False  # stop() was called: whoever is waiting on a line drops the rest of the exchange
         self._kokoro = None
         self._lock = threading.Lock()
@@ -432,6 +491,7 @@ class Voice:
         """Start playing; returns the duration in seconds."""
         sd.stop()
         self._audio, self._t0, self._held = audio, time.monotonic(), None
+        self._track = mouth_track(audio)  # a few milliseconds for a 5 s line
         sd.play(audio, SR, device=find_device(config.VOICE_DEVICE, "output"))  # a VoiceMeeter input puts him in your calls
         return len(audio) / SR
 
@@ -464,8 +524,14 @@ class Voice:
     def busy(self):
         return self._audio is not None and time.monotonic() - self._t0 < len(self._audio) / SR
 
+    def mouth(self):
+        """(open, wide, teeth) for the mouth right now (see mouth_track); closed when he isn't talking."""
+        if not self.busy() or self._track is None or not len(self._track):
+            return (0.0, 0.0, 0.0)
+        return tuple(float(v) for v in self._track[min(int((time.monotonic() - self._t0) * MOUTH_FPS), len(self._track) - 1)])
+
     def level(self):
-        """Loudness 0..1 at the current playback position (drives the mouth)."""
+        """Loudness 0..1 at the current playback position (moves his head as he talks)."""
         if not self.busy():
             return 0.0
         i = int((time.monotonic() - self._t0) * SR)

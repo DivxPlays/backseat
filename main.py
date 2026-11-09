@@ -270,6 +270,7 @@ class Overlay(QWidget):
             char.afk = afk  # yawns and bored eyes while you're away
             char.toward = 1.0 if self.left else -1.0  # the rest of your screen is on the bubble side
             char.tier = tier_for(self.respect())  # gear upgrades as you earn respect
+            char.say = self.voice.mouth() if i == self.speaking else (0.0, 0.0, 0.0)  # lip-sync: the shape of each sound
             char.step(dt, level if i == self.speaking else 0.0)  # only the one talking moves their mouth
         if self.ducker.saved and not self.voice.busy():
             self.ducker.restore()

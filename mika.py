@@ -590,11 +590,12 @@ class Mika(Vorn):
     def _mouth(self, g):
         p, b = self.d, self.d["blood"]
         cx, cy = 150, 178
-        open_ = max(p["mouth"], self.talk * 0.8)
+        open_ = max(p["mouth"], self.lips[0] * 0.85)
+        wide, rnd = self.lips[1], max(0.0, -self.lips[1])  # lip-sync: wider on "ee", a little O on "oo"
         smile = min(1.0, p["smile"] + 0.8 * b)  # Lovesick: a too-wide smile
-        w = 8 + 4 * max(smile, 0) + 2 * open_ + 6 * b
+        w = (8 + 4 * max(smile, 0) + 2 * open_ + 3 * max(wide, 0) + 6 * b) * (1 - 0.4 * rnd)
         left, right = P(cx - w, cy - smile * 2.5 + max(-p["smirk"], 0) * 1.5), P(cx + w, cy - smile * 2.5 - p["smirk"] * 3)
-        upper = P(cx, cy + smile * 3.5 - open_ * 1.5)
+        upper = P(cx, cy + smile * 3.5 - open_ * 1.5 - rnd * open_ * 6)
         if open_ < 0.06 and b < 0.3:
             m = QPainterPath(left)
             m.quadTo(upper, right)
@@ -610,7 +611,7 @@ class Mika(Vorn):
         g.setPen(Qt.NoPen)
         g.setBrush(QBrush(QColor("#ff7f9e")))
         g.drawEllipse(P(cx, cy + 5 + open_ * 7), w * 0.55, 4)
-        if smile > 0.4 or p["teeth"] > 0.5:
+        if smile > 0.4 or p["teeth"] > 0.5 or self.lips[2] > 0.5:
             g.setBrush(QBrush(QColor("white")))
             g.drawRect(QRectF(cx - w, min(left.y(), right.y()) - 4, 2 * w, upper.y() - min(left.y(), right.y()) + 5))
         g.restore()

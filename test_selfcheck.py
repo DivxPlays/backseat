@@ -817,6 +817,52 @@ try:
 finally:
     senses.sd.play, senses.sd.stop = real_sd
 
+# lip-sync: a made-up voice with known vowels; the mouth closes in silence, opens on "ah", goes wide on "ee", round on "oo",
+# and shows teeth on a hiss ("s")
+def vowel(f1, f2, seconds=0.4):
+    """A 120 Hz buzz through two resonances: a crude vowel."""
+    n = int(senses.SR * seconds)
+    x = np.zeros(n)
+    x[:: senses.SR // 120] = 1.0
+    for freq, bw in ((f1, 80), (f2, 120)):
+        r, th = np.exp(-np.pi * bw / senses.SR), 2 * np.pi * freq / senses.SR
+        b1, b2, y = 2 * r * np.cos(th), -r * r, np.zeros(n)
+        for i in range(n):
+            y[i] = x[i] + b1 * (y[i - 1] if i else 0) + b2 * (y[i - 2] if i > 1 else 0)
+        x = y
+    return (x / np.abs(x).max() * 0.3).astype(np.float32)
+
+
+hush = lambda s: np.zeros(int(senses.SR * s), np.float32)  # noqa: E731
+rng = np.random.default_rng(1)
+hiss = np.diff(rng.normal(0, 0.1, int(senses.SR * 0.3) + 1)).astype(np.float32)  # high-pitched noise, like "sss"
+parts = [hush(0.3), vowel(750, 1200), hush(0.2), vowel(300, 2300), hush(0.2), vowel(300, 800), hush(0.2), hiss, hush(0.2)]
+track, at, seen = senses.mouth_track(np.concatenate(parts)), 0.0, []
+for part in parts:
+    seg = track[int(at * senses.MOUTH_FPS) + 3: int((at + len(part) / senses.SR) * senses.MOUTH_FPS) - 3]
+    seen.append(seg.mean(axis=0))
+    at += len(part) / senses.SR
+ah, ee, oo, sss = seen[1], seen[3], seen[5], seen[7]
+assert seen[0][0] < 0.02 and seen[2][0] < 0.05, seen[:3]  # silence: closed
+assert ah[0] > ee[0] + 0.15 and ah[0] > oo[0] + 0.15, (ah, ee, oo)  # "ah" opens widest
+assert ee[1] > 0.3 > oo[1] and oo[1] < 0, (ee, oo)  # "ee" wide, "oo" round
+assert sss[2] > 0.8 and ah[2] < 0.2, (sss, ah)  # teeth on the hiss only
+v = Voice()
+real_sd = (senses.sd.play, senses.sd.stop)
+senses.sd.play = senses.sd.stop = lambda *a, **k: None
+try:
+    assert v.mouth() == (0.0, 0.0, 0.0)  # not talking: closed
+    v.play(np.concatenate(parts))
+    v._t0 -= 0.5  # half a second in: the "ah"
+    assert v.mouth()[0] > 0.3
+    face = Vorn("warlord")
+    face.say = v.mouth()
+    for _ in range(10):
+        face.step(0.05, 0.5)
+    assert face.lips[0] > 0.3 and not face.render().isNull()  # the lips follow the voice
+finally:
+    senses.sd.play, senses.sd.stop = real_sd
+
 # two on screen never look like copies: the listener makes a different face, and their idle motion is out of step
 assert all(main.REACT[m] != m for m in main.REACT if m != "idle")
 assert main.make_character("vorn").t != main.make_character("vorn").t

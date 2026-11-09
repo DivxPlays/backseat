@@ -21,7 +21,6 @@
 ### Interaction
 - **Click reactions:** poke them, drag and throw them, and they react.
 - **Mini-games in menus and queues:** trivia about your game, or a dare from the character.
-- **Real lip-sync:** mouth shapes that match each sound (Kokoro already gives word timing).
 - **Sound effects:** Vorn's scoffs and grunts (real ones), Mika's giggles.
 
 ### Under the hood
@@ -32,6 +31,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Real lip-sync: mouth shapes for each sound (open, wide, round, teeth), read from the voice's sound, for both characters and the Discord camera.
 - Smarter free mode: with the local model, Haiku takes a comment every 5 minutes and double-checks wins, deaths and losses (at most every 2 minutes), so score, respect, Bloodfire and the Hall of Shame keep working (about 10 cents a day).
 - Outfits to earn: four each (10 hours, 100 talks, 7 days in a row, 100 respect), plus six free anime-inspired outfits for Mika (maid, shrine maiden, magical girl, yukata, netrunner, track suit).
 - Interrupting: talk over them and they pause to listen; they stop for good if you called them, and carry on if you didn't.

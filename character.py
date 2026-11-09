@@ -212,6 +212,8 @@ class Vorn:
         self.p = dict(MOODS["idle"])
         self.t = 0.0
         self.talk = 0.0
+        self.say = (0.0, 0.0, 0.0)  # the mouth shape the voice asks for right now: open, wide (- round), teeth
+        self.lips = [0.0, 0.0, 0.0]  # where the mouth is, easing toward that
         self.blink = 0.0
         self.blink_at = 1.5
         self.glance = 0.0
@@ -275,6 +277,8 @@ class Vorn:
         for key, v in MOODS[self.mood].items():
             self.p[key] += (v - self.p[key]) * k
         self.talk += (level - self.talk) * (1 - math.exp(-dt * 28))
+        k = 1 - math.exp(-dt * 30)  # lip-sync: quick, but no snapping between shapes
+        self.lips = [v + (target - v) * k for v, target in zip(self.lips, self.say)]
         if self.t >= self.blink_at:
             self.blink = 1.0
             self.blink_at = self.t + random.uniform(2.0, 5.5)
@@ -964,13 +968,15 @@ class Vorn:
     def _mouth(self, g):
         p = self.d
         cx, cy = 150, 197
-        open_ = max(p["mouth"], self.talk * 0.9)
+        open_ = max(p["mouth"], self.lips[0] * 0.95)
+        wide, teeth = self.lips[1], max(p["teeth"], self.lips[2])
+        rnd = max(0.0, -wide)  # "oo": narrower, and the top lip arcs up into an O
         smile, smirk = p["smile"], p["smirk"]
-        w = 12 + 3 * max(smile, 0) + 3 * open_
+        w = (12 + 3 * max(smile, 0) + 3 * open_ + 4 * max(wide, 0)) * (1 - 0.4 * rnd)
         left = P(cx - w, cy - smile * 3 + max(-smirk, 0) * 2)
         right = P(cx + w, cy - smile * 3 - smirk * 5)
-        upper = P(cx, cy + smile * 5 - open_ * 2)
-        if open_ < 0.06 and p["teeth"] < 0.5:
+        upper = P(cx, cy + smile * 5 - open_ * 2 - rnd * open_ * 9)
+        if open_ < 0.06 and teeth < 0.5:
             m = QPainterPath(left)
             m.quadTo(upper, right)
             stroke(g, m, INK, 2.4)
@@ -986,8 +992,8 @@ class Vorn:
         g.setClipPath(m)
         g.setBrush(QBrush(TONGUE))
         g.drawEllipse(P(cx, cy + 5 + open_ * 11), w * 0.55, 6)
-        gritted = p["teeth"] > 0.5 and open_ < 0.4
-        if p["teeth"] > 0.5 or open_ > 0.35:
+        gritted = teeth > 0.5 and open_ < 0.4  # also "s" and "f": teeth together
+        if teeth > 0.5 or open_ > 0.35:
             g.setBrush(QBrush(SCLERA))
             top = min(left.y(), right.y()) - 4
             g.drawRect(cx - w, top, 2 * w, (upper.y() - top) + 4 + (3 if gritted else 0))
