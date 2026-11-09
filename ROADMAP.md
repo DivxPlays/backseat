@@ -4,7 +4,6 @@
 
 ### Characters
 - **Character creator:** make your own character in Settings (name, personality, voice, hair, eye and outfit colours) without touching code.
-- **Jealousy across characters:** switch from Mika to Vorn and back and she knows ("You were with *him*?"); Vorn mocks you for hiding behind the girl.
 - **Grudges that stick:** rage-quit or ignore them for days and they hold it against you next session.
 
 ### Gameplay
@@ -30,6 +29,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Jealousy across characters: they track your time alone with each; whoever was left out opens with it, and the rivalry comes up now and then.
 - Holidays: Halloween and Christmas outfits for both that switch in by themselves, bats, snow, confetti (New Year's, your birthday) and hearts (Valentine's), festive lines, and a birthday setting.
 - Real lip-sync: mouth shapes for each sound (open, wide, round, teeth), read from the voice's sound, for both characters and the Discord camera.
 - Smarter free mode: with the local model, Haiku takes a comment every 5 minutes and double-checks wins, deaths and losses (at most every 2 minutes), so score, respect, Bloodfire and the Hall of Shame keep working (about 10 cents a day).

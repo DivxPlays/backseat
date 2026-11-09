@@ -1,6 +1,7 @@
 """Vorn: an AI gaming companion that watches your screen, talks, gives hints and trash-talks you."""
 import ctypes
 import difflib
+import functools
 import json
 import logging
 import os
@@ -105,6 +106,15 @@ def addressed(text, wake_of):
     hits = [(m.start(), name) for name, names in wake_of.items()
             if (m := re.search(r"\b(?:" + "|".join(map(re.escape, names)) + r")\b", text, re.I))]
     return min(hits)[1] if hits else None
+
+
+@functools.lru_cache(maxsize=16)
+def preset_name(preset):
+    """A preset's character name ("mika" -> "Mika")."""
+    try:
+        return json.loads((config.PRESETS / f"{preset}.json").read_text(encoding="utf-8"))["NAME"]
+    except (OSError, ValueError, KeyError):
+        return preset.title()
 
 
 def needs_check(level, since, event=None):
@@ -428,6 +438,8 @@ class Companion:
         if self.partner:
             self.voices_of[self.partner["NAME"]] = {k: self.partner[k] for k in ("VOICE", "VOICE_RATE", "VOICE_PITCH", "POWER")}
             self.wake_of[self.partner["NAME"]] = self.partner["WAKE_NAMES"]
+        self.on_screen = [config.PRESET] + ([self.partner["PRESET"]] if self.partner else [])
+        self.jealous = self.jealousy()  # for the greeting: who was left out, and for whom
         self.check_season()  # before anyone gets dressed: in season, "Surprise me" is the holiday's look
         for p in presets():  # the outfits you've earned, before anyone gets dressed ("random" only picks from those)
             try:
@@ -437,6 +449,16 @@ class Companion:
             cls.earned |= set(self.mem.mind(p).get("unlocked", []))
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
+
+    def jealousy(self):
+        """What each character on screen missed: the time you spent alone with another one while they were away."""
+        lines = []
+        for p in self.on_screen:
+            missed = {o: s for o, s in self.mem.missed(p).items() if s >= 600}  # 10 minutes or more
+            if missed:
+                spent = " and ".join(f"{fmt(s)} alone with {preset_name(o)}" for o, s in missed.items())
+                lines.append(f"While {preset_name(p)} was away, the player spent {spent} instead.")
+        return " ".join(lines)
 
     def check_season(self):
         """Today's holiday or your birthday (holidays.py): their lines, and what falls around them."""
@@ -683,6 +705,10 @@ class Companion:
                          f'with the player, says to you: "{arg}". Answer them.')
         else:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
+        if kind == "start" and self.jealous:
+            situation += (f" {self.jealous} Bring it up in the greeting, in character: whoever was left out is jealous, "
+                          "hurt or mocking about it.")
+            self.jealous = ""
         if kind == "ask":  # duo mode keeps "Hey Mika, " in front: "remember that ..." comes after it
             m = WakeListener.pattern([n for names in self.wake_of.values() for n in names]).match(arg)
             situation += self.memory_command(arg[m.end():] if m else arg)
@@ -797,6 +823,12 @@ class Companion:
         if self.partner:  # duo mode: they also know what the other one remembers about you
             text += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"], query=query,
                                                     stories=alone is None or alone is self.partner)
+        if not self.partner:  # the rivalry: who else they could be switched for, and how much time each gets
+            alone = dict(self.mem.d["alone"])
+            rivals = [f"{preset_name(p)} ({fmt(s)})" for p, s in alone.items() if p != config.PRESET and s >= 600]
+            if rivals:
+                text += (f"\nRivals for the player's attention (they can switch you for them): {', '.join(rivals)} alone with "
+                         f"the player so far; you: {fmt(alone.get(config.PRESET, 0))}. Bring it up now and then, in character.")
         if self.season:  # a holiday or your birthday
             text += "\n" + self.season[1]
         return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
@@ -902,10 +934,11 @@ class Companion:
             if afk:
                 self.streak_start = now  # a real break resets the no-break clock
             else:
-                self.mem.tick(app_name(*self.app[:2]), dt)
+                self.mem.tick(app_name(*self.app[:2]), dt, self.on_screen)
             if now - last_save > 30:
                 self.check_season()  # (midnight may have brought a holiday)
                 self.check_unlocks()
+                self.mem.saw(self.on_screen)  # whoever is on screen knows how you've spent your time up to now
                 self.mem.save()
                 last_save = now
             quiet = now - self.last_spoke

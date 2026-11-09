@@ -79,7 +79,7 @@ class Memory:
         for key, empty in (("total_seconds", 0), ("session_count", 0), ("apps", {}), ("games", {}), ("notes", []),
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
                            ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {}),
-                           ("unlocked", []), ("talks", 0)):
+                           ("unlocked", []), ("talks", 0), ("alone", {}), ("seen", {})):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
@@ -91,9 +91,12 @@ class Memory:
         self.session = {"start": datetime.now().isoformat(timespec="minutes"), "seconds": 0, "apps": {}, "events": {}, "lines": []}
         self.d["sessions"] = self.d["sessions"][-(MAX_SESSIONS - 1):] + [self.session]
 
-    def tick(self, app, dt):
+    def tick(self, app, dt, on_screen=()):
+        """dt more seconds of your time; on_screen: the characters showing (one = you're alone with them)."""
         with self.lock:
             d, s = self.d, self.session
+            if len(on_screen) == 1:  # jealousy: how long you spend alone with each of them (shared, so the others know)
+                d["alone"][on_screen[0]] = d["alone"].get(on_screen[0], 0) + dt
             d["total_seconds"] += dt
             s["seconds"] += dt
             d["apps"][app] = d["apps"].get(app, 0) + dt
@@ -102,6 +105,18 @@ class Memory:
             d["days"][today] = d["days"].get(today, 0) + dt
             for old in sorted(d["days"])[:-MAX_DAYS]:
                 del d["days"][old]
+
+    def missed(self, preset):
+        """While `preset` was off screen: {another character: seconds you spent alone with them}."""
+        with self.lock:
+            seen = self.d["seen"].get(preset, {})
+            return {p: s - seen.get(p, 0) for p, s in self.d["alone"].items() if p != preset and s - seen.get(p, 0) >= 1}
+
+    def saw(self, presets):
+        """These characters are on screen: they know about everything up to now."""
+        with self.lock:
+            for p in presets:
+                self.d["seen"][p] = dict(self.d["alone"])
 
     def pin(self, fact):
         """Something the player asked to be remembered: kept for good (never pushed out like notes).

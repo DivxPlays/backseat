@@ -750,6 +750,25 @@ birthday_check = SettingsWindow(lambda: None, None)
 assert not birthday_check.problems({**birthday_check.values(), "BIRTHDAY": "02-10"})
 assert birthday_check.problems({**birthday_check.values(), "BIRTHDAY": "Feb 10"})
 
+# jealousy: time alone with each one counts only in solo mode; whoever was away hears how long you spent with the other
+with tempfile.TemporaryDirectory() as d:
+    real_preset, config.PRESET = config.PRESET, "vorn"
+    m = Memory(Path(d, "memory.json"))
+    m.saw(["vorn", "mika"])  # both know where things stand
+    m.tick("g.exe", 3 * 3600, ["mika"])  # 3 hours alone with Mika
+    m.tick("g.exe", 1800, ["vorn", "mika"])  # half an hour of duo mode: nobody's alone
+    assert m.d["alone"] == {"mika": 3 * 3600} and m.missed("vorn") == {"mika": 3 * 3600} and m.missed("mika") == {}
+    jealous = main.Companion.jealousy(SimpleNamespace(on_screen=["vorn"], mem=m))
+    assert jealous == "While Vorn was away, the player spent 3.0 h alone with Mika instead.", jealous
+    m.saw(["vorn"])  # Vorn has been on screen since: he's caught up
+    assert m.missed("vorn") == {} and main.Companion.jealousy(SimpleNamespace(on_screen=["vorn"], mem=m)) == ""
+    m.tick("g.exe", 300, ["mika"])  # five minutes isn't worth a scene
+    assert main.Companion.jealousy(SimpleNamespace(on_screen=["vorn"], mem=m)) == ""
+    m.save()
+    assert Memory(Path(d, "memory.json")).d["alone"]["mika"] == 3 * 3600 + 300  # kept, shared by both
+    config.PRESET = real_preset
+assert main.preset_name("mika") == "Mika" and main.preset_name("nobody") == "Nobody"
+
 # unlocks: what counts, the streak, and handing each one out once (announced as a job)
 import queue  # noqa: E402
 import unlocks  # noqa: E402
