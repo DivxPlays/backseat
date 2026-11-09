@@ -1,8 +1,20 @@
+<p align="center"><img src="docs/images/icon-vorn.png" width="96" alt="Vorn"> <img src="docs/images/icon-mika.png" width="96" alt="Mika"></p>
+
 # Vorn: your trash-talking gaming companion
 
 Version 1.2.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
 
 An animated, full-body character in the corner of your screen: Vorn the warlord, or Mika the yandere gamer girl. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
+
+<p align="center"><img src="docs/images/duo.png" width="520" alt="Vorn and Mika in duo mode, Mika talking"></p>
+
+**Warlord Vorn**: idle, smug, angry, laughing, and in Bloodfire.
+
+![Vorn in his moods and in Bloodfire](docs/images/vorn.png)
+
+**Mika**: her four outfits (gothic, hoodie, jacket, jersey), then Lovesick.
+
+![Mika in her four outfits and in Lovesick](docs/images/mika.png)
 
 ## Setup
 
@@ -101,6 +113,8 @@ To spend less: watch one display (`MONITOR = 1`), raise the seconds between comm
 
 Show Vorn, Mika, or both as your camera in Discord. Needs OBS Studio installed (free, from obsproject.com; only its virtual camera is used, OBS doesn't have to run).
 
+![What your friends see on the Discord camera](docs/images/camera.png)
+
 1. Tray > **Discord camera** > **On: <character>** (or **On: Vorn and Mika**).
 2. In Discord > User Settings > Voice & Video > Camera, pick **OBS Virtual Camera**.
 
@@ -124,7 +138,7 @@ Right-click the tray icon > **Settings...** to change his name, voice (with a Te
 
 ## What's on GitHub
 
-The code, this README and [ROADMAP.md](ROADMAP.md) (planned features). Your API key, his memory of you, your settings, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
+The code, this README, [ROADMAP.md](ROADMAP.md) (planned features), the shortcut icon (`vorn.ico`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. Your API key, his memory of you, your settings, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
 
 ## Moving him to another PC
 
