@@ -862,5 +862,8 @@ def make_character(name):
     """The drawing for a preset's CHARACTER: "vorn" or "mika"."""
     if name == "mika":
         from mika import Mika
-        return Mika()
-    return Vorn()
+        char = Mika()
+    else:
+        char = Vorn()
+    char.step(random.uniform(5, 60), 0.0)  # a random head start: two on screen don't breathe, sway and blink in lockstep
+    return char

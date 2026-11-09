@@ -18,7 +18,8 @@ from character import H, W, make_character
 
 CAM_W, CAM_H, FPS = 1280, 720, 24
 BACKGROUNDS = ("dark", "green", "game", "webcam")
-REACT = {"laugh": "laugh", "angry": "surprised", "smug": "disgusted", "surprised": "surprised", "disgusted": "smug", "idle": "idle"}
+# the face the one listening makes: never the speaker's own, so the two never look like copies
+REACT = {"laugh": "smug", "angry": "surprised", "smug": "disgusted", "surprised": "laugh", "disgusted": "smug", "idle": "idle"}
 
 
 def fit(img, w, h):

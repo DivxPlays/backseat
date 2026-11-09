@@ -538,13 +538,13 @@ class Companion:
                          f'with the player, says to you: "{arg}". Answer them.')
         else:
             situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
-        if kind == "ask":
-            situation += self.memory_command(arg)
+        if kind == "ask":  # duo mode keeps "Hey Mika, " in front: "remember that ..." comes after it
+            m = WakeListener.pattern([n for names in self.wake_of.values() for n in names]).match(arg)
+            situation += self.memory_command(arg[m.end():] if m else arg)
         to = addressed(arg, self.wake_of) if self.partner and kind in ("ask", "friend") else None
         if to:  # duo mode: without this the other one answers too ("My day?") when only one was asked
             other = next(n for n in self.names if n != to)
-            situation += (f" (This was said to {to}, so only {to} answers it. {other} wasn't asked: at most one short "
-                          f"reaction to {to}'s answer, or nothing.)")
+            situation += f" (This was said to {to}: only {to} speaks, in one turn. {other} stays silent.)"
         if crossed:
             situation += " " + BUDGET_NEWS[level]
         # duo mode: the small local model voices one of them per comment and sees only that one's own past (shown both,
@@ -578,6 +578,8 @@ class Companion:
         self.mem.spend(spent, kind)
         logging.info("%s%s ($%.4f) -> %s", kind, " (local)" if spent == 0 and local else "", spent, out)
         turns = turns_of(out, self.names)  # [(speaker, mood, line)]: one for a solo character, a short exchange in duo mode
+        if to:  # only the one you called speaks, even if the model wrote a line for the other
+            turns = [t for t in turns if t[0] == to] or turns
         text = " ".join(line for _, _, line in turns)
         if kind in AUTO and (not text.strip() or repeats(text, self.recent)):
             return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again

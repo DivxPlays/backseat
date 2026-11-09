@@ -648,6 +648,14 @@ wl.WAKE, wl.keep_name = WakeListener.pattern(["vorn", "mika"]), True
 wl.hear("Hey Mika, am I getting better?")
 wl.flush(force=True)
 assert heard_duo == ["Hey Mika, am I getting better?"], heard_duo
+wl.hear("Hey Mika.")  # the name, a pause, then the question: the name must still reach them
+wl.hear("You look pretty today.")
+wl.flush(force=True)
+assert heard_duo[-1] == "Hey Mika, You look pretty today.", heard_duo
+assert main.addressed(heard_duo[-1], {"Vorn": VORN_NAMES, "Mika": ["mika", "micah"]}) == "Mika"
+# two on screen never look like copies: the listener makes a different face, and their idle motion is out of step
+assert all(main.REACT[m] != m for m in main.REACT if m != "idle")
+assert main.make_character("vorn").t != main.make_character("vorn").t
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
