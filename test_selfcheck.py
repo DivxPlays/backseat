@@ -1633,8 +1633,12 @@ def fake_zip(files):
 real_urlopen, real_popen = updater.urllib.request.urlopen, updater.subprocess.Popen
 launched = []
 try:
-    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(main_py.replace(f'"{main.VERSION}"', '"9.9.9"').encode())
-    assert updater.latest() == "9.9.9"
+    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(json.dumps({"tag_name": "v9.9.9"}).encode())
+    assert updater.latest() == "9.9.9"  # the latest release's tag
+    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(b"<html>rate limited</html>")
+    assert updater.latest() is None
+    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(json.dumps({"tag_name": "nightly"}).encode())
+    assert updater.latest() is None
 
     def offline(*a, **k):
         raise OSError("no internet")
@@ -1657,6 +1661,9 @@ try:
         assert len(launched) == 1
 finally:
     updater.urllib.request.urlopen, updater.subprocess.Popen = real_urlopen, real_popen
+assert updater.ZIP.endswith("/releases/latest/download/Backseat.zip")
+bat = Path("Install Backseat.bat").read_bytes()
+assert b"\r\n" in bat and updater.ZIP.encode() in bat and b'if exist "%~dp0install.ps1" goto here' in bat  # one-file installer
 assert "AUTO_UPDATE" in config._DEFAULTS and "presets /XC" not in Path("install.ps1").read_text(encoding="utf-8")
 assert "/XD .venv .git __pycache__ \"Hall of Shame\" presets" in Path("install.ps1").read_text(encoding="utf-8")  # your characters stay
 

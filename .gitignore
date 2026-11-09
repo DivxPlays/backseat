@@ -13,6 +13,9 @@ presets/*.json
 !presets/vorn.json
 !presets/mika.json
 
+# release.py's build
+dist/
+
 # rebuilt by run.bat
 .venv/
 __pycache__/
