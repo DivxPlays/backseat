@@ -3,7 +3,10 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
-## 2.1.0 (not released yet)
+## 2.1.0 Beta (2026-11-09)
+
+"Clip that!", milestones, fresher lines and a Report a problem button, plus two fixes from the log. Still beta: the new
+parts are self-checked but haven't been tried in a real game yet.
 
 ### New
 - **Fresher lines.** Their automatic comments kept opening the same way ("Ah, the tinkerer...", "[your name], still

@@ -50,7 +50,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 
 ## Done
 
-2.1.0 (in progress):
+2.1.0 (2026-11-09):
 - Milestones: 10 to 1,000 hours together, a month since you met and each year since, celebrated once at the next greeting or comment.
 - "Clip that!": said in a game (no wake word; friends too), the moment goes in the Hall of Shame with their verdict and the clip is saved.
 - Clips through Medal when it's running (its key and folder): Medal is needed for split audio (the game and Discord on their own tracks).
