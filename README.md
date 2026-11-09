@@ -24,7 +24,7 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 
 | Key | What it does |
 |---|---|
-| "Hey Vorn, ..." | talk to him hands-free. Say just "Hey Vorn" and he chimes and waits for your question |
+| "Hey Vorn, ..." | talk to him hands-free. Pauses are fine: he waits until you've been quiet for about 2 seconds (up to 30 s per stretch of talking), and he won't start a comment while you're talking. Say just "Hey Vorn" and he chimes and waits for your question |
 | hold F8 | talk to him (mic, transcribed on your PC) |
 | F9 | type to him (Enter sends, Esc closes) |
 | F10 | "look at this": he comments on or gives a hint about your screen right now |

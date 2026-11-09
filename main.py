@@ -345,6 +345,7 @@ class Companion:
         self.streak = 0  # wins and epic plays in a row, for Bloodfire
         self.local_down_until = 0.0  # after the local model fails, use Claude until then
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
+        self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
 
@@ -360,9 +361,11 @@ class Companion:
             return
         self.started = self.awake = True
         if config.WAKE_WORD:  # the mic only opens once he's awake
-            threading.Thread(target=WakeListener(self.ears, self.voice, self.wake_heard, config.MIC_DEVICE).run, daemon=True).start()
+            self.listeners.append(WakeListener(self.ears, self.voice, self.wake_heard, config.MIC_DEVICE))
         if config.FRIENDS_DEVICE:  # his second ear, on your friends' voices from Discord
-            threading.Thread(target=WakeListener(self.ears, self.voice, self.friend_heard, config.FRIENDS_DEVICE).run, daemon=True).start()
+            self.listeners.append(WakeListener(self.ears, self.voice, self.friend_heard, config.FRIENDS_DEVICE))
+        for listener in self.listeners:
+            threading.Thread(target=listener.run, daemon=True).start()
         self.bridge.awake.emit()
         self.jobs.put(("start", None))
 
@@ -600,7 +603,8 @@ class Companion:
                 last_save = now
             quiet = now - self.last_spoke
             broke = not config.LOCAL_MODEL and config.MONTHLY_BUDGET and self.mem.spent() >= config.MONTHLY_BUDGET
-            if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or self.ears.recording or quiet < config.LOOK_COOLDOWN:
+            talking_to_him = self.ears.recording or any(listener.active() for listener in self.listeners)
+            if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or talking_to_him or quiet < config.LOOK_COOLDOWN:
                 continue
             start, end = config.BEDTIME
             hour = datetime.now().hour

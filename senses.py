@@ -234,10 +234,18 @@ class WakeListener:
     # Whisper often mishears an invented name, so accept the usual near-misses
     WAKE = re.compile(r"\b(?:hey|hay|hi|a|okay|ok)[\s,.!]+(?:vorn|vorne|vern|born|bourne|vaughn|vaughan|von|forn|fawn|warn|horn|bjorn)\b[\s,.!?]*", re.I)
 
+    DONE = 1.2  # after "Hey Vorn", the question is sent once you've been quiet this long (on top of the 0.7 s pause)
+    WAIT = 6.0  # after a bare "Hey Vorn", how long he waits for you to start the question
+
     def __init__(self, ears, voice, on_heard, device=None):
         self.ears, self.voice, self.on_heard, self.device = ears, voice, on_heard, device
         self.q = queue.Queue()
-        self.armed_until = 0.0  # after a bare "Hey Vorn", the next sentence is the question
+        self.pending, self.clips, self.last_end = None, [], 0.0  # the question being collected after "Hey Vorn"
+        self.speaking = False  # someone is mid-sentence right now
+
+    def active(self):
+        """True while someone is talking to him (so he doesn't start a comment over them)."""
+        return self.speaking or self.pending is not None
 
     def run(self):
         with sd.InputStream(samplerate=16000, channels=1, dtype="float32", blocksize=1600,  # 0.1 s chunks
@@ -245,6 +253,8 @@ class WakeListener:
             speech, silent = [], 0
             while True:
                 chunk = self.q.get()
+                self.speaking = bool(speech)
+                self.flush()
                 if self.voice.busy() or self.ears.recording:  # ignore his own voice and push-to-talk
                     speech, silent = [], 0
                     continue
@@ -252,22 +262,37 @@ class WakeListener:
                 if loud or speech:
                     speech.append(chunk)
                     silent = 0 if loud else silent + 1
-                if speech and (silent >= 7 or len(speech) >= 150):  # a 0.7 s pause (or 15 s) ends a sentence
+                if speech and (silent >= 7 or len(speech) >= 300):  # a 0.7 s pause (or 30 s) ends a stretch of talking
                     audio = np.concatenate(speech)
                     speech, silent = [], 0
                     if len(audio) > 16000 * 0.5:
                         self.hear(self.ears.transcribe(audio, prompt=f"Hey {config.NAME}."), audio)
 
     def hear(self, text, audio=None):
-        """Calls on_heard(question or None, the clip it came from) when he's addressed."""
+        """Collect what's said after "Hey Vorn"; flush() sends it once you stop talking."""
         m = self.WAKE.search(text)
         if m:
             rest = text[m.end():].strip()
-            self.armed_until = 0.0 if rest else time.monotonic() + 6
-            self.on_heard(rest or None, audio)  # None = he heard his name and is waiting for the question
-        elif text and time.monotonic() < self.armed_until:
-            self.armed_until = 0.0
-            self.on_heard(text, audio)
+            if not rest:
+                self.on_heard(None, None)  # just his name: he chimes and waits for the question
+            self.pending, self.clips = rest, ([audio] if rest and audio is not None else [])
+        elif text and self.pending is not None:  # you kept talking after a pause: same question
+            self.pending = f"{self.pending} {text}".strip()
+            if audio is not None:
+                self.clips.append(audio)
+        self.last_end = time.monotonic()
+
+    def flush(self, force=False):
+        """Send the collected question once you've stopped talking (force: now)."""
+        if self.pending is None or (self.speaking and not force):
+            return
+        quiet = time.monotonic() - self.last_end
+        if self.pending and (force or quiet >= self.DONE):
+            text, clips = self.pending, self.clips
+            self.pending, self.clips = None, []
+            self.on_heard(text, np.concatenate(clips) if clips else None)
+        elif not self.pending and (force or quiet >= self.WAIT):  # a bare "Hey Vorn", then nothing
+            self.pending = None
 
 
 class Voice:

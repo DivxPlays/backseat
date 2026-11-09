@@ -140,12 +140,27 @@ with tempfile.TemporaryDirectory() as d:
 # wake word: tolerant of Whisper's mishearings, ignores everything else
 heard = []
 w = WakeListener(None, None, lambda text, audio: heard.append(text))
-for said in ("Hey Vorn, what does this boss do?", "hey born. where's the key", "Okay, Vern! reload faster"):
-    w.hear(said)
-w.hear("hey there buddy")
-w.hear("Hey Vorn.")
-w.hear("how do I beat this?")  # the sentence right after a bare "Hey Vorn" is the question
-assert heard == ["what does this boss do?", "where's the key", "reload faster", None, "how do I beat this?"], heard
+
+
+def say(*stretches):  # stretches of talking with short pauses between, then silence
+    for s in stretches:
+        w.hear(s)
+    w.flush(force=True)
+
+
+say("Hey Vorn, what does this boss do?")
+say("hey born. where's the key")
+say("Okay, Vern! reload faster")
+say("hey there buddy")
+say("Hey Vorn.", "how do I beat this?")  # after a bare "Hey Vorn" he chimes (None), then takes the question
+say("Hey Vorn, how do I", "get past the second phase", "without dying?")  # pauses mid-question don't cut it off
+say("Hey Vorn.")  # and then nothing: nothing is sent
+assert heard == ["what does this boss do?", "where's the key", "reload faster", None, "how do I beat this?",
+                 "how do I get past the second phase without dying?", None], heard
+w.hear("Hey Vorn, wait")
+w.speaking = True
+w.flush()
+assert heard[-1] is None and w.active()  # not sent while you're still mid-sentence
 
 # spending: cost math, monthly ledger, cheap mode at 80%, announced once
 from types import SimpleNamespace  # noqa: E402
