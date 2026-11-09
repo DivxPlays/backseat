@@ -1,13 +1,15 @@
 # Roadmap
 
-## Planned for 2.0.0
+## Planned
 
-Everything planned for 2.0.0 is built (see Done).
+Nothing yet: 2.0.0 shipped everything that was planned (see Done).
 
 ## Not planned
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+
+2.0.0 (2026-11-09):
 - Accurate stats from Steam: real kills, deaths and wins this session for games with Steam stats (CS2, TF2, Left 4 Dead 2...), with your own Steam Web API key; read every 2 minutes while such a game is in front.
 - Auto-update: a daily check of GitHub (the repo is public now) and tray > Update to x.y.z, which runs the new version's installer and keeps memory, settings, key and characters (the installer no longer overwrites characters you edited).
 - Sound effects: 37 real recordings (public domain, from Freesound): grunts on pokes, grabs and landings, sighs, yawns, chuckles and giggles with idle animations, and a scoff or giggle before some lines.

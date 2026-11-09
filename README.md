@@ -2,7 +2,7 @@
 
 # Backseat: your trash-talking gaming companions
 
-Version 1.2.0 · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
+Version 2.0.0 · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
 Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 

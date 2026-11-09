@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).parent
-APP, VERSION, AUTHOR = "Backseat", "1.2.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
+APP, VERSION, AUTHOR = "Backseat", "2.0.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
 RUNNING = __name__ == "__main__"  # (imported by the self-checks or make_images.py: no log file, no crash box)
 if RUNNING:
     logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
