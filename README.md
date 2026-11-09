@@ -1,6 +1,6 @@
 # Vorn: your trash-talking gaming companion
 
-Version 1.0.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
+Version 1.1.0 · Made by DivxPlays (tray > About Vorn shows the version you have)
 
 An animated, full-body warlord in the corner of your screen. He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
@@ -33,7 +33,7 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 | F7 | pause / resume watching (falling chime = stopped, rising = watching). Use it before opening anything private |
 | F4 | shut-up mode: he keeps watching and keeping score, but only talks when you talk to him |
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
-| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, open Settings, turn on Start with Windows, see About (version and who made it), or quit |
+| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, export or import his memory, switch Character, open Settings, turn on Start with Windows, see About (version and who made it), or quit |
 
 ## How it behaves
 
@@ -107,6 +107,8 @@ Screenshots go to Anthropic's API, which means whatever is on your screen, inclu
 ## Tweaking
 
 **His voice:** the `kokoro:` voices (Michael, Onyx, Fenrir, Eric, Adam, George, Lewis, Daniel) run on your PC and are ready in about half a second; the first time you pick one, he downloads the Kokoro model (about 205 MB). They have no pitch control. The other voices are Microsoft's online voices (1.5-2.5 s before he speaks). If a local voice ever fails, he uses the online voice for that line.
+
+**Characters:** each character is a preset in `presets/` (name, personality, voice, look, wake word, power-up). Switch in tray > Character (he restarts). Each character keeps their own respect meter and past; your stats, notes and friends are shared. Settings > Character edits the current one.
 
 Right-click the tray icon > **Settings...** to change his name, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Only the settings you changed are stored in `settings.json`, so improvements to the defaults in `config.py` still reach you; **Restore Defaults** deletes it.
 

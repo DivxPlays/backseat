@@ -59,6 +59,12 @@ class Memory:
                            ("spend_days", {}), ("spend_level", {}), ("hall", [])):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
+        active = self.d.get("character", "vorn")  # each character keeps their own respect meter and past
+        if active != config.PRESET:
+            saved = self.d.setdefault("characters", {})
+            saved[active] = {"respect": self.d["respect"], "lore": self.d["lore"]}
+            mine = saved.pop(config.PRESET, {"respect": 10, "lore": []})
+            self.d["respect"], self.d["lore"], self.d["character"] = mine["respect"], mine["lore"], config.PRESET
         self.session = {"start": datetime.now().isoformat(timespec="minutes"), "seconds": 0, "apps": {}, "events": {}, "lines": []}
         self.d["sessions"] = self.d["sessions"][-(MAX_SESSIONS - 1):] + [self.session]
 

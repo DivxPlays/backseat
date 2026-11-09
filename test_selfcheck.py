@@ -241,13 +241,20 @@ assert not SettingsWindow(lambda: None, None).problems(saved)
 
 import settings_ui  # noqa: E402
 
+import shutil  # noqa: E402
+
 real_file, settings_ui.FILE = settings_ui.FILE, Path(tempfile.mkdtemp()) / "settings.json"
+real_presets, config.PRESETS = config.PRESETS, Path(tempfile.mkdtemp())  # never touch the real characters
+shutil.copy(real_presets / f"{config.PRESET}.json", config.PRESETS)
 win = SettingsWindow(lambda: None, None)
 win.get["NAME"] = lambda: "Krag"
+win.get["SCALE"] = lambda: 1.25
 win.save()
 written = json.loads(settings_ui.FILE.read_text(encoding="utf-8"))
-assert "PERSONA" not in written and written["NAME"] == "Krag", written  # only changes are saved
-settings_ui.FILE = real_file
+preset = json.loads((config.PRESETS / f"{config.PRESET}.json").read_text(encoding="utf-8"))
+assert written == {k: v for k, v in written.items() if k not in config.PRESET_KEYS} and written["SCALE"] == 1.25, written
+assert preset["NAME"] == "Krag" and preset["PERSONA"] == config.PERSONA, preset  # the character's fields go to its preset
+settings_ui.FILE, config.PRESETS = real_file, real_presets
 assert "grunt" not in config.PERSONA.split("Never call")[0]  # he turned "a grunt" into a nickname for every line
 
 import logging  # noqa: E402
@@ -447,6 +454,23 @@ said = ["Player: nice", "You: Finally, the soundboard monk dares to kill someone
 assert main.repeats("Finally, the soundboard monk dares to kill someone. One kill doesn't make a warlord, you know.", said)
 assert not main.repeats("You died again? Fourteen deaths, that's a cry for help.", said)
 assert not main.repeats("Finally, the soundboard monk dares to kill someone.", ["Player: Finally, the soundboard monk dares to kill someone."])
+
+# characters: each keeps their own respect and past; the wake word follows the name
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    m.d["respect"], m.d["lore"] = 64, ["I burned the moon of Kesh."]
+    m.save()
+    real_preset, config.PRESET = config.PRESET, "mika"
+    m2 = Memory(Path(d, "memory.json"))
+    assert m2.d["respect"] == 10 and m2.d["lore"] == [] and m2.d["characters"]["vorn"]["respect"] == 64
+    m2.d["respect"] = 33
+    m2.save()
+    config.PRESET = "vorn"
+    m3 = Memory(Path(d, "memory.json"))
+    assert m3.d["respect"] == 64 and m3.d["lore"] == ["I burned the moon of Kesh."] and m3.d["characters"]["mika"]["respect"] == 33
+    config.PRESET = real_preset
+assert WakeListener.WAKE.search("hey vern, look") and "{power}" in config.RULES and config.POWER in brain.system()
+assert type(main.make_character("vorn")).__name__ == "Vorn"
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

@@ -51,7 +51,8 @@ SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the play
 
 def system():
     # replace, not format: an edited persona may contain braces
-    return config.PERSONA.replace("{name}", config.NAME) + (SWEARING if config.SWEAR else "")
+    who_and_rules = config.PERSONA + "\n\n" + config.RULES  # the preset's character, then the rules every character follows
+    return who_and_rules.replace("{name}", config.NAME).replace("{power}", config.POWER) + (SWEARING if config.SWEAR else "")
 
 
 def make_client():

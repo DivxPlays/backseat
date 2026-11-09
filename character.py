@@ -848,3 +848,11 @@ class Vorn:
                 g.setPen(pen(INK, 1))
                 g.setBrush(QBrush(BRONZE))
                 g.drawEllipse(P(rx, ry), 2.6, 2.6)
+
+
+def make_character(name):
+    """The drawing for a preset's CHARACTER: "vorn" or "mika"."""
+    if name == "mika":
+        from mika import Mika
+        return Mika()
+    return Vorn()

@@ -58,6 +58,18 @@ def _row(*widgets):
     return box
 
 
+def presets():
+    """The characters you can pick: presets/<name>.json."""
+    return sorted(p.stem for p in config.PRESETS.glob("*.json")) or [config.PRESET]
+
+
+def set_setting(key, value):
+    """Save one setting into settings.json (the tray menu's character and outfit pickers)."""
+    saved = json.loads(FILE.read_text(encoding="utf-8")) if FILE.exists() else {}
+    saved[key] = value
+    FILE.write_text(json.dumps(saved, indent=1), encoding="utf-8")
+
+
 def _signed(text):
     """'+6%' or '-8Hz' -> 6 / -8"""
     m = re.match(r"([+-]?\d+)", text or "0")
@@ -73,20 +85,22 @@ class SettingsWindow(QDialog):
         self.get = {}  # setting name -> function returning its new value
 
         w = {}
+        w["PRESET"] = _combo(presets(), config.PRESET)
         w["NAME"] = QLineEdit(config.NAME)
         w["VOICE"] = _combo(VOICES, config.VOICE, editable=True)
         rate, pitch = _spin(_signed(config.VOICE_RATE), -50, 50, " %"), _spin(_signed(config.VOICE_PITCH), -40, 40, " Hz")
         w["SCALE"] = _real(config.SCALE, 0.4, 2.0, 0.05)
         w["DUCK_TO"] = _real(config.DUCK_TO, 0.0, 1.0, 0.05)
-        w["SWEAR"] = QCheckBox("Let him swear (never slurs)")
+        w["SWEAR"] = QCheckBox("Let them swear (never slurs)")
         w["SWEAR"].setChecked(config.SWEAR)
         persona = QPlainTextEdit(config.PERSONA)
         persona.setMinimumHeight(200)
         test = QPushButton("Test voice")
         test.clicked.connect(lambda: self.test_voice(w["VOICE"].currentText(), rate.value(), pitch.value()))
-        him = self._page([("Name", w["NAME"]), ("Voice", _row(w["VOICE"], test)), ("Voice speed", rate), ("Voice pitch", pitch),
-                          ("Size on screen", w["SCALE"]), ("Other apps' volume while he talks (1 = unchanged)", w["DUCK_TO"]),
-                          ("Language", w["SWEAR"]), ("Personality ({name} = his name)", persona)])
+        him = self._page([("Character (switching restarts)", w["PRESET"]), ("Name", w["NAME"]), ("Voice", _row(w["VOICE"], test)),
+                          ("Voice speed", rate), ("Voice pitch (online voices)", pitch), ("Size on screen", w["SCALE"]),
+                          ("Other apps' volume while they talk (1 = unchanged)", w["DUCK_TO"]),
+                          ("Language", w["SWEAR"]), ("Personality ({name} = their name)", persona)])
 
         w["MODEL"] = _combo(MODELS, config.MODEL)
         w["SMART_MODEL"] = _combo(MODELS, config.SMART_MODEL)
@@ -133,7 +147,7 @@ class SettingsWindow(QDialog):
                             ("Friends' voices (blank = off)", w["FRIENDS_DEVICE"])])
 
         tabs = QTabWidget()
-        for page, title in ((him, "Him"), (brain, "Brain && budget"), (behave, "Behavior"), (displays, "Keys && displays"),
+        for page, title in ((him, "Character"), (brain, "Brain && budget"), (behave, "Behavior"), (displays, "Keys && displays"),
                             (audio, "Discord && audio")):
             tabs.addTab(page, title)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel | QDialogButtonBox.RestoreDefaults)
@@ -219,7 +233,13 @@ class SettingsWindow(QDialog):
         if bad:
             QMessageBox.warning(self, "Can't save yet", "\n".join(bad))
             return
-        changed = {k: x for k, x in v.items() if json.dumps(x) != json.dumps(config._DEFAULTS.get(k))}
+        if v["PRESET"] == config.PRESET:  # the character's own fields go into its preset (when switching, the new one loads as is)
+            path = config.PRESETS / f"{config.PRESET}.json"
+            preset = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            preset.update({k: x for k, x in v.items() if k in config.PRESET_KEYS})
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(json.dumps(preset, indent=1), encoding="utf-8")
+        changed = {k: x for k, x in v.items() if k not in config.PRESET_KEYS and json.dumps(x) != json.dumps(config._DEFAULTS.get(k))}
         FILE.write_text(json.dumps(changed, indent=1), encoding="utf-8")
         self.accept()
         self.restart()

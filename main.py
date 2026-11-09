@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
-APP, VERSION, AUTHOR = "Vorn", "1.0.0", "DivxPlays"  # bump VERSION with every change: x.y.Z fixes, x.Y.0 features
+APP, VERSION, AUTHOR = "Vorn", "1.1.0", "DivxPlays"  # bump VERSION with every change: x.y.Z fixes, x.Y.0 features
 logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 for noisy in ("httpx", "httpx2", "huggingface_hub", "faster_whisper", "comtypes"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
@@ -43,10 +43,10 @@ import highlights  # noqa: E402
 import transfer  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
-from character import H as CH, HEAD_Y, W as CW, Vorn, tier_for  # noqa: E402
+from character import H as CH, HEAD_Y, W as CW, make_character, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
 from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, save_clip, save_moment  # noqa: E402
-from settings_ui import SettingsWindow  # noqa: E402
+from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
 user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
 user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
@@ -148,7 +148,7 @@ class Overlay(QWidget):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.char, self.voice, self.respect, self.spent, self.ducker = Vorn(), voice, respect, spent, Ducker()
+        self.char, self.voice, self.respect, self.spent, self.ducker = make_character(config.CHARACTER), voice, respect, spent, Ducker()
         self.text, self.shown, self.cps, self.hide_at = "", 0.0, 40.0, 0.0
         self.moving, self.grab_at = False, QPoint()
         self.left = "left" in config.CORNER  # True = bubble on his right
@@ -571,7 +571,7 @@ class Companion:
 
     def speak(self, mood, line, event="none"):
         if event in BLOODFIRE:
-            line = f"Bloodfire! {line}"  # he roars it as he transforms
+            line = f"{config.POWER}! {line}"  # shouted as the character transforms
         elif random.random() < 0.4 and not ALREADY_A_SOUND.match(line):  # a scoff, laugh or grunt first
             line = f"{random.choice(SOUNDS.get(mood, ['Hmph.']))} {line}"
         audio = self.synth(line)
@@ -745,6 +745,13 @@ def main():
     menu.addSeparator()
     menu.addAction("Export memory (to move him to another PC)...").triggered.connect(export_memory)
     menu.addAction("Import memory...").triggered.connect(import_memory)
+    menu.addSeparator()
+    characters = menu.addMenu("Character")
+    for preset in presets():
+        pick = characters.addAction(preset.title())
+        pick.setCheckable(True)
+        pick.setChecked(preset == config.PRESET)
+        pick.triggered.connect(lambda _=False, p=preset: (set_setting("PRESET", p), restart()) if p != config.PRESET else None)
     menu.addAction("Settings...").triggered.connect(lambda: (settings.show(), settings.raise_(), settings.activateWindow()))
     boot = menu.addAction("Start with Windows (wakes up when a game starts)")
     boot.setCheckable(True)
