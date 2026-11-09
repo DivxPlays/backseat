@@ -2,6 +2,7 @@
 Run it after changing how they look:  .venv\\Scripts\\python make_images.py
 """
 import os
+import random
 import sys
 from pathlib import Path
 
@@ -60,6 +61,7 @@ def lineup(chars, name, scale=1.2):
 
 
 def main_images():
+    random.seed(7)  # same pictures every run (the characters' random head start), so only real changes reach GitHub
     OUT.mkdir(parents=True, exist_ok=True)
     pose(Vorn("warlord"), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-vorn.png"))
     pose(Mika("jacket"), "smug").render(256 / 340, bust=True).save(str(OUT / "icon-mika.png"))
