@@ -49,10 +49,45 @@ SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the play
             "Never slurs, and never mock real-world identity.")
 
 
+DUO_RULES = """Duo mode: you write both characters. Instead of a single line and mood, fill "turns": 2 or 3 short lines (each under 20 words) alternating between {a} and {b}, as one quick exchange. They react to each other: when one is hard on the player, the other takes the player's side in their own way, and they snipe at each other. Each stays fully in character. If the player names one of them, that one speaks first. "remember" is a fact either of them learned. The line rules above apply to every turn."""
+
+
+def partner():
+    """The other character's preset when duo mode is on (both on screen), else None."""
+    if not config.DUO:
+        return None
+    name = "mika" if config.PRESET == "vorn" else "vorn"
+    try:
+        return {**json.loads((config.PRESETS / f"{name}.json").read_text(encoding="utf-8")), "PRESET": name}
+    except (OSError, ValueError):
+        return None
+
+
 def system():
     # replace, not format: an edited persona may contain braces
-    who_and_rules = config.PERSONA + "\n\n" + config.RULES  # the preset's character, then the rules every character follows
-    return who_and_rules.replace("{name}", config.NAME).replace("{power}", config.POWER) + (SWEARING if config.SWEAR else "")
+    other = partner()
+    if not other:
+        text = (config.PERSONA + "\n\n" + config.RULES).replace("{name}", config.NAME).replace("{power}", config.POWER)
+    else:
+        a, b = config.NAME, other["NAME"]
+        text = (f"You voice two characters who share a small window in the corner of the player's screen: {a} and {b}.\n\n"
+                f"=== {a} ===\n" + config.PERSONA.replace("{name}", a) + f"\n\n=== {b} ===\n" + other["PERSONA"].replace("{name}", b)
+                + "\n\n" + config.RULES.replace("{name}", f"{a} or {b}").replace("{power}", f"{config.POWER} ({a}) or {other['POWER']} ({b})")
+                + "\n\n" + DUO_RULES.replace("{a}", a).replace("{b}", b))
+    return text + (SWEARING if config.SWEAR else "")
+
+
+def schema():
+    """The reply format: one line, or in duo mode a few turns between the two characters."""
+    other = partner()
+    if not other:
+        return SCHEMA
+    rest = {k: v for k, v in SCHEMA["properties"].items() if k not in ("line", "mood")}
+    turn = {"type": "object", "properties": {"speaker": {"type": "string", "enum": [config.NAME, other["NAME"]]},
+                                             "mood": SCHEMA["properties"]["mood"], "line": {"type": "string"}},
+            "required": ["speaker", "mood", "line"], "additionalProperties": False}
+    return {"type": "object", "properties": {"turns": {"type": "array", "items": turn}, **rest},
+            "required": ["turns"] + [k for k in SCHEMA["required"] if k in rest], "additionalProperties": False}
 
 
 def make_client():
@@ -91,13 +126,13 @@ def prompt(context, recent, situation, jpegs):
 
 def local_think(model, context, recent, situation, jpegs):
     """think() on a free vision model running on this PC through Ollama. Returns (reply, 0.0); raises if Ollama fails."""
-    body = {"model": model, "stream": False, "format": SCHEMA, "keep_alive": "15m", "options": {"num_predict": 400},
+    body = {"model": model, "stream": False, "format": schema(), "keep_alive": "15m", "options": {"num_predict": 500},
             "messages": [{"role": "system", "content": system()},
                          {"role": "user", "content": prompt(context, recent, situation, jpegs), "images": jpegs}]}
     req = urllib.request.Request(f"{OLLAMA}/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:  # the first call also loads the model onto the GPU
         out = json.loads(json.loads(r.read())["message"]["content"])
-    return {**QUIET_REPLY, **{k: v for k, v in out.items() if k in SCHEMA["properties"]}}, 0.0
+    return {**QUIET_REPLY, **{k: v for k, v in out.items() if k in schema()["properties"]}}, 0.0
 
 
 def start_ollama():
@@ -116,12 +151,12 @@ def think(client, model, context, recent, situation, jpegs, search=False):
     content.append({"type": "text", "text": text})
     tools = WEB_SEARCH if search and "haiku" not in model else None
     try:
-        out, spent = _ask(client, model, content, SCHEMA, tools)
+        out, spent = _ask(client, model, content, schema(), tools)
     except anthropic.BadRequestError:
         if not tools:
             raise
         logging.warning("web search unavailable, answering without it", exc_info=True)
-        out, spent = _ask(client, model, content, SCHEMA)
+        out, spent = _ask(client, model, content, schema())
     return out or QUIET_REPLY, spent
 
 

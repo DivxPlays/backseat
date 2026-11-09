@@ -578,6 +578,30 @@ with tempfile.TemporaryDirectory() as d:
     assert contexts["vorn"].count("\n- Fact number") < 45  # not all 500 in one message
     assert "M40A3" not in contexts["mika"]  # Mika has her own memory
 
+# duo mode: both on screen, one exchange per reaction, the right one talks, and the one you called answers first
+names = ["Vorn", "Mika"]
+assert main.turns_of({"turns": [{"speaker": "Mika", "mood": "smug", "line": "Mine."}, {"speaker": "Bob", "mood": "idle", "line": "x"},
+                                {"speaker": "Vorn", "mood": "angry", "line": " Weak. "}]}, names) == [("Mika", "smug", "Mine."), ("Vorn", "angry", "Weak.")]
+assert main.turns_of({"mood": "smug", "line": "Solo."}, names) == [("Vorn", "smug", "Solo.")]  # a refusal or a solo reply still works
+assert main.repeats("Mine, all mine.", ["You (Mika): Mine, all mine!"])
+saved_duo = (config.DUO, config.PRESET, config.NAME, config.CHARACTER)
+config.DUO, config.PRESET, config.NAME, config.CHARACTER = True, "vorn", "Vorn", "vorn"
+assert brain.partner()["NAME"] == "Mika" and "turns" in brain.schema()["properties"] and "line" not in brain.schema()["properties"]
+assert brain.schema()["properties"]["turns"]["items"]["properties"]["speaker"]["enum"] == ["Vorn", "Mika"]
+assert "=== Vorn ===" in brain.system() and "=== Mika ===" in brain.system() and "Duo mode" in brain.system()
+duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
+assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
+duo.show_line("angry", "Hands off my player.", None, "none", "Mika")
+assert duo.speaking == 1 and duo.text.startswith("Mika: ") and duo.chars[1].mood == "angry" and duo.chars[0].mood == "surprised"
+config.DUO, config.PRESET, config.NAME, config.CHARACTER = saved_duo
+assert brain.partner() is None or config.DUO
+heard_duo = []
+wl = WakeListener(None, None, lambda text, audio: heard_duo.append(text))
+wl.WAKE, wl.keep_name = WakeListener.pattern(["vorn", "mika"]), True
+wl.hear("Hey Mika, am I getting better?")
+wl.flush(force=True)
+assert heard_duo == ["Hey Mika, am I getting better?"], heard_duo
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

@@ -271,6 +271,7 @@ class WakeListener:
         self.ears, self.voice, self.on_heard, self.device = ears, voice, on_heard, device
         self.q = queue.Queue()
         self.pending, self.clips, self.last_end = None, [], 0.0  # the question being collected after "Hey Vorn"
+        self.keep_name = False  # duo mode: keep "Hey Mika" in the question, so the one you called answers first
         self.speaking = False  # someone is mid-sentence right now
 
     def active(self):
@@ -318,6 +319,8 @@ class WakeListener:
         m = self.WAKE.search(text)
         if m:
             rest = text[m.end():].strip()
+            if rest and self.keep_name:
+                rest = f"{m.group(0).strip(' ,.!?')}, {rest}"
             if not rest:
                 self.on_heard(None, None)  # just his name: he chimes and waits for the question
             self.pending, self.clips = rest, ([audio] if rest and audio is not None else [])

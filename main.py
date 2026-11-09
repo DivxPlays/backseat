@@ -41,13 +41,13 @@ import brain  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
 import transfer  # noqa: E402
-from camera import BACKGROUNDS, Camera  # noqa: E402
+from camera import BACKGROUNDS, REACT, Camera  # noqa: E402
 import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, make_character, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
-from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
+from senses import SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
 user32, kernel32 = ctypes.windll.user32, ctypes.windll.kernel32
@@ -82,10 +82,19 @@ BLOODFIRE = {"bloodfire": 8, "bloodfire-max": 25}  # seconds he burns: a big pla
 
 
 def repeats(line, recent):
-    """True if line is nearly word for word one of his last few lines."""
+    """True if line is nearly word for word one of their last few lines ("You: ..." or, in duo mode, "You (Mika): ...")."""
     words = re.findall(r"[a-z']+", line.lower())
-    return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said[5:].lower())).ratio() > 0.6
-               for said in recent[-8:] if said.startswith("You: "))
+    return any(difflib.SequenceMatcher(None, words, re.findall(r"[a-z']+", said.split(": ", 1)[-1].lower())).ratio() > 0.6
+               for said in recent[-8:] if said.startswith("You"))
+
+
+def turns_of(out, names):
+    """What to say, as [(speaker, mood, line)]: one line for a solo character, a short exchange in duo mode."""
+    if "turns" in out:
+        turns = [(t["speaker"], t.get("mood", "idle"), t["line"].strip()) for t in out["turns"]
+                 if t.get("speaker") in names and t.get("line", "").strip()]
+        return turns[:3] or [(names[0], "idle", "")]
+    return [(names[0], out.get("mood", "idle"), out.get("line", ""))]
 
 
 def bloodfire(streak, event, before, after):
@@ -112,7 +121,7 @@ ALREADY_A_SOUND = re.compile(r"^(hmph|heh|hah?|ugh|argh|what|huh|tch)\b", re.I)
 
 class Bridge(QObject):
     """Signals that carry events from background threads to the UI thread."""
-    say = Signal(str, str, object, str)  # mood, line, audio samples (or None), game event
+    say = Signal(str, str, object, str, str)  # mood, line, audio samples (or None), game event, who says it
     note = Signal(str)  # status text in the bubble, no voice
     chat = Signal()
     move = Signal()
@@ -156,7 +165,12 @@ class Overlay(QWidget):
         self.text, self.shown, self.cps, self.hide_at = "", 0.0, 40.0, 0.0
         self.moving, self.grab_at = False, QPoint()
         self.left = "left" in config.CORNER  # True = bubble on his right
-        self.resize(int(BUBBLE_W + CW * config.SCALE), int(CH * config.SCALE) + 26)  # + a strip under his feet for the cost tag
+        other = brain.partner()
+        self.chars = [self.char] + ([make_character(other["CHARACTER"])] if other else [])  # duo mode: both on screen
+        self.names = [config.NAME] + ([other["NAME"]] if other else [])
+        self.speaking = 0  # which of them is talking (their mouth follows the voice)
+        self.span = CW * config.SCALE * len(self.chars)  # how wide the characters are together
+        self.resize(int(BUBBLE_W + self.span), int(CH * config.SCALE) + 26)  # + a strip under their feet for the cost tag
         geo = QApplication.primaryScreen().availableGeometry()
         x, y = (geo.left() if self.left else geo.right() - self.width() + 1), geo.bottom() - self.height() + 1
         if saved_pos and QApplication.screenAt(QPoint(saved_pos[0] + self.width() // 2, saved_pos[1] + self.height() // 2)):
@@ -176,7 +190,7 @@ class Overlay(QWidget):
         if self.moving:
             return None
         s = config.SCALE
-        char_x = self.x() + (0 if self.left else BUBBLE_W) + CW * s / 2
+        char_x = self.x() + (0 if self.left else BUBBLE_W) + self.span / 2
         screen = (QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()).geometry()
         left = char_x < screen.center().x()  # bubble goes on the side with more room
         if left != self.left:
@@ -192,16 +206,24 @@ class Overlay(QWidget):
         if self.moving and e.buttons() & Qt.LeftButton:
             self.move(e.globalPosition().toPoint() - self.grab_at)
 
-    def show_line(self, mood, line, audio, event="none"):
-        self.char.set_mood(mood)
+    def show_line(self, mood, line, audio, event="none", who=""):
+        self.speaking = self.names.index(who) if who in self.names else 0
+        char = self.chars[self.speaking]
+        char.set_mood(mood)
+        for i, other in enumerate(self.chars):
+            if i != self.speaking:
+                other.set_mood(REACT.get(mood, "idle"))  # duo mode: the other one reacts to what's said
         if event in BLOODFIRE:
-            self.char.bloodfire(BLOODFIRE[event])
+            for c in self.chars:  # both power up
+                c.bloodfire(BLOODFIRE[event])
         elif event in ("win", "epic"):
-            self.char.flare()
+            char.flare()
         elif event == "menu":
-            self.char.roll()
+            char.roll()
         elif event == "loss":
-            self.char.slump()
+            char.slump()
+        if len(self.chars) > 1:
+            line = f"{who or self.names[0]}: {line}"  # who's talking, in the shared bubble
         if audio is not None:
             self.ducker.duck()
         dur = self.voice.play(audio) if audio is not None else 0.0
@@ -216,16 +238,19 @@ class Overlay(QWidget):
     def tick(self):
         now = time.monotonic()
         dt, self.last = min(0.1, now - self.last), now
-        self.char.afk = idle_seconds() > 60  # yawns and bored eyes while you're away
-        self.char.toward = 1.0 if self.left else -1.0  # the rest of your screen is on his bubble side
-        self.char.tier = tier_for(self.respect())  # his gear upgrades as you earn respect
-        self.char.step(dt, self.voice.level())
+        afk, level = idle_seconds() > 60, self.voice.level()
+        for i, char in enumerate(self.chars):
+            char.afk = afk  # yawns and bored eyes while you're away
+            char.toward = 1.0 if self.left else -1.0  # the rest of your screen is on the bubble side
+            char.tier = tier_for(self.respect())  # gear upgrades as you earn respect
+            char.step(dt, level if i == self.speaking else 0.0)  # only the one talking moves their mouth
         if self.ducker.saved and not self.voice.busy():
             self.ducker.restore()
         self.shown += dt * self.cps
         if self.text and now > self.hide_at:
             self.text = ""
-            self.char.set_mood("idle")
+            for char in self.chars:
+                char.set_mood("idle")
         self.update()
 
     def paintEvent(self, _):
@@ -238,11 +263,12 @@ class Overlay(QWidget):
             g.setPen(QColor("#f1e9df"))
             g.setFont(QFont("Segoe UI", 10, QFont.Bold))
             g.drawText(QRectF(12, 8, BUBBLE_W, 40), Qt.TextWordWrap, f"Drag me anywhere.\n{config.KEY_MOVE.upper()} to lock.")
-        g.save()
-        g.translate(0 if self.left else BUBBLE_W, 0)
-        g.scale(config.SCALE, config.SCALE)
-        self.char.paint(g)
-        g.restore()
+        for i, char in enumerate(self.chars):
+            g.save()
+            g.translate((0 if self.left else BUBBLE_W) + i * CW * config.SCALE, 0)
+            g.scale(config.SCALE, config.SCALE)
+            char.paint(g)
+            g.restore()
         self.cost_tag(g)
         if self.text:
             self.bubble(g)
@@ -254,7 +280,7 @@ class Overlay(QWidget):
         font = QFont("Segoe UI", 9, QFont.Bold)
         g.setFont(font)
         w = QFontMetrics(font).horizontalAdvance(text) + 18
-        center = (0 if self.left else BUBBLE_W) + CW * config.SCALE / 2
+        center = (0 if self.left else BUBBLE_W) + self.span / 2
         r = QRectF(center - w / 2, self.height() - 24, w, 20)
         g.setPen(QPen(QColor(232, 194, 122, 120), 1))
         g.setBrush(QColor(18, 14, 18, 200))
@@ -268,7 +294,7 @@ class Overlay(QWidget):
         r = QFontMetrics(font).boundingRect(0, 0, BUBBLE_W - 44, 1000, Qt.TextWordWrap, self.text)  # full text: no jumping
         bw, bh = r.width() + 28, r.height() + 20
         s = config.SCALE
-        x = CW * s + 14 if self.left else BUBBLE_W - bw - 14
+        x = self.span + 14 if self.left else BUBBLE_W - bw - 14
         y = max(4.0, HEAD_Y * s - bh / 2)
         tip_x, base_x = (x - 16, x + 2) if self.left else (x + bw + 16, x + bw - 2)
         shape = QPainterPath()
@@ -352,6 +378,12 @@ class Companion:
         self.local_down_until = 0.0  # after the local model fails, use Claude until then
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
+        self.partner = brain.partner()  # duo mode: the other character, on screen too
+        self.names = [config.NAME] + ([self.partner["NAME"]] if self.partner else [])
+        self.voices_of = {config.NAME: {"VOICE": config.VOICE, "VOICE_RATE": config.VOICE_RATE, "VOICE_PITCH": config.VOICE_PITCH,
+                                        "POWER": config.POWER}}
+        if self.partner:
+            self.voices_of[self.partner["NAME"]] = {k: self.partner[k] for k in ("VOICE", "VOICE_RATE", "VOICE_PITCH", "POWER")}
         if config.LOCAL_MODEL:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
 
@@ -373,6 +405,9 @@ class Companion:
             # (never on a missing device: the fallback would be your own mic, and he'd hear you twice)
             self.listeners.append(WakeListener(self.ears, self.voice, self.friend_heard, config.FRIENDS_DEVICE))
         for listener in self.listeners:
+            if self.partner:  # duo mode: answer to either name, and keep it so the one you called answers first
+                listener.WAKE = WakeListener.pattern(config.WAKE_NAMES + self.partner["WAKE_NAMES"])
+                listener.keep_name = True
             threading.Thread(target=listener.run, daemon=True).start()
         self.bridge.awake.emit()
         self.jobs.put(("start", None))
@@ -500,6 +535,9 @@ class Companion:
             situation += " " + BUDGET_NEWS[level]
         context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start,
                                    query=arg if kind in ("ask", "friend") else "")  # picks the facts relevant to what was said
+        if self.partner:  # duo mode: they also know what the other one remembers about you
+            context += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"],
+                                                       query=arg if kind in ("ask", "friend") else "")
         context += ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
                     if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
@@ -520,7 +558,9 @@ class Companion:
             out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
         logging.info("%s%s ($%.4f) -> %s", kind, " (local)" if spent == 0 and local else "", spent, out)
-        if kind in AUTO and (not out["line"].strip() or repeats(out["line"], self.recent)):
+        turns = turns_of(out, self.names)  # [(speaker, mood, line)]: one for a solo character, a short exchange in duo mode
+        text = " ".join(line for _, _, line in turns)
+        if kind in AUTO and (not text.strip() or repeats(text, self.recent)):
             return logging.info("nothing new to say: staying quiet")  # a stale moment must not be counted or spoken again
         before = self.mem.d["respect"]
         self.mem.record(app, out, friend=speaker)
@@ -530,24 +570,30 @@ class Companion:
         shame = None
         if out.get("save_moment") and shot and time.monotonic() - self.last_shame > 60:
             self.last_shame = time.monotonic()
-            shame = save_moment(shot[2], self.focus, out["line"], HALL)
+            shame = save_moment(shot[2], self.focus, turns[0][2], HALL)
         if out.get("event") == "loss" and kind != "breakdown" and not self.muted and time.monotonic() - self.last_breakdown > 180:
             self.last_breakdown = time.monotonic()
             self.jobs.put(("breakdown", None))
         self.mem.save()
         if self.muted and kind == "change":  # shut-up mode: he keeps score, he just keeps it to himself
             if shame:
-                self.hall_entry(shame, out["line"], title or app, self.synth(out["line"]))
+                self.hall_entry(shame, turns[0][2], title or app, self.synth(turns[0][2]))
             return
         if kind in ("ask", "friend"):
             said = f"Player: {arg}" if kind == "ask" else f"{(speaker or 'unknown').title()} (friend): {arg}"
             self.recent.append(said)
             self.mem.line(said)
-        self.recent = (self.recent + [f"You: {out['line']}"])[-12:]
-        self.mem.line(f"You: {out['line']}")
-        line, audio = self.speak(out.get("mood", "idle"), out["line"], event)
+        first = None
+        for i, (who, mood, line) in enumerate(turns):
+            said = f"You ({who}): {line}" if len(self.names) > 1 else f"You: {line}"
+            self.recent = (self.recent + [said])[-12:]
+            self.mem.line(said)
+            spoken, audio = self.speak(mood, line, event if i == 0 else "none", who)
+            first = first or (spoken, audio)
+            if i < len(turns) - 1 and audio is not None:
+                time.sleep(len(audio) / SR + 0.25)  # let them finish before the other one answers
         if shame:
-            self.hall_entry(shame, line, title or app, audio)
+            self.hall_entry(shame, first[0], title or app, first[1])
         self.condense_memory()
 
     def memory_command(self, said):
@@ -608,13 +654,19 @@ class Companion:
             logging.exception("voice failed; showing text only")
             return None
 
-    def speak(self, mood, line, event="none"):
+    def speak(self, mood, line, event="none", who=None):
+        """Say a line in the voice of `who` (a character's name; default the current one)."""
+        voice = self.voices_of.get(who) or {}
         if event in BLOODFIRE:
-            line = f"{config.POWER}! {line}"  # shouted as the character transforms
+            line = f"{voice.get('POWER', config.POWER)}! {line}"  # shouted as the character transforms
         elif random.random() < 0.4 and not ALREADY_A_SOUND.match(line):  # a scoff, laugh or grunt first
             line = f"{random.choice(SOUNDS.get(mood, ['Hmph.']))} {line}"
-        audio = self.synth(line)
-        self.bridge.say.emit(mood, line, audio, event)
+        try:
+            audio = self.voice.synth(line, voice.get("VOICE"), voice.get("VOICE_RATE"), voice.get("VOICE_PITCH"))
+        except Exception:
+            logging.exception("voice failed; showing text only")
+            audio = None
+        self.bridge.say.emit(mood, line, audio, event, who or config.NAME)
         return line, audio
 
     def watcher(self):
@@ -797,8 +849,13 @@ def main():
     for preset in presets():
         pick = characters.addAction(preset.title())
         pick.setCheckable(True)
-        pick.setChecked(preset == config.PRESET)
-        pick.triggered.connect(lambda _=False, p=preset: (set_setting("PRESET", p), restart()) if p != config.PRESET else None)
+        pick.setChecked(preset == config.PRESET and not config.DUO)
+        pick.triggered.connect(lambda _=False, p=preset: (set_setting("PRESET", p), set_setting("DUO", False), restart())
+                               if p != config.PRESET or config.DUO else None)
+    both = characters.addAction("Both (duo mode)")
+    both.setCheckable(True)
+    both.setChecked(config.DUO)
+    both.triggered.connect(lambda: (set_setting("DUO", True), restart()) if not config.DUO else None)
     camera = Camera(overlay, lambda: comp.focus)  # the Discord camera
     cam_menu = menu.addMenu("Discord camera")
     cam_picks = {}
@@ -822,14 +879,15 @@ def main():
             cam_picks[key, value].triggered.connect(lambda _=False, k=key, v=value: set_camera(k, v))
         cam_menu.addSeparator()
     camera.start()
-    if hasattr(overlay.char, "outfit"):  # characters with outfits (Mika): switch live
+    dresser = next((c for c in overlay.chars if hasattr(c, "outfit")), None)  # the character with outfits (Mika), solo or duo
+    if dresser:  # switch live
         from mika import OUTFITS
         outfits = menu.addMenu("Outfit")
         choices = {}
 
         def wear(name):
             set_setting("OUTFIT", name)
-            overlay.char.outfit = name if name in OUTFITS else random.choice(sorted(OUTFITS))  # "random": pick one now too
+            dresser.outfit = name if name in OUTFITS else random.choice(sorted(OUTFITS))  # "random": pick one now too
             for n, action in choices.items():
                 action.setChecked(n == name)
 

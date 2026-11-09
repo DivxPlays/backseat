@@ -46,7 +46,8 @@ class Camera:
         """Start sending frames (call on the Qt thread: the webcam has to be opened there)."""
         if self.running or config.CAMERA == "off":
             return
-        self.other = make_character("mika" if config.CHARACTER == "vorn" else "vorn") if config.CAMERA == "both" else None
+        duo = len(getattr(self.overlay, "chars", [])) > 1  # duo mode: both are already animated by the overlay
+        self.other = make_character("mika" if config.CHARACTER == "vorn" else "vorn") if config.CAMERA == "both" and not duo else None
         if config.CAMERA_BACKGROUND == "webcam":
             self.open_webcam()
         self.running = True
@@ -124,7 +125,11 @@ class Camera:
             g.fillRect(0, 0, CAM_W, CAM_H, grad)
         main = self.overlay.char
         scale = (CAM_H - 10) / H
-        if self.other:  # both: the talker on the left, the other on the right reacting
+        chars = getattr(self.overlay, "chars", [main])
+        if len(chars) > 1:  # duo mode: both, each moving their own mouth
+            self.draw_char(g, chars[1], CAM_W - 40 - W * scale, scale)
+            main_x = 40
+        elif self.other:  # both: the talker on the left, the other on the right reacting
             mood = REACT.get(main.mood, "idle")
             if self.other.mood != mood:
                 self.other.set_mood(mood)
@@ -149,7 +154,7 @@ class Camera:
             return
         font = QFont("Segoe UI", 22, QFont.DemiBold)
         g.setFont(font)
-        line = f"{config.NAME}: {text}"
+        line = text if len(getattr(self.overlay, "chars", [])) > 1 else f"{config.NAME}: {text}"  # duo text names the speaker
         r = QFontMetrics(font).boundingRect(0, 0, CAM_W - 160, 400, Qt.TextWordWrap, line)
         box = QRectF((CAM_W - r.width()) / 2 - 20, CAM_H - r.height() - 50, r.width() + 40, r.height() + 24)
         path = QPainterPath()

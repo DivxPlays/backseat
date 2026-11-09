@@ -48,6 +48,17 @@ def fresh_mind():
     return {"respect": 10, "lore": [], "notes": [], "pinned": [], "profile": "", "games": {}, "friends": {}, "sessions": [], "hall": []}
 
 
+def pick_pinned(pinned, query):
+    """The pinned facts for one message: all of them while there are few, otherwise the ones sharing words with
+    `query` (what was said, the game) plus the most recent, so any number can be stored without every call costing more."""
+    if len(pinned) <= SHOW_PINNED:
+        return pinned
+    words = set(re.findall(r"[a-z0-9']+", query.lower())) - STOP
+    hits = sorted(((len(words & set(re.findall(r"[a-z0-9']+", p.lower()))), i) for i, p in enumerate(pinned)), reverse=True)
+    pick = {i for n, i in hits[:SHOW_PINNED - 10] if n} | set(range(len(pinned) - 10, len(pinned)))
+    return [pinned[i] for i in sorted(pick)]
+
+
 def app_name(exe, title):
     return Path(exe).name.lower() if exe else (title or "unknown")
 
@@ -213,16 +224,19 @@ class Memory:
             tmp.write_text(json.dumps(self.d, indent=1), encoding="utf-8")
             os.replace(tmp, self.path)  # atomic: a crash mid-save can't wipe your history
 
+    def partner_context(self, preset, name, query=""):
+        """Duo mode: what the other character remembers about the player (theirs to read, not to change)."""
+        with self.lock:
+            mind = {**fresh_mind(), **self.d.get("characters", {}).get(preset, {})}
+        pinned = pick_pinned(mind["pinned"], query)
+        lines = [f"What {name} remembers about the player:"]
+        if mind["profile"]:
+            lines.append(f"- Long-term picture: {mind['profile']}")
+        lines += [f"- Always remember: {p}" for p in pinned] + [f"- {n}" for n in mind["notes"][-10:]]
+        return "\n".join(lines) if len(lines) > 1 else f"{name} doesn't know much about the player yet."
+
     def relevant_pinned(self, query):
-        """The pinned facts for one message: all of them while there are few, otherwise the ones sharing words with
-        `query` (what was said, the game) plus the most recent, so any number can be stored without every call costing more."""
-        pinned = self.d["pinned"]
-        if len(pinned) <= SHOW_PINNED:
-            return pinned
-        words = set(re.findall(r"[a-z0-9']+", query.lower())) - STOP
-        hits = sorted(((len(words & set(re.findall(r"[a-z0-9']+", p.lower()))), i) for i, p in enumerate(pinned)), reverse=True)
-        pick = {i for n, i in hits[:SHOW_PINNED - 10] if n} | set(range(len(pinned) - 10, len(pinned)))
-        return [pinned[i] for i in sorted(pick)]
+        return pick_pinned(self.d["pinned"], query)
 
     def context(self, app, title, steam, streak, query=""):
         with self.lock:

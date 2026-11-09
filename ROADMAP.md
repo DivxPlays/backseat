@@ -3,7 +3,6 @@
 ## Planned for 2.0.0
 
 ### Characters
-- **Duo mode:** Vorn and Mika on screen together, arguing about your gameplay: Mika defends you, Vorn roasts you, and they snipe at each other.
 - **Character creator:** make your own character in Settings (name, personality, voice, hair, eye and outfit colours) without touching code.
 - **Jealousy across characters:** switch from Mika to Vorn and back and she knows ("You were with *him*?"); Vorn mocks you for hiding behind the girl.
 - **Unlockable outfits and armour:** new outfits for Mika and armour for Vorn, earned through hours played, wins and challenges.
@@ -37,6 +36,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Duo mode: Vorn and Mika side by side, each reaction a 2-3 line exchange in their own voices, lip-synced, on the overlay and the Discord camera.
 - Discord camera: the current character or both as "OBS Virtual Camera", lip-synced with subtitles; backgrounds dark, green, game screen or real webcam. (Both talking to each other comes with duo mode.)
 - Mika (1.2.0): original yandere gamer girl, four outfits, Lovesick power-up, Alpha voice; characters as presets (1.1.0); About and version number (1.0.0).
 - Local Kokoro voices (Michael for Vorn), snappier and fresher automatic comments, questions no longer cut off by pauses.
