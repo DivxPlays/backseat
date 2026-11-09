@@ -601,6 +601,8 @@ assert "=== Vorn ===" in brain.system() and "=== Mika ===" in brain.system() and
 # a story belongs to whoever told it; the one you called answers alone; nobody's past leaks into the other's
 assert "lore" not in brain.schema()["properties"] and "lore" in brain.schema()["properties"]["turns"]["items"]["required"]
 assert "conquests" not in main.SITUATIONS["lore"]  # Vorn's word, and every character tells stories
+comeback = main.COMEBACK_SAYS.format(a="Mika", line="I stole a {controller}.")  # the other one fires back, keeping to their own past
+assert '"I stole a {controller}."' in comeback and "never tell Mika's stories" in comeback and 0 < main.COMEBACK < 1
 wake_of = {"Vorn": VORN_NAMES, "Mika": brain.partner()["WAKE_NAMES"]}
 assert main.addressed("Hey Mika, how was your day?", wake_of) == "Mika"
 assert main.addressed("hey vern, ask mika what she thinks", wake_of) == "Vorn"  # the first one called

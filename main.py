@@ -69,7 +69,8 @@ SITUATIONS = {
               "else you see, or return an empty line to stay quiet.",
     "quiet": "You've been quiet a while. Look at the screen and trash-talk the player in one short sentence (under 15 words): "
              "their play, their hours, or their idling. Don't repeat a point from your recent lines.",
-    "lore": "You've been quiet a while. Tell a very short story from your own past (stay consistent with it), "
+    "lore": "You've been quiet a while. Tell a new, very short story from your own past: one not in your listed past (it "
+            "must fit with it, never retell it), "
             "then turn it into a jab at the player. Under 25 words.",
     "look": "The player pressed the look hotkey. Comment on what they're looking at, or give a hint about it.",
     "nag": "It's late, or the player has gone a long time without a break (see the local time and break time in the stats). "
@@ -78,6 +79,10 @@ SITUATIONS = {
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
 }
 AUTO = {"change", "quiet", "lore", "nag", "breakdown"}  # jobs he starts himself; they stop when the budget runs out
+COMEBACK = 0.6  # duo mode, local model: how often the other one fires back at a comment
+COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
+                 "words), in your own style: roast what {a} said, or take the player's side against {a}. Your past is your "
+                 "own: never tell {a}'s stories or claim {a}'s deeds as yours.")
 BLOODFIRE = {"bloodfire": 8, "bloodfire-max": 25}  # seconds he burns: a big play, or reaching 100 respect
 
 
@@ -551,13 +556,7 @@ class Companion:
         # it tells the other's stories). shortcut: if it fails, Claude's fallback reply also misses the other's past (rare)
         alone = random.choice([brain.me(), self.partner]) if local and self.partner else None
         query = arg if kind in ("ask", "friend") else ""  # picks the facts relevant to what was said
-        context = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start, query=query,
-                                   stories=alone is None or alone["NAME"] == config.NAME)
-        if self.partner:  # duo mode: they also know what the other one remembers about you
-            context += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"], query=query,
-                                                       stories=alone is None or alone is self.partner)
-        context += ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
-                    if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
+        context = self.knowledge(app, title, exe, query, alone)
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
         model = config.SMART_MODEL if smart else config.MODEL
         search = smart and kind == "ask" and bool(SEARCH_ASKED.search(arg))  # having the tool costs ~2 cents even unused
@@ -570,6 +569,13 @@ class Companion:
                 # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
                 # (it reads your memory, it doesn't write it); Claude does those
                 out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="")
+                said = out["turns"][0] if alone else None
+                if said and said["line"].strip() and random.random() < COMEBACK:  # duo mode: the other one fires back
+                    other = brain.me() if alone is self.partner else self.partner  # from their own head: own past only
+                    back, _ = brain.local_think(config.LOCAL_MODEL, self.knowledge(app, title, exe, query, other),
+                                                self.recent[-3:] + [f"{said['speaker']}: {said['line']}"],
+                                                COMEBACK_SAYS.format(a=said["speaker"], line=said["line"]), jpegs, only=other)
+                    out["turns"] += back["turns"]
             except Exception:
                 logging.warning("local model failed; using Claude for the next 5 minutes", exc_info=True)
                 self.local_down_until = time.monotonic() + 300
@@ -619,6 +625,16 @@ class Companion:
         if shame:
             self.hall_entry(shame, first[0], title or app, first[1])
         self.condense_memory()
+
+    def knowledge(self, app, title, exe, query="", alone=None):
+        """What they know right now; `alone` (a preset: duo mode, local model) shows only that character's own past."""
+        text = self.mem.context(app, title, steam_hours(exe), time.monotonic() - self.streak_start, query=query,
+                                stories=alone is None or alone["NAME"] == config.NAME)
+        if self.partner:  # duo mode: they also know what the other one remembers about you
+            text += "\n" + self.mem.partner_context(self.partner["PRESET"], self.partner["NAME"], query=query,
+                                                    stories=alone is None or alone is self.partner)
+        return text + ("\n(You are visible in a corner of the screenshots, with your speech bubble. Ignore yourself.)"
+                       if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
 
     def memory_command(self, said):
         """ "Remember that ..." pins a fact for good, "forget ..." removes it; returns a note for the reply."""
