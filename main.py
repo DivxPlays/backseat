@@ -38,6 +38,7 @@ from PySide6.QtWidgets import QApplication, QLineEdit, QMenu, QSystemTrayIcon, Q
 import brain  # noqa: E402
 import config  # noqa: E402
 import highlights  # noqa: E402
+from costs_ui import CostsWindow  # noqa: E402
 from character import H as CH, W as CW, Vorn, tier_for  # noqa: E402
 from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
 from senses import Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, save_clip, save_moment  # noqa: E402
@@ -112,11 +113,11 @@ def set_autostart(on):
 
 
 class Overlay(QWidget):
-    def __init__(self, voice, saved_pos, respect):
+    def __init__(self, voice, saved_pos, respect, spent):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.char, self.voice, self.respect, self.ducker = Vorn(), voice, respect, Ducker()
+        self.char, self.voice, self.respect, self.spent, self.ducker = Vorn(), voice, respect, spent, Ducker()
         self.text, self.shown, self.cps, self.hide_at = "", 0.0, 40.0, 0.0
         self.moving, self.grab_at = False, QPoint()
         self.left = "left" in config.CORNER  # True = bubble on his right
@@ -201,9 +202,24 @@ class Overlay(QWidget):
         g.scale(config.SCALE, config.SCALE)
         self.char.paint(g)
         g.restore()
+        self.cost_tag(g)
         if self.text:
             self.bubble(g)
         g.end()
+
+    def cost_tag(self, g):
+        """This month's API spend, always shown under him."""
+        text = f"${self.spent():.2f}" + (f" / ${config.MONTHLY_BUDGET}" if config.MONTHLY_BUDGET else "")
+        font = QFont("Segoe UI", 9, QFont.Bold)
+        g.setFont(font)
+        w = QFontMetrics(font).horizontalAdvance(text) + 18
+        center = (0 if self.left else BUBBLE_W) + CW * config.SCALE / 2
+        r = QRectF(center - w / 2, self.height() - 24, w, 20)
+        g.setPen(QPen(QColor(232, 194, 122, 120), 1))
+        g.setBrush(QColor(18, 14, 18, 200))
+        g.drawRoundedRect(r, 10, 10)
+        g.setPen(QColor("#e8c27a"))
+        g.drawText(r, Qt.AlignCenter, text)
 
     def bubble(self, g):
         font = QFont("Segoe UI", 11, QFont.DemiBold)
@@ -389,7 +405,7 @@ class Companion:
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
         model = config.SMART_MODEL if smart else config.MODEL
         out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=smart and kind != "breakdown")
-        self.mem.spend(spent)
+        self.mem.spend(spent, kind)
         logging.info("%s ($%.4f) -> %s", kind, spent, out)
         tier = tier_for(self.mem.d["respect"])
         self.mem.record(app, out)
@@ -430,7 +446,7 @@ class Companion:
         if not prev:
             return
         text, spent = brain.report(self.client, config.MODEL, Memory.report_input(prev))
-        self.mem.spend(spent)
+        self.mem.spend(spent, "report")
         with self.mem.lock:
             prev["report"] = text
         self.mem.save()
@@ -523,7 +539,7 @@ def main():
     update_skips()
     app.screenAdded.connect(update_skips)
     app.screenRemoved.connect(update_skips)
-    overlay = Overlay(comp.voice, comp.mem.d.get("overlay_pos"), lambda: comp.mem.d["respect"])
+    overlay = Overlay(comp.voice, comp.mem.d.get("overlay_pos"), lambda: comp.mem.d["respect"], comp.mem.spent)
     set_clickthrough(overlay, True)  # also creates his window, even while he's hidden waiting for a game
 
     def set_stream(on):  # off = WDA_EXCLUDEFROMCAPTURE: hidden from OBS, recordings and his own screenshots
@@ -557,6 +573,13 @@ def main():
         os.startfile(page)
 
     settings = SettingsWindow(restart, comp.voice)
+    windows = {}
+
+    def open_costs():
+        windows["costs"] = CostsWindow(comp.mem)  # built fresh each time, so the numbers are current
+        windows["costs"].show()
+        windows["costs"].raise_()
+        windows["costs"].activateWindow()
     bridge.say.connect(overlay.show_line)
     bridge.note.connect(overlay.note)
     bridge.chat.connect(lambda: comp.awake and chat.popup(overlay))
@@ -566,7 +589,7 @@ def main():
     tray = QSystemTrayIcon(QIcon(QPixmap.fromImage(overlay.char.render(0.3))), app)
     menu = QMenu()
     spend = menu.addAction("")
-    spend.setEnabled(False)
+    spend.triggered.connect(open_costs)
     wake = menu.addAction("Wake up now")
     wake.setVisible(waiting)
     wake.triggered.connect(lambda: (comp.wake_up(), wake.setVisible(False)))
@@ -591,7 +614,7 @@ def main():
     boot.toggled.connect(set_autostart)
     menu.addAction("Quit").triggered.connect(app.quit)
     menu.aboutToShow.connect(lambda: spend.setText(
-        f"Spent this month: ${comp.mem.spent():.2f}" + (f" of ${config.MONTHLY_BUDGET}" if config.MONTHLY_BUDGET else "")))
+        f"Costs: ${comp.mem.spent():.2f}" + (f" of ${config.MONTHLY_BUDGET}" if config.MONTHLY_BUDGET else "") + " this month..."))
     tray.setContextMenu(menu)
     tray.setToolTip(f"{config.NAME}" + (" (waiting for a game)" if waiting else "")
                     + f": hold {config.KEY_TALK.upper()} or say \"Hey {config.NAME}\" to talk, {config.KEY_TYPE.upper()} type, "

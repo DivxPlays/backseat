@@ -55,7 +55,7 @@ class Memory:
             self.d = {}
         for key, empty in (("total_seconds", 0), ("session_count", 0), ("apps", {}), ("games", {}), ("notes", []),
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
-                           ("spend_level", {}), ("hall", [])):
+                           ("spend_days", {}), ("spend_level", {}), ("hall", [])):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         self.session = {"start": datetime.now().isoformat(timespec="minutes"), "seconds": 0, "apps": {}, "events": {}, "lines": []}
@@ -99,12 +99,21 @@ class Memory:
                 self.d["lore"] = (self.d["lore"] + [lore])[-MAX_NOTES:]
         self.remember(out.get("remember", ""))
 
-    def spend(self, dollars):
+    def spend(self, dollars, kind="other"):
         with self.lock:
             self.d["spend"][month()] = self.d["spend"].get(month(), 0.0) + dollars
+            day = self.d["spend_days"].setdefault(date.today().isoformat(), {})
+            day[kind] = day.get(kind, 0.0) + dollars
+            for old in sorted(self.d["spend_days"])[:-62]:  # this month and last
+                del self.d["spend_days"][old]
 
     def spent(self):
         return self.d["spend"].get(month(), 0.0)
+
+    def month_costs(self):
+        """(this month's total, {day of the month: {kind of call: dollars}}) for the Costs window."""
+        with self.lock:
+            return self.spent(), {int(k[8:]): dict(v) for k, v in self.d["spend_days"].items() if k.startswith(month())}
 
     def budget_level(self):
         """0 = fine, 1 = cheap mode (80% of the budget used), 2 = budget used up. Only counts up within a month."""

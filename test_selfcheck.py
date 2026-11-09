@@ -87,7 +87,7 @@ import main  # noqa: E402
 from senses import CUES, Voice  # noqa: E402
 
 sys.excepthook = sys.__excepthook__  # main.py shows a crash dialog; a test should just fail
-o = main.Overlay(Voice(), None, lambda: 10)
+o = main.Overlay(Voice(), None, lambda: 10, lambda: 4.83)
 o.show_line("smug", "Subtitle test, grunt.", None)
 QTest.qWait(300)
 assert o.timer.isActive() and o.shown > 0, "overlay animation loop is not running"
@@ -150,6 +150,19 @@ with tempfile.TemporaryDirectory() as d:
     assert m.budget_level() == (1, True) and m.budget_level() == (1, False)  # cheap mode, announced only once
     m.spend(2.0)
     assert m.budget_level() == (2, True) and "$10.50 of their $10 budget" in m.context("g.exe", "G", None, 0)
+    # Costs window: per day and per kind of call
+    m.spend(0.05, "ask")
+    m.spend(0.01, "change")
+    total, days = m.month_costs()
+    from datetime import date  # noqa: E402
+
+    from costs_ui import CostsWindow, summary  # noqa: E402
+    today_cost, estimate, groups = summary(total, days, date.today())
+    assert abs(total - 10.56) < 1e-9 and abs(today_cost - 10.56) < 1e-9 and estimate >= total
+    assert dict(groups)["Talking to him"] == 0.05 and groups[0] == ("Other", 10.5), groups
+    t, e, g = summary(1.0, {}, date(2026, 11, 10))  # spend from before daily tracking still shows up
+    assert g == [("Before daily tracking", 1.0)] and abs(e - 21.0) < 1e-9, (e, g)  # $1 a day, 20 days left in November
+    CostsWindow(m)
     config.MONTHLY_BUDGET = budget
     # grudges, lore, Hall of Shame list
     m.record("g.exe", {"event": "death", "killer": "Ferris Wheel Dogs"})

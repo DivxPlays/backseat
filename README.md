@@ -21,7 +21,7 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 | F7 | pause / resume watching (falling chime = stopped, rising = watching). Use it before opening anything private |
 | F4 | shut-up mode: he keeps watching and keeping score, but only talks when you talk to him |
 | F6 | unlock him, drag him anywhere on any display, then F6 again to lock. He remembers the spot |
-| tray icon | right-click to see this month's spend, move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, open Settings, turn on Start with Windows, or quit |
+| tray icon | right-click for this month's cost (click it for the Costs window), move/lock, pause, shut up, show him on stream, open the Hall of Shame, this week's highlights or battle reports, open Settings, turn on Start with Windows, or quit |
 
 ## How it behaves
 
@@ -45,7 +45,7 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 - **Lore:** during quiet moments he sometimes tells a story from his conquests. He remembers what he's told you and keeps it consistent.
 - **Voice clips:** every Hall of Shame screenshot gets a WAV of his roast next to it.
 - **Weekly highlights:** tray > Open this week's highlights builds a page with the week's Hall of Shame, captions, playable voice clips and your stats.
-- **Spending tracker:** he estimates the cost of every call and keeps a monthly total (shown in the tray menu). At 80% of `MONTHLY_BUDGET` he switches to cheap mode (Haiku only, no web search, no breakdowns); at 100% he only talks when you talk to him. He tells you when either happens. These are estimates from token counts; the Anthropic Console is the real bill.
+- **Spending tracker:** he estimates the cost of every call and keeps a monthly total, always shown in a small tag under him. Click the cost line at the top of the tray menu for the **Costs window**: this month against your budget, today, a bar per day, a month-end estimate, and what it went to (talking to him, automatic comments, breakdowns, battle reports). At 80% of `MONTHLY_BUDGET` he switches to cheap mode (Haiku only, no web search, no breakdowns); at 100% he only talks when you talk to him. He tells you when either happens. These are estimates from token counts; the Anthropic Console is the real bill.
 - **Start with Windows:** tray > Start with Windows. He starts hidden at login and wakes up when a Steam game (or one listed in `GAMES`) comes to the front. Until then he doesn't watch, listen or track anything. Tray > Wake up now skips the wait.
 - **Volume ducking:** while he talks, every other app drops to 35% of its volume (`DUCK_TO`), then goes back. If he ever crashes mid-sentence, raise them again in the Windows Volume Mixer.
 - **Only one Vorn at a time:** starting a second copy just tells you he's already running, so you can't double your bill by accident.
