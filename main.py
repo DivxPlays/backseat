@@ -70,7 +70,7 @@ from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
 from memory import (SHAME, Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen,  # noqa: E402
-                    gpu_load, idle_seconds, is_game, steam_app, steam_hours, week as memory_week)
+                    gpu_load, idle_seconds, is_game, milestone, steam_app, steam_hours, week as memory_week)
 from senses import (SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, new_clip,  # noqa: E402
                     save_clip, save_moment, videos_folder)
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
@@ -1437,6 +1437,12 @@ class Companion:
                 said = [s for x in self.mem.d["sessions"][-3:] for s in x.get("lines", [])][-60:]
             hour = kind == "nag" or (random.random() < 0.25 and not any(TIME_TALK.search(s) for s in said[-8:] if s.startswith("You")))
             situation += stale_note(said, set(re.findall(r"[a-z']{5,}", f"{title} {app} {' '.join(self.names)}".lower())), hour)
+        celebrate = None
+        if kind in ("start", "quiet", "change") and not (self.muted and kind != "start"):  # a milestone: at the next greeting
+            with self.mem.lock:  # or comment; marked once it's been said
+                celebrate = milestone(self.mem.d, datetime.now().date())
+            if celebrate:
+                situation += f" (Before anything else: {celebrate[1]})"
         if crossed:
             situation += " " + BUDGET_NEWS[level]
         # smarter free mode: the local model only talks, so every CHECK_EVERY minutes Claude (Haiku) takes the comment and
@@ -1553,6 +1559,11 @@ class Companion:
             first = first or (spoken, audio)
             if i < len(turns) - 1 and audio is not None:
                 self.wait_spoken(audio)  # let them finish before the other one answers
+        if celebrate and first:
+            with self.mem.lock:
+                self.mem.d["milestones"] = self.mem.d.get("milestones", []) + celebrate[0]
+            self.mem.save()
+            logging.info("milestone celebrated: %s", ", ".join(celebrate[0]))
         if shame and first:
             self.hall_entry(shame, first[0], title or app, first[1])
         self.condense_memory()

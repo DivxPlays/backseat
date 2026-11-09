@@ -126,6 +126,7 @@ These are handled on your PC, instantly and without an API call, and confirmed i
 - **Bloodfire:** his power-up form. His black hair ignites into dark-red flame, his eyes burn white, his armor cracks with molten light and a crimson aura surrounds him. He roars "Bloodfire!" and transforms for about 8 seconds when you pull off an epic play or win twice in a row, and for about 25 seconds when your respect reaches 100. (Not during shut-up mode: he keeps quiet then.)
 - **Evolving look:** his gear upgrades as your respect grows: polished armor and gold trim at 25, white fur and a gold-trimmed cape and tabard at 50, a war-crown and a golden glow at 75. His aura flares when he levels up.
 - **Moods by time of day:** grumpy in the morning, tactical in the afternoon, hyped in the evening, unhinged after 11 PM, extra smug on weekends.
+- **Milestones:** 10, 50, 100, 250, 500 and 1,000 hours together, a month since you met, and every year since. They celebrate each one once, at the next greeting or comment (a year on the day you met, or the first time you play after it).
 - **Lore:** during quiet moments he sometimes tells a story from his conquests. He remembers what he's told you and keeps it consistent.
 - **Voice clips:** every Hall of Shame screenshot gets a WAV of his roast next to it.
 - **Weekly highlights:** tray > Open this week's highlights builds a page with the week's Hall of Shame, captions, playable voice clips and your stats.

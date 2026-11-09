@@ -23,7 +23,6 @@ GitHub issues land in Planned with their number. No issues yet (checked 2026-11-
 
 ### Characters
 - **Pick any duo partner:** pair any two characters, created ones included (today a created character pairs only with Vorn).
-- **Milestones:** 50/100/500 hours together, a month since you met, a first-launch anniversary, each celebrated.
 - **More holidays:** Lunar New Year, Valentine's outfits, St. Patrick's, Easter, Thanksgiving.
 - **Power-up colours** for created characters, and their **own outfit choice** instead of sharing Vorn's or Mika's.
 
@@ -51,6 +50,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.1.0 (in progress):
+- Milestones: 10 to 1,000 hours together, a month since you met and each year since, celebrated once at the next greeting or comment.
 - "Clip that!": said in a game (no wake word; friends too), the moment goes in the Hall of Shame with their verdict and the clip is saved.
 - Clips through Medal when it's running (its key and folder): Medal is needed for split audio (the game and Discord on their own tracks).
 - Report a problem: tray > Report a problem... opens a GitHub issue filled in with the version, Windows and the last error (names, paths and keys taken out).

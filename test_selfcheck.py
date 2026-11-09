@@ -47,6 +47,7 @@ with tempfile.TemporaryDirectory() as d:
     m.save()
     m2 = Memory(f)
     assert m2.d["apps"]["game.exe"] == 7200 and m2.d["session_count"] == 2 and len(m2.d["sessions"]) == 2
+    assert m2.d["met"] == min(m2.d["days"]) and m2.d["milestones"] == []  # milestones count from the first day
     assert len(m2.d["notes"]) == 40 and m2.d["notes"][-1].endswith(": note 49")
     m2.record("game.exe", {"event": "death", "respect": "down", "game_note": "stuck on the bridge", "remember": "likes snipers"})
     m2.record("game.exe", {"event": "death", "respect": "down", "game_note": "stuck on the bridge", "remember": ""})
@@ -1885,6 +1886,23 @@ long_url = main.report_url(long_crash)
 assert len(long_url) < 8000 and "ValueError: last" in urllib.parse.unquote_plus(long_url) and "boom" in urllib.parse.unquote_plus(long_url)
 assert main.last_error("2026-11-08 18:50:00,749 INFO fine\n") == "" and "No errors" in urllib.parse.unquote_plus(main.report_url(""))
 assert main.last_error("2026-11-08 18:50:00,749 WARNING local model failed\nTraceback (most recent call last):\nOSError: x\n")
+
+# milestones: hours together (the biggest new one), a month since you met, each year since; each celebrated once
+from datetime import date  # noqa: E402
+
+from memory import milestone  # noqa: E402
+
+md = {"total_seconds": 3 * 3600, "met": "2026-11-01", "milestones": []}
+assert milestone(md, date(2026, 11, 9)) is None
+md["total_seconds"] = 120 * 3600
+keys, said = milestone(md, date(2026, 11, 9))
+assert keys == ["10 h", "50 h", "100 h"] and "100 hours" in said  # one party, not three
+md["milestones"] += keys
+assert milestone(md, date(2026, 11, 30)) is None and milestone(md, date(2026, 12, 1))[0] == ["a month"]
+md["milestones"].append("a month")
+assert milestone(md, date(2027, 10, 31)) is None and "a year" in milestone(md, date(2027, 11, 1))[1]
+assert milestone(md, date(2027, 12, 25))[0] == ["year 1"]  # missed the day: the next time you play
+assert milestone({"total_seconds": 0, "met": "2024-02-29"}, date(2025, 3, 1))[0] == ["year 1"]  # a leap-day start
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

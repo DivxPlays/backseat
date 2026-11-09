@@ -16,6 +16,9 @@ version's entry is also its release notes on GitHub.
 - **Clips through Medal, with split audio.** With Medal running, clips use Medal's own clip key and clips folder instead
   of Game Bar's. **For clips with split audio (the game and your Discord call on their own tracks), you need Medal**, with
   its audio split by app: Game Bar and NVIDIA Instant Replay don't split it, and Game Bar records the game's sound only.
+- **Milestones.** 10, 50, 100, 250, 500 and 1,000 hours together, a month since you met, and every year since: they
+  celebrate it at the next greeting or comment, once. Updating from 2.0, the day you met is the first day they still
+  have in memory.
 - **Report a problem.** Tray > Report a problem... opens a new issue on GitHub in your browser, already filled in with
   your version, your Windows version and the last error in companion.log, with names, paths, keys, emails and Steam IDs
   taken out. Nothing is sent until you read it and press Submit (you need a GitHub account).

@@ -46,6 +46,29 @@ def month():
 MINE = ("respect", "lore", "notes", "pinned", "profile", "games", "friends", "sessions", "hall", "unlocked", "talks", "held")  # per character; time and spend are shared
 
 
+HOURS = (10, 50, 100, 250, 500, 1000)  # milestones: hours together
+
+
+def milestone(d, today):
+    """(keys, what to tell them) for a milestone reached and not celebrated yet, or None: hours together (only the biggest
+    new one: 300 hours on an update is one party, not four), a month since you met, and each year since (on the day, or
+    the first time you play after it)."""
+    done, met = set(d.get("milestones", [])), date.fromisoformat(d.get("met") or today.isoformat())
+    hours = [h for h in HOURS if d.get("total_seconds", 0) >= h * 3600 and f"{h} h" not in done]
+    if hours:
+        return ([f"{h} h" for h in hours], f"A milestone: you and the player just passed {hours[-1]:,} hours together "
+                "(all your time watching them). Celebrate it in character, in a sentence or two: proud, mocking or both, "
+                "with something from what you know about them.")
+    years = today.year - met.year - ((today.month, today.day) < (met.month, met.day))
+    if years >= 1 and f"year {years}" not in done:
+        return ([f"year {years}"], f"An anniversary: you and the player met {'a year' if years == 1 else f'{years} years'} "
+                f"ago ({met:%B} {met.day}, {met.year}). Celebrate it in character, in a sentence or two, with a memory of them.")
+    if (today - met).days >= 30 and "a month" not in done:
+        return (["a month"], f"A milestone: it's been a month since you and the player met ({met:%B} {met.day}). Mark it in "
+                "character, in a sentence or two, with something you've learned about them.")
+    return None
+
+
 def fresh_mind():
     """What a character remembers before meeting you."""
     return {"respect": 10, "lore": [], "notes": [], "pinned": [], "profile": "", "games": {}, "friends": {}, "sessions": [], "hall": [],
@@ -96,6 +119,9 @@ class Memory:
                            ("last_with", {}), ("music", {}), ("songs", {}),
                            ("game_profiles", {})):
             self.d.setdefault(key, empty)
+        self.d.setdefault("met", min(self.d["days"], default=date.today().isoformat()))  # (milestones; before 2.1.0: the
+        # first day still kept)
+        self.d.setdefault("milestones", [])
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
         if active != config.PRESET:
