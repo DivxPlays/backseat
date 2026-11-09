@@ -61,6 +61,9 @@ def strip(imgs):
     return np.concatenate([thumbnail(img) for img in imgs], axis=1) if imgs else np.zeros((36, 0), np.float32)
 
 
+OTHER_EDGE = 768  # displays without the game: about a quarter of the image cost, still readable enough to mock
+
+
 class Eyes:
     def __init__(self):
         self.skip = set()  # top-left corners of displays to ignore; main.py fills this from SKIP_DISPLAYS
@@ -79,13 +82,16 @@ class Eyes:
     def thumb(self):
         return strip([img for _, img in self.grab()])
 
-    def look(self):
-        """(thumbnail strip for change detection, one JPEG base64 per display for Claude, the raw (display, image) pairs)."""
+    def look(self, point=None):
+        """(thumbnail strip for change detection, one JPEG base64 per display for Claude, the raw (display, image) pairs).
+        The display with point on it (the game) is sent sharp; the others smaller, which is cheaper and still enough to roast."""
         pairs, jpegs = self.grab(), []
         imgs = [img for _, img in pairs]
-        for img in imgs:
+        focus = game_display(pairs, point) if point else None
+        for i, img in enumerate(imgs):
             small = img.copy()
-            small.thumbnail((1568, 1568))  # Claude's max useful edge; keeps HUD text readable on ultrawides
+            edge = 1568 if focus in (None, i) else OTHER_EDGE  # 1568: Claude's max useful edge; keeps HUD text readable on ultrawides
+            small.thumbnail((edge, edge))
             buf = io.BytesIO()
             small.save(buf, "JPEG", quality=70)
             jpegs.append(base64.standard_b64encode(buf.getvalue()).decode())

@@ -35,7 +35,7 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 - **Respect meter (0-100):** goes up when you play well and down when you embarrass yourself. Low respect means pure contempt; high respect means grudging, still-arrogant praise. It moves slowly.
 - **Hall of Shame:** truly hilarious fails and genuinely epic plays get saved as screenshots with his caption in the `Hall of Shame` folder (at most one a minute).
 - **Battle reports:** when you start him, he writes a short roast of your previous session, reads it out, and adds it to `battle reports.txt`.
-- **Hints:** when you ask about something specific (a boss, puzzle, item), he can search the web for guides first. Web search costs about 1 cent per search on top of the question.
+- **Hints:** he answers from what he knows. To make him search the web for guides first, say "look it up" (or search, google, wiki, guide, walkthrough) in your question. Searching adds about 3-4 cents to that question, so he only does it when you ask.
 - **Nags:** after 90 minutes without a 5-minute break, or between 1 and 6 AM, he tells you to take a break or go to bed (at most every 45 minutes).
 - **Wake word:** the mic stays on and listens for "Hey Vorn". Everything is transcribed on your PC; nothing is sent anywhere until he hears his name. If game sound or music keeps setting him off, raise `WAKE_LEVEL` or set `WAKE_WORD = False`.
 - **Post-match breakdowns:** after a loss, he goes over the last minute of screenshots and tells you what went wrong (at most every 3 minutes; uses the smart model, so roughly what a question costs).
@@ -55,12 +55,12 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 
 ## Cost
 
-Each look sends a screenshot of every display he watches. Two models split the work (pick them in Settings). The costs below were measured from real calls with two displays:
+Each look sends a screenshot of every display he watches: the display with your game sharp, the others smaller (cheaper, still enough to roast). Two models split the work (pick them in Settings). The costs below were measured from real calls with two displays (5120x1440 and 4K):
 
-- `MODEL` (Claude Haiku 5.5) makes his automatic comments and roasts. About 0.07 cents each. How many depends on **Seconds between comments** (`LOOK_COOLDOWN`), counted from when he last spoke: at 60 s he makes at most ~55 an hour (up to ~4 cents an hour); at the default 15 s, a fast-moving game can push it to ~180 an hour (up to ~13 cents an hour). On a desktop or in menus it's far fewer.
-- `SMART_MODEL` (Claude Opus 5.5) answers when you talk to him (voice, F8, F9), when you press F10, and writes post-match breakdowns. About 4.6 cents each, plus 1 cent per web search. Talking to him is usually most of the bill.
+- `MODEL` (Claude Haiku 5.5) makes his automatic comments and roasts. About 0.05 cents each. How many depends on **Seconds between comments** (`LOOK_COOLDOWN`), counted from when he last spoke: at 60 s he makes at most ~55 an hour (up to ~3 cents an hour); at the default 15 s, a fast-moving game can push it to ~180 an hour (up to ~9 cents an hour). On a desktop or in menus it's far fewer.
+- `SMART_MODEL` (Claude Opus 5.5) answers when you talk to him (voice, F8, F9), when you press F10, and writes post-match breakdowns. About 2 cents each; asking him to look something up adds about 3-4 cents.
 
-Example: 8 active hours a day, comments every 60 s, and 10 questions a day comes to at most ~80 cents a day, about $24 a month. With the default 15 s it's up to ~$1.50 a day, about $45 a month.
+Example: 8 active hours a day, comments every 60 s, and 10 questions a day comes to at most ~40 cents a day, about $12 a month. With the default 15 s it's up to ~90 cents a day, about $26 a month.
 
 To spend less: watch one display (`MONITOR = 1`), raise the seconds between comments, or set the model for talking to him to Haiku (questions drop to about a tenth of a cent, but hints get weaker). Set a monthly spend limit in the Anthropic Console as a hard backstop. The spend in the tray menu is his own estimate from token counts; the Console is the real bill.
 

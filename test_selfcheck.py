@@ -1,4 +1,6 @@
 """Quick self-check, no API key or internet needed:  python test_selfcheck.py"""
+import base64
+import io
 import json
 import os
 import tempfile
@@ -234,6 +236,22 @@ except SystemExit:
     pass
 time.sleep, _ = real_sleep, logging.disable(logging.NOTSET)
 assert len(watch_calls) == 2, watch_calls  # the watcher came back after the failed screenshot
+
+# cheaper calls: web search only when asked for; the game's display sharp, the others small
+assert all(main.SEARCH_ASKED.search(q) for q in ("look it up", "Can you search the build?", "google that boss", "any guide for this"))
+assert not any(main.SEARCH_ASKED.search(q) for q in ("how do I beat this boss?", "what do you think of my aim", "researcher"))
+from unittest import mock  # noqa: E402
+
+from senses import Eyes  # noqa: E402
+
+screens = [({"left": 0, "top": 0, "width": 5120, "height": 1440}, Image.new("RGB", (5120, 1440))),
+           ({"left": 5120, "top": 0, "width": 3840, "height": 2160}, Image.new("RGB", (3840, 2160)))]
+with mock.patch.object(Eyes, "grab", lambda self: screens):
+    sizes = [Image.open(io.BytesIO(base64.b64decode(j))).size for j in Eyes().look((6000, 900))[1]]
+assert sizes == [(768, 216), (1568, 882)], sizes  # the game is on the 4K display
+with mock.patch.object(Eyes, "grab", lambda self: screens):
+    sizes = [Image.open(io.BytesIO(base64.b64decode(j))).size for j in Eyes().look()[1]]
+assert sizes == [(1568, 441), (1568, 882)], sizes  # no game point: everything sharp
 
 # moving his memory to another PC: export, import (with a backup first), and nothing escapes his folder
 import zipfile  # noqa: E402

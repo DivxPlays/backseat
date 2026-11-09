@@ -69,6 +69,7 @@ SITUATIONS = {
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
 }
 AUTO = {"change", "quiet", "lore", "nag", "breakdown"}  # jobs he starts himself; they stop when the budget runs out
+SEARCH_ASKED = re.compile(r"\b(search|look (it |that |this )?up|google|wiki|guide|walkthrough)", re.I)
 BUDGET_NEWS = {1: "Also tell them they've burned through 80% of this month's budget on you, so you're switching to cheap mode.",
                2: "Also tell them this month's budget is gone, so from now on you only speak when they talk to you."}
 SOUNDS = {"smug": ["Heh.", "Hmph."], "angry": ["Hmph!", "Argh!"], "laugh": ["Ha ha ha!", "Hah!"],
@@ -305,6 +306,7 @@ class Companion:
         self.streak_start = now  # when your current stretch without a break began
         self.last_nag = now - (config.NAG_EVERY - 10) * 60  # first nag can come 10 minutes in
         self.app = ("", "", 0)
+        self.focus = foreground_center()  # middle of the last window you used that isn't him: which display the game is on
         self.base_thumb = None
         self.history = deque(maxlen=3)  # the game's display from the last few looks, for post-match breakdowns
 
@@ -392,11 +394,11 @@ class Companion:
         if kind == "breakdown":
             jpegs = list(self.history)
         else:
-            shot = None if self.paused else self.eyes.look()
+            shot = None if self.paused else self.eyes.look(self.focus)
             jpegs = shot[1] if shot else []
             if shot:
                 self.base_thumb = shot[0]
-                self.history.append(shot[1][game_display(shot[2], foreground_center())])
+                self.history.append(shot[1][game_display(shot[2], self.focus)])
         situation = f'The player says to you: "{arg}". Answer them.' if kind == "ask" else SITUATIONS[kind]
         if crossed:
             situation += " " + BUDGET_NEWS[level]
@@ -405,7 +407,8 @@ class Companion:
                     if self.show_on_stream else "\n(Your own overlay is hidden from the screenshots.)")
         smart = kind in ("ask", "look", "breakdown") and level == 0  # cheap mode (80% of budget): Haiku only, no web search
         model = config.SMART_MODEL if smart else config.MODEL
-        out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=smart and kind != "breakdown")
+        search = smart and kind == "ask" and bool(SEARCH_ASKED.search(arg))  # having the tool costs ~2 cents even unused
+        out, spent = brain.think(self.client, model, context, self.recent, situation, jpegs, search=search)
         self.mem.spend(spent, kind)
         logging.info("%s ($%.4f) -> %s", kind, spent, out)
         tier = tier_for(self.mem.d["respect"])
@@ -414,7 +417,7 @@ class Companion:
         shame = None
         if out.get("save_moment") and shot and time.monotonic() - self.last_shame > 60:
             self.last_shame = time.monotonic()
-            shame = save_moment(shot[2], foreground_center(), out["line"], HALL)
+            shame = save_moment(shot[2], self.focus, out["line"], HALL)
         if out.get("event") == "loss" and kind != "breakdown" and not self.muted and time.monotonic() - self.last_breakdown > 180:
             self.last_breakdown = time.monotonic()
             self.jobs.put(("breakdown", None))
@@ -484,7 +487,7 @@ class Companion:
             dt, prev = now - prev, now
             exe, title, pid = foreground_app()
             if pid != os.getpid():
-                self.app = (exe, title, pid)
+                self.app, self.focus = (exe, title, pid), foreground_center()
             if not self.awake:  # started with Windows: wait for a game, without tracking or looking
                 if steam_app(self.app[0]) or app_name(*self.app[:2]) in [g.lower() for g in config.GAMES]:
                     self.wake_up()

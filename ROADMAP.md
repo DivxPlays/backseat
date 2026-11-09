@@ -16,7 +16,7 @@ One setup file that installs him on another PC: Python, everything he needs, a S
 A full-body character instead of the bust, with more animations: idle stance, arms crossed, pointing at you, laughing, slumping when you lose.
 
 ## Cheaper (or free) brain
-- Cheaper Claude: smaller screenshots (images are most of each call), skip displays that didn't change, cache the parts of the prompt that repeat every call, and look less often in menus.
+- Done: web search only when asked (questions 4.6 -> 1.9 cents), smaller screenshots of displays without the game (comments 0.07 -> 0.05 cents). Prompt caching doesn't apply: the repeated part of a call is below the minimum length that can be cached.
 - Free option: a local vision model on your own GPU (for example through Ollama). No API bill, but slower, weaker roasts and hints, and it competes with your game for the GPU, so it could cost frames.
 - Maybe a mix: the free local model for automatic comments, Claude only when you talk to him.
 
