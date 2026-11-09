@@ -14,8 +14,10 @@ import voicemeeter
 from senses import device_names
 
 FILE = Path(__file__).with_name("settings.json")
-VOICES = ["en-US-ChristopherNeural", "en-US-GuyNeural", "en-US-EricNeural", "en-US-RogerNeural", "en-US-SteffanNeural",
-          "en-US-AndrewNeural", "en-GB-RyanNeural", "en-AU-WilliamNeural"]
+VOICES = ["kokoro:am_michael", "kokoro:am_onyx", "kokoro:am_fenrir", "kokoro:am_eric", "kokoro:am_adam", "kokoro:bm_george",
+          "kokoro:bm_lewis", "kokoro:bm_daniel",  # on this PC: fast, no pitch control
+          "en-US-ChristopherNeural", "en-US-GuyNeural", "en-US-EricNeural", "en-US-RogerNeural", "en-US-SteffanNeural",
+          "en-US-AndrewNeural", "en-GB-RyanNeural", "en-AU-WilliamNeural"]  # Microsoft online voices
 MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]
 KEYS = [("KEY_TALK", "Hold to talk"), ("KEY_TYPE", "Type to him"), ("KEY_LOOK", "Look at this"), ("KEY_PAUSE", "Pause watching"),
         ("KEY_MUTE", "Shut-up mode"), ("KEY_MOVE", "Move / lock")]

@@ -50,7 +50,7 @@ MIC_DEVICE = ""  # the mic he listens to for you
 VOICE_DEVICE = ""  # where his voice plays ("Voicemeeter AUX Input" puts him in your call)
 FRIENDS_DEVICE = ""  # where your friends' voices come from ("Voicemeeter Out B2"); "" = he doesn't listen to them
 
-VOICE = "en-US-ChristopherNeural"  # any edge-tts voice (list them with: edge-tts --list-voices)
+VOICE = "en-US-ChristopherNeural"  # an online voice (edge-tts --list-voices), or "kokoro:am_michael" etc. to run on this PC (faster)
 VOICE_RATE = "+6%"
 VOICE_PITCH = "-8Hz"
 

@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
 rem Launch only if everything is installed; otherwise install what's missing first.
-.venv\Scripts\python.exe -c "import anthropic, PySide6, faster_whisper, pycaw, sherpa_onnx" 2>nul || call :setup || goto :fail
+.venv\Scripts\python.exe -c "import anthropic, PySide6, faster_whisper, pycaw, sherpa_onnx, kokoro_onnx" 2>nul || call :setup || goto :fail
 start "" .venv\Scripts\pythonw.exe main.py
 exit /b
 

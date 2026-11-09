@@ -37,7 +37,7 @@ Working on his code instead? Put your key in `api_key.txt` in the code folder an
 
 - He sees all your displays except the ones in `SKIP_DISPLAYS` (the XENEON EDGE is skipped), each sent as its own image. Add a display's name to `SKIP_DISPLAYS` to hide it from him, or set `MONITOR = 1` to watch only your main display.
 - When locked, mouse clicks pass straight through him to your game. He only grabs the mouse while unlocked with F6.
-- He looks at your screen when it changes a lot (at most every 15 s), or after 60 s of silence to roast you. His automatic comments are one short sentence about what's happening right now, about 4 seconds from screenshot to voice (most of it is the voice service). If nothing new happened he stays quiet instead of repeating himself, and a repeated moment isn't counted twice in your score.
+- He looks at your screen when it changes a lot (at most every 15 s), or after 60 s of silence to roast you. His automatic comments are one short sentence about what's happening right now, about 2 seconds from screenshot to voice with a local Kokoro voice (about 4 with an online voice). If nothing new happened he stays quiet instead of repeating himself, and a repeated moment isn't counted twice in your score.
 - He stops looking and stops counting your time after 5 minutes without keyboard or mouse input.
 - If Windows blocks a screenshot (a UAC prompt, the lock screen, a game switching resolution), he waits a few seconds and carries on watching.
 - Hours played: time per app while he runs, plus lifetime Steam hours for Steam games (read from Steam's local files).
@@ -103,6 +103,8 @@ He keeps running jokes on each friend (in `memory.json`, exported with your memo
 Screenshots go to Anthropic's API, which means whatever is on your screen, including Discord or browser tabs. Press F7 first. While paused he answers questions without seeing the screen. Everything you and your friends say is transcribed on your PC; only what's said after "Hey Vorn" is sent. Friends' voice fingerprints never leave your PC.
 
 ## Tweaking
+
+**His voice:** the `kokoro:` voices (Michael, Onyx, Fenrir, Eric, Adam, George, Lewis, Daniel) run on your PC and are ready in about half a second; the first time you pick one, he downloads the Kokoro model (about 205 MB). They have no pitch control. The other voices are Microsoft's online voices (1.5-2.5 s before he speaks). If a local voice ever fails, he uses the online voice for that line.
 
 Right-click the tray icon > **Settings...** to change his name, voice (with a Test button), size, personality, models, budget, timings, nags, wake word, hotkeys and displays. Saving restarts him. Only the settings you changed are stored in `settings.json`, so improvements to the defaults in `config.py` still reach you; **Restore Defaults** deletes it.
 

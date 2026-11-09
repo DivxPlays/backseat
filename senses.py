@@ -9,9 +9,11 @@ import re
 import textwrap
 import threading
 import time
+import urllib.request
 import wave
 import winsound
 from datetime import datetime
+from pathlib import Path
 
 import edge_tts
 import miniaudio
@@ -295,17 +297,60 @@ class WakeListener:
             self.pending = None
 
 
+KOKORO = Path(__file__).with_name("models") / "kokoro"
+KOKORO_FILES = {"kokoro-v1.0.fp16-gpu.onnx": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/",
+                "voices-v1.0.bin": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"}
+ONLINE = "en-US-ChristopherNeural"  # backup voice if the local one fails
+
+
+def speed_of(rate):
+    """'+6%' -> 1.06 (Kokoro's speed from the voice-speed setting)."""
+    m = re.match(r"([+-]?\d+)", rate or "0")
+    return 1 + (int(m.group(1)) if m else 0) / 100
+
+
 class Voice:
+    """His voice: "kokoro:<voice>" runs Kokoro on this PC (well under a second), anything else is a Microsoft online voice."""
+
     def __init__(self):
         self._audio = None
         self._t0 = 0.0
+        self._kokoro = None
+        self._lock = threading.Lock()
+
+    def kokoro(self):
+        """Load Kokoro once (downloading its ~205 MB of files the first time)."""
+        with self._lock:
+            if self._kokoro is None:
+                import onnxruntime as ort
+                from kokoro_onnx import Kokoro
+                KOKORO.mkdir(parents=True, exist_ok=True)
+                for name, url in KOKORO_FILES.items():
+                    if not (KOKORO / name).exists():
+                        tmp = KOKORO / (name + ".part")
+                        urllib.request.urlretrieve(url + name, tmp)
+                        tmp.replace(KOKORO / name)
+                options = ort.SessionOptions()
+                options.intra_op_num_threads = 4  # leave the rest of the CPU to your game
+                session = ort.InferenceSession(str(KOKORO / "kokoro-v1.0.fp16-gpu.onnx"), options, providers=["CPUExecutionProvider"])
+                self._kokoro = Kokoro.from_session(session, str(KOKORO / "voices-v1.0.bin"))
+            return self._kokoro
 
     def synth(self, text, voice=None, rate=None, pitch=None):
         """Speech audio for text; voice/rate/pitch override the settings (the Settings window's Test button)."""
+        voice, rate = voice or config.VOICE, rate or config.VOICE_RATE
+        if voice.startswith("kokoro:"):
+            try:
+                audio, sr = self.kokoro().create(text, voice=voice[7:], speed=speed_of(rate))
+                return audio.astype(np.float32) if sr == SR else np.interp(
+                    np.arange(0, len(audio), sr / SR), np.arange(len(audio)), audio).astype(np.float32)
+            except Exception:
+                logging.warning("local voice failed, using the online voice", exc_info=True)
+                voice = ONLINE
+
         async def fetch():
             out = bytearray()
-            async for chunk in edge_tts.Communicate(text, voice or config.VOICE, rate=rate or config.VOICE_RATE,
-                                                    pitch=pitch or config.VOICE_PITCH).stream():
+            async for chunk in edge_tts.Communicate(text, voice, rate=rate, pitch=pitch or config.VOICE_PITCH).stream():
                 if chunk["type"] == "audio":
                     out += chunk["data"]
             return bytes(out)

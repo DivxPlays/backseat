@@ -350,7 +350,8 @@ class Companion:
             threading.Thread(target=brain.start_ollama, daemon=True).start()
 
     def start(self):
-        for target in (self.worker, self.watcher, self.ears.model):  # ears.model preloads Whisper
+        preload = [self.ears.model] + ([self.voice.kokoro] if config.VOICE.startswith("kokoro:") else [])  # Whisper, Kokoro
+        for target in [self.worker, self.watcher] + preload:
             threading.Thread(target=target, daemon=True).start()
         if self.awake:
             self.wake_up()

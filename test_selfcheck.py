@@ -415,6 +415,30 @@ config.SWEAR = False
 assert "swear freely" not in brain.system()
 config.SWEAR = swear
 
+# local voice: Kokoro on this PC, the online voice as backup if it fails
+assert senses.speed_of("+6%") == 1.06 and senses.speed_of("-10%") == 0.9 and senses.speed_of("") == 1.0
+used = []
+
+
+class FakeCommunicate:
+    def __init__(self, text, voice, rate, pitch):
+        used.append(voice)
+
+    async def stream(self):
+        yield {"type": "audio", "data": b"mp3"}
+
+
+logging.disable(logging.CRITICAL)
+with mock.patch.object(senses.Voice, "kokoro", side_effect=RuntimeError("no model")), \
+        mock.patch.object(senses.edge_tts, "Communicate", FakeCommunicate), \
+        mock.patch.object(senses.miniaudio, "decode", lambda *a, **k: SimpleNamespace(samples=np.zeros(5, np.float32).tobytes())):
+    backup = senses.Voice().synth("Hi.", voice="kokoro:am_michael")
+logging.disable(logging.NOTSET)
+assert used == [senses.ONLINE] and len(backup) == 5
+if (senses.KOKORO / "voices-v1.0.bin").exists():  # the real thing, when the model is on this PC
+    spoken = senses.Voice().synth("Pathetic, noob.", voice="kokoro:am_michael")
+    assert len(spoken) > senses.SR * 0.3 and np.abs(spoken).max() > 0.05
+
 # freshness: a near word-for-word repeat of one of his recent lines is dropped (not spoken, not counted again)
 said = ["Player: nice", "You: Finally, the soundboard monk dares to kill someone. One kill doesn't make a warrior."]
 assert main.repeats("Finally, the soundboard monk dares to kill someone. One kill doesn't make a warlord, you know.", said)
