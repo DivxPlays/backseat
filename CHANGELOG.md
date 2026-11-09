@@ -25,6 +25,8 @@ parts are self-checked but haven't been tried in a real game yet.
 - **Report a problem.** Tray > Report a problem... opens a new issue on GitHub in your browser, already filled in with
   your version, your Windows version and the last error in companion.log, with names, paths, keys, emails and Steam IDs
   taken out. Nothing is sent until you read it and press Submit (you need a GitHub account).
+- **Open source.** Backseat is now free software under the GNU GPL v3 (see LICENSE): anyone can use, change and
+  share it, and a shared changed version stays GPL v3, with its source. The About box says so too.
 
 ### Fixed
 - **A crash when the sound device dropped out.** A headset reconnecting or Windows switching its default device made
