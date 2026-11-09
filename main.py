@@ -412,8 +412,13 @@ class Overlay(QWidget):
         dt = max(t1 - t0, 1 / 60)
         vx, vy = (p1.x() - p0.x()) / dt, (p1.y() - p0.y()) / dt  # let go: thrown at that speed, spinning with it
         self.flight, self.phase, self.chars[i].rag = [vx, vy, max(-720.0, min(720.0, vx * 0.45))], "fly", 1.0
+        clip = sfx.pick(self.chars[i].BUILD, sfx.MOMENTS["throw"])
+        if clip is not None:  # and they yell (a recording, played like a line: the "grabbed" one can't cut in)
+            self.speaking = i
+            self.voice.play(clip)
+            return
         got = self.scream(i) if self.scream else None
-        if got:  # and they scream
+        if got:  # (sound effects off: a scream in their voice)
             self.show_line("surprised", got[1], got[0], "none", self.names[i])
 
     def effect(self, i, kinds):

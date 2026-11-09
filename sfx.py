@@ -15,7 +15,7 @@ SR = 24000  # the voice's sample rate (senses.SR); the recordings are stored at 
 MOODS = {"smug": ("scoff", "chuckle", "giggle"), "laugh": ("laugh", "chuckle", "giggle"), "angry": ("grunt", "pout"),
          "disgusted": ("scoff", "pout", "sigh"), "surprised": ("gasp",)}  # before a line in that mood
 MOMENTS = {"poke": ("grunt",), "poke head": ("grunt",), "poke annoyed": ("grunt", "pout"), "grabbed": ("gasp", "grunt"),
-           "thrown": ("grunt",)}  # pokes and throws (the scream when let go is their voice)
+           "throw": ("yell", "gasp"), "thrown": ("grunt",)}  # pokes and throws (let go: Vorn yells, Mika gasps; landing: a grunt)
 IDLES = {"sigh": ("sigh",), "nod off": ("yawn",), "stretch": ("yawn", "sigh"), "power stance": ("chuckle",),
          "heart hands": ("giggle",), "bounce": ("giggle",), "wave": ("giggle",)}  # with these idle animations
 IDLE_GAP = 45  # s: at most one idle sound per character this often

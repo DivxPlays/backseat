@@ -143,6 +143,7 @@ from senses import CUES, Voice  # noqa: E402
 
 sys.excepthook = sys.__excepthook__  # main.py shows a crash dialog; a test should just fail
 o = main.Overlay(Voice(), None, lambda: 10, lambda: 4.83)
+o.hush = lambda: True  # (no idle sounds on your speakers during the checks)
 o.show_line("smug", "Subtitle test, grunt.", None)
 QTest.qWait(300)
 assert o.timer.isActive() and o.shown > 0, "overlay animation loop is not running"
@@ -1204,6 +1205,8 @@ with tempfile.TemporaryDirectory() as d:
     Mika.earned.clear()
     Mika.earned |= saved_mika
 duo = main.Overlay(Voice(), None, lambda: 10, lambda: 0.0)
+played_fx = []
+duo.voice.play = lambda audio, effect=False: (played_fx.append(effect), 0.0)[1]  # (silent: no grunts on your speakers)
 assert [type(c).__name__ for c in duo.chars] == ["Vorn", "Mika"] and duo.width() > o.width()
 duo.show_line("angry", "Hands off my player.", None, "none", "Mika")
 assert duo.speaking == 1 and duo.text.startswith("Mika: ") and duo.chars[1].mood == "angry" and duo.chars[0].mood != "surprised"
@@ -1245,7 +1248,8 @@ assert duo.phase == "drag" and duo.chars[0].rag > 0.3  # dangling from your hand
 duo.mouseReleaseEvent(mouse(QEvent.MouseButtonRelease, x0 + 30 - 100, 300 - 80, home))
 assert said[-1][1] == "grabbed" and duo.flight and duo.flight[0] < 0 and duo.flyer and duo.thrown_by == 0
 assert duo.pos() == home  # only the one you grabbed flies: the overlay (and the other one) stays put
-assert duo.phase == "fly" and "Raaaagh!" in duo.text and duo.flight[2] < 0  # a scream, and a spin with the throw
+assert duo.phase == "fly" and played_fx[-1] is False and "Raaaagh!" not in duo.text and duo.flight[2] < 0  # a real yell
+# (played like a line, so the "grabbed" line can't cut in), and a spin with the throw
 t, angles = 1000.0, set()
 for _ in range(3000):  # fly, spin, bounce, land
     t += 1 / 60
@@ -1519,7 +1523,9 @@ import sfx  # noqa: E402
 import wave as wave_mod  # noqa: E402
 
 assert sfx.SR == senses.SR and {wave_mod.open(str(p)).getframerate() for p in sfx.FOLDER.rglob("*.wav")} == {senses.SR}
-assert all(sfx.clips("vorn", k) for k in ("grunt", "scoff", "chuckle", "laugh", "sigh", "yawn"))
+assert all(sfx.clips("vorn", k) for k in ("grunt", "yell", "scoff", "chuckle", "laugh", "sigh", "yawn"))
+thrown_vorn, thrown_mika = sfx.pick("vorn", sfx.MOMENTS["throw"]), sfx.pick("mika", sfx.MOMENTS["throw"])
+assert any(thrown_vorn is c for c in sfx.clips("vorn", "yell")) and any(thrown_mika is c for c in sfx.clips("mika", "gasp"))
 assert all(sfx.clips("mika", k) for k in ("grunt", "gasp", "giggle", "sigh", "yawn", "pout")) and not sfx.clips("vorn", "giggle")
 assert Vorn.BUILD == "vorn" and Mika.BUILD == "mika" and (sfx.FOLDER / "CREDITS.md").exists()
 assert sfx.pick("vorn", ("giggle",)) is None and sfx.pick("mika", ("giggle",)) is not None  # Vorn doesn't giggle

@@ -28,8 +28,8 @@ Real recordings from [Freesound](https://freesound.org), all released under [CC0
 | `vorn/grunt-2.wav` | Voice_AdultMale_PainGrunts_09.wav | MrFossy | [freesound.org/s/547209](https://freesound.org/s/547209/) |
 | `vorn/grunt-3.wav` | Oof (original) | unfa | [freesound.org/s/719053](https://freesound.org/s/719053/) |
 | `vorn/grunt-4.wav` | Male Grunting In Pain | elynch0901 | [freesound.org/s/464486](https://freesound.org/s/464486/) |
-| `vorn/grunt-5.wav` | Strong_Male_Grunt1(2).wav | EvilOldScratch | [freesound.org/s/667697](https://freesound.org/s/667697/) |
-| `vorn/grunt-6.wav` | WarriorPain1.wav | EvilOldScratch | [freesound.org/s/670857](https://freesound.org/s/670857/) |
+| `vorn/yell-1.wav` | Strong_Male_Grunt1(2).wav | EvilOldScratch | [freesound.org/s/667697](https://freesound.org/s/667697/) |
+| `vorn/yell-2.wav` | WarriorPain1.wav | EvilOldScratch | [freesound.org/s/670857](https://freesound.org/s/670857/) |
 | `vorn/scoff-1.wav` | Scoff Laugh Low Quality | qubodup | [freesound.org/s/857075](https://freesound.org/s/857075/) |
 | `vorn/scoff-2.wav` | approving hm.wav | trimono | [freesound.org/s/519112](https://freesound.org/s/519112/) |
 | `vorn/scoff-3.wav` | Doubt - Huhn | Sadiquecat | [freesound.org/s/801398](https://freesound.org/s/801398/) |
