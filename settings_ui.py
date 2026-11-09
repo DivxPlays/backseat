@@ -1,15 +1,23 @@
 """Settings window: change Vorn without touching code. Saves to settings.json, then restarts him."""
 import json
+import logging
+import random
 import re
 import threading
 from pathlib import Path
 
 import keyboard
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QHBoxLayout,
-                               QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout,
+                               QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTabWidget,
+                               QVBoxLayout, QWidget)
 
+import brain
+import commands
 import config
 import holidays
+from character import make_character
 from senses import device_names
 
 FILE = Path(__file__).with_name("settings.json")
@@ -75,6 +83,191 @@ def set_setting(key, value):
     FILE.write_text(json.dumps(saved, indent=1), encoding="utf-8")
 
 
+BUILDS = {"Vorn's build (warlord)": "vorn", "Mika's build (gamer girl)": "mika"}
+PARTS = (("hair", "Hair"), ("eyes", "Eyes"), ("skin", "Skin"), ("outfit", "Outfit"))
+PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+
+def test_voice(player, voice, rate, pitch):
+    def run():
+        try:
+            player.play(player.synth("So this is how I sound. Try to keep up.", voice, f"{rate:+d}%", f"{pitch:+d}Hz"))
+        except Exception as e:  # unknown voice name or no internet
+            print("voice test failed:", e)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+class ColorPicks(QWidget):
+    """Hair, eyes, skin and outfit colour buttons (the outfit colour tints every outfit); unset ones keep the build's own."""
+
+    def __init__(self, colors, changed=lambda: None):
+        super().__init__()
+        self.colors, self.changed, self.buttons = {k: v for k, v in (colors or {}).items() if v}, changed, {}
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        for part, label in PARTS:
+            self.buttons[part] = QPushButton(label)
+            self.buttons[part].clicked.connect(lambda _=False, p=part: self.pick(p))
+            lay.addWidget(self.buttons[part])
+        own = QPushButton("Their own")
+        own.setToolTip("Back to the build's own colours")
+        own.clicked.connect(self.reset)
+        lay.addWidget(own)
+        self.show_colors()
+
+    def pick(self, part):
+        c = QColorDialog.getColor(QColor(self.colors.get(part, "#808080")), self, f"{dict(PARTS)[part]} colour")
+        if c.isValid():
+            self.colors[part] = c.name()
+            self.show_colors()
+            self.changed()
+
+    def reset(self):
+        self.colors = {}
+        self.show_colors()
+        self.changed()
+
+    def show_colors(self):
+        for part, b in self.buttons.items():
+            c = self.colors.get(part)
+            b.setStyleSheet(f"background: {c}; color: {'black' if QColor(c).lightness() > 128 else 'white'}" if c else "")
+
+    def value(self):
+        return dict(self.colors)
+
+
+def own_lines(made, example):
+    """The lines Claude wrote for a new character that are safe to say: for each moment in `example` ({key: (mood,
+    lines)}), the lines using only that moment's {placeholders} and no stray braces."""
+    out = {}
+    for key, (mood, lines) in example.items():
+        allowed = set(PLACEHOLDER.findall(" ".join(lines)))
+        got = made.get(key) if isinstance(made.get(key), dict) else {}
+        ok = [line.strip() for line in got.get("lines", []) if line.strip() and set(PLACEHOLDER.findall(line)) <= allowed
+              and not set(PLACEHOLDER.sub("", line)) & set("{}")]
+        if ok:
+            out[key] = [got.get("mood", mood), ok]
+    return out
+
+
+def save_character(name, build, voice, power, colors, about, made):
+    """Write a new character to presets/ (never over an existing one) and return its preset name. made: what Claude wrote
+    ({"persona", "wake_names", "lines"}), or {} when it couldn't (a plain personality from your words, Vorn's or Mika's lines)."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "character"
+    path, n = config.PRESETS / f"{slug}.json", 2
+    while path.exists():
+        path, n = config.PRESETS / f"{slug}-{n}.json", n + 1
+    persona = (made.get("persona") or "").strip() or (
+        "You are {name}, a companion who lives in a small window in the corner of the player's screen, watches them play "
+        f"and talks to them out loud.\n\nWho you are: {about}\n\nRespect is how much you rate the player: the score (0-100) "
+        "colours your tone. It moves slowly.\n\n{power} is your power-up form: your most intense moment.")
+    wake = [name.lower()] + [w.strip().lower() for w in made.get("wake_names", []) if w.strip()]
+    preset = {"NAME": name, "PERSONA": persona, "VOICE": voice, "VOICE_RATE": "+0%", "VOICE_PITCH": "+0Hz", "CHARACTER": build,
+              "WAKE_NAMES": list(dict.fromkeys(wake)), "POWER": power, "COLORS": colors,
+              "LINES": own_lines(made.get("lines", {}), commands.LINES[build])}
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(preset, indent=1), encoding="utf-8")
+    return path.stem
+
+
+class CreatorWindow(QDialog):
+    """Make your own character: name, build (Vorn's or Mika's body), who they are, voice, power-up and colours, with a live
+    preview. Claude writes their full personality, the ways their name gets misheard and their own lines (one call)."""
+    MOODS = ("idle", "smug", "laugh", "angry", "surprised", "disgusted")
+
+    def __init__(self, voice, spend, created):
+        super().__init__()
+        self.setWindowTitle("Create a character")
+        self.voice, self.spend, self.created, self.result = voice, spend, created, None
+        self.name = QLineEdit()
+        self.name.setPlaceholderText("Captain Rook")
+        self.build = QComboBox()
+        self.build.addItems(list(BUILDS))
+        self.build.currentTextChanged.connect(self.redress)
+        self.about = QPlainTextEdit()
+        self.about.setPlaceholderText("A washed-up pirate captain who thinks every match is a naval battle. Gruff and dramatic, "
+                                      "calls the player 'deckhand', secretly proud of them.")
+        self.about.setMinimumHeight(120)
+        self.voice_pick = _combo(VOICES, VOICES[0], editable=True)
+        test = QPushButton("Test voice")
+        test.clicked.connect(lambda: test_voice(self.voice, self.voice_pick.currentText(), 0, 0))
+        self.power = QLineEdit()
+        self.power.setPlaceholderText("Stormcall")
+        self.picks = ColorPicks({}, self.redress)
+        form = QWidget()
+        rows = QFormLayout(form)
+        for label, field in (("Name", self.name), ("Body", self.build), ("Who they are", self.about),
+                             ("Voice", _row(self.voice_pick, test)), ("Power-up name", self.power), ("Colours", self.picks)):
+            rows.addRow(label, field)
+        self.preview = QLabel()
+        self.preview.setMinimumSize(180, 470)
+        self.status = QLabel("Claude writes their full personality and their own lines from your words "
+                             f"(one call to {config.SMART_MODEL}, about 6 cents). You can edit them after in Settings > Character.")
+        self.status.setWordWrap(True)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Create")
+        self.buttons.accepted.connect(self.create)
+        self.buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(_row(form, self.preview))
+        layout.addWidget(self.status)
+        layout.addWidget(self.buttons)
+        self.frame = 0
+        self.redress()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.tick)
+        self.timer.start(66)
+
+    def redress(self, *_):
+        """A fresh preview in the chosen body and colours."""
+        self.char = make_character(BUILDS[self.build.currentText()], self.picks.value())
+        self.tick()
+
+    def tick(self):
+        self.frame += 1
+        if self.frame % 60 == 1:  # a new face every 4 s
+            self.char.set_mood(random.choice(self.MOODS))
+        self.char.step(1 / 15, 0.0)
+        self.preview.setPixmap(QPixmap.fromImage(self.char.render(0.9)))
+
+    def create(self):
+        name, about = self.name.text().strip(), self.about.toPlainText().strip()
+        if not name or not about:
+            QMessageBox.warning(self, "Create a character", "Give them a name and a few words about who they are.")
+            return
+        build, power = BUILDS[self.build.currentText()], self.power.text().strip() or "Overdrive"
+        self.buttons.setEnabled(False)
+        self.status.setText(f"Writing who {name} is...")
+        example = commands._preset(build).get("PERSONA", "")
+
+        def run():
+            try:
+                client = brain.make_client()
+                self.result = ({}, 0.0) if client is None else brain.create_character(
+                    client, config.SMART_MODEL, name, build.title(), power, about, example, commands.LINES[build])
+            except Exception:
+                logging.warning("couldn't write the new character", exc_info=True)
+                self.result = ({}, 0.0)
+
+        threading.Thread(target=run, daemon=True).start()
+        self.waiter = QTimer(self)
+        self.waiter.timeout.connect(lambda: self.finish(name, build, power, about))
+        self.waiter.start(200)
+
+    def finish(self, name, build, power, about):
+        if self.result is None:
+            return
+        self.waiter.stop()
+        made, spent = self.result
+        self.spend(spent)
+        preset = save_character(name, build, self.voice_pick.currentText(), power, self.picks.value(), about, made or {})
+        logging.info("created character %s ($%.4f)%s", preset, spent, "" if made else " without Claude")
+        self.timer.stop()
+        self.accept()
+        self.created(preset, name)
+
+
 def _signed(text):
     """'+6%' or '-8Hz' -> 6 / -8"""
     m = re.match(r"([+-]?\d+)", text or "0")
@@ -82,11 +275,11 @@ def _signed(text):
 
 
 class SettingsWindow(QDialog):
-    def __init__(self, restart, voice):
+    def __init__(self, restart, voice, spend=lambda dollars: None):
         super().__init__()
         self.setWindowTitle(f"{config.NAME} settings")
         self.setMinimumWidth(560)
-        self.restart, self.voice = restart, voice
+        self.restart, self.voice, self.spend = restart, voice, spend
         self.get = {}  # setting name -> function returning its new value
 
         w = {}
@@ -101,8 +294,13 @@ class SettingsWindow(QDialog):
         persona = QPlainTextEdit(config.PERSONA)
         persona.setMinimumHeight(200)
         test = QPushButton("Test voice")
-        test.clicked.connect(lambda: self.test_voice(w["VOICE"].currentText(), rate.value(), pitch.value()))
-        him = self._page([("Character (switching restarts)", w["PRESET"]), ("Name", w["NAME"]), ("Voice", _row(w["VOICE"], test)),
+        test.clicked.connect(lambda: test_voice(self.voice, w["VOICE"].currentText(), rate.value(), pitch.value()))
+        picks = ColorPicks(config.COLORS)
+        create = QPushButton("Create a character...")
+        create.clicked.connect(self.open_creator)
+        self.preset_pick = w["PRESET"]
+        him = self._page([("Character (switching restarts)", _row(w["PRESET"], create)), ("Name", w["NAME"]),
+                          ("Colours (over the build's own)", picks), ("Voice", _row(w["VOICE"], test)),
                           ("Voice speed", rate), ("Voice pitch (online voices)", pitch), ("Size on screen", w["SCALE"]),
                           ("Other apps' volume while they talk (1 = unchanged)", w["DUCK_TO"]),
                           ("Language", w["SWEAR"]), ("Personality ({name} = their name)", persona)])
@@ -197,6 +395,7 @@ class SettingsWindow(QDialog):
         self.get["VOICE_PITCH"] = lambda: f"{pitch.value():+d}Hz"
         self.get["BEDTIME"] = lambda: [bed_from.value(), bed_to.value()]
         self.get["PERSONA"] = persona.toPlainText
+        self.get["COLORS"] = picks.value
         self.get["SKIP_DISPLAYS"] = lambda: [s.strip() for s in skip.text().split(",") if s.strip()]
         self.get["GAMES"] = lambda: [s.strip().lower() for s in games.text().split(",") if s.strip()]
 
@@ -208,14 +407,17 @@ class SettingsWindow(QDialog):
             form.addRow(label, field)
         return page
 
-    def test_voice(self, voice, rate, pitch):
-        def run():
-            try:
-                self.voice.play(self.voice.synth("So this is how I sound. Try to keep up.", voice, f"{rate:+d}%", f"{pitch:+d}Hz"))
-            except Exception as e:  # unknown voice name or no internet
-                print("voice test failed:", e)
+    def open_creator(self):
+        self.creator = CreatorWindow(self.voice, self.spend, self.created)
+        self.creator.show()
 
-        threading.Thread(target=run, daemon=True).start()
+    def created(self, preset, name):
+        """A new character is ready: switch to them now (he restarts), or later from tray > Character."""
+        self.preset_pick.addItem(preset)
+        if QMessageBox.question(self, "Character created", f"{name} is ready. Switch to them now? (restarts)") == QMessageBox.Yes:
+            set_setting("PRESET", preset)
+            self.reject()
+            self.restart()
 
     def values(self):
         return {name: get() for name, get in self.get.items()}

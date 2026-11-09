@@ -6,6 +6,7 @@ PRESET = "vorn"  # which character: presets/<PRESET>.json (switch in the tray me
 CHARACTER = "vorn"  # which drawing: "vorn" or "mika" (from the preset)
 WAKE_NAMES = ["vorn", "vorne", "vern", "born", "bourne", "vaughn", "vaughan", "von", "forn", "fawn", "warn", "horn", "bjorn"]  # "Hey <name>" as Whisper may hear it
 POWER = "Bloodfire"  # the character's power-up form (from the preset)
+COLORS = {}  # the character's own colours over their build's: {"hair", "eyes", "skin", "outfit"} as "#rrggbb" (from the preset)
 DUO = False  # both characters on screen together (tray > Character > Both)
 OUTFIT = "random"  # Mika's outfit: "jacket", "hoodie", "gothic", "jersey", or "random" (a new one each launch)
 VORN_OUTFIT = "random"  # Vorn's: "warlord", "obsidian", "frostbound", "desert raider", "off-duty", or "random"
@@ -108,7 +109,7 @@ GAMES = []  # exe names of games they can't spot by themselves (Steam, Game Bar,
 # Anything saved from the Settings window overrides the defaults above (unknown or broken entries are ignored), then the
 # chosen character's preset (presets/<PRESET>.json) sets who the character is.
 _DEFAULTS = {k: v for k, v in globals().items() if k.isupper()}  # settings.json stores only changes, so later default fixes still apply
-PRESET_KEYS = ("NAME", "PERSONA", "VOICE", "VOICE_RATE", "VOICE_PITCH", "CHARACTER", "WAKE_NAMES", "POWER")
+PRESET_KEYS = ("NAME", "PERSONA", "VOICE", "VOICE_RATE", "VOICE_PITCH", "CHARACTER", "WAKE_NAMES", "POWER", "COLORS")
 
 import json as _json  # noqa: E402
 import pathlib as _pathlib  # noqa: E402

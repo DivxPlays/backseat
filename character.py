@@ -244,6 +244,9 @@ WEATHER = None  # and what falls around them: "bats", "snow", "confetti" or "hea
 
 class Vorn:
     OUTFITS, OUTFIT_SETTING = VORN_OUTFITS, "VORN_OUTFIT"  # his wardrobe and the setting that picks from it
+    SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, IRIS, IRIS_SH = SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, IRIS, IRIS_SH  # (recolor())
+    SHADES = {"hair": ("HAIR", "HAIR_SH", "HAIR_HI"), "eyes": ("IRIS", "IRIS_SH"), "skin": ("SKIN", "SKIN_SH")}
+    GEM, TINTED = GEM, ("GEM",)  # also in the outfit's colour (recolor()): his chest gem
     UNLOCKS = VORN_UNLOCKS  # the ones you have to earn
     HOLIDAY = VORN_HOLIDAY  # the ones for a holiday
     IDLES = {**IDLES, **VORN_IDLES}  # what he does while idle: the shared ones and his own
@@ -475,6 +478,19 @@ class Vorn:
         p["brow"] -= 0.6 * sl
         p["smile"] -= 0.4 * sl
         return p
+
+    def recolor(self, colors):
+        """Their own colours over the build's: {"hair", "eyes", "skin", "outfit"} as "#rrggbb" (missing or empty: the
+        build's own). The outfit colour tints every outfit."""
+        cls = type(self)
+        for part, names in self.SHADES.items():
+            picked = (colors or {}).get(part)
+            for name, value in zip(names, shades(part, QColor(picked)) if picked else (getattr(cls, n) for n in names)):
+                setattr(self, name, value)
+        outfit = (colors or {}).get("outfit")
+        self.OUTFITS = {n: tinted(o, QColor(outfit)) for n, o in cls.OUTFITS.items()} if outfit else cls.OUTFITS
+        for name in self.TINTED:
+            setattr(self, name, tinted({"c": getattr(cls, name)}, QColor(outfit))["c"] if outfit else getattr(cls, name))
 
     def render(self, scale=1.0, bust=False):
         """The full body at W x H times scale, or just head and shoulders (bust=True, for the tray icon)."""
@@ -941,7 +957,7 @@ class Vorn:
         s = math.sin(t * 1.5) * 1.5
         back = poly((96, 110), (86, 80), (92, 58), (104, 52), (104, 34 + s), (124, 40), (136, 24 + s), (152, 36),
                     (168, 22 + s), (178, 38), (198, 30 + s), (198, 50), (214, 54 + s), (212, 80), (204, 110))
-        fill(g, back, vgrad(10, 110, HAIR, HAIR_SH))
+        fill(g, back, vgrad(10, 110, self.HAIR, self.HAIR_SH))
         if self.d["blood"] > 0.02:
             fill(g, back, vgrad(10, 110, alpha(EMBER, 0.7 * self.d["blood"]), alpha(BLOOD, 0.3 * self.d["blood"])), 0)
 
@@ -978,13 +994,13 @@ class Vorn:
     def _body(self, g):
         """Neck and collar: fur, an iron gorget, a scarf or a hood, by outfit (the armor is in _torso)."""
         neck = poly((126, 178), (124, 232), (108, 254), (192, 254), (176, 232), (174, 178))
-        fill(g, neck, SKIN)
-        fill(g, poly((124, 182), (176, 182), (176, 214), (150, 228), (124, 212)), SKIN_SH, 0)  # under-jaw shadow
-        fill(g, poly((168, 214), (176, 214), (176, 232), (192, 254), (170, 254)), SKIN_SH, 0)
+        fill(g, neck, self.SKIN)
+        fill(g, poly((124, 182), (176, 182), (176, 214), (150, 228), (124, 212)), self.SKIN_SH, 0)  # under-jaw shadow
+        fill(g, poly((168, 214), (176, 214), (176, 232), (192, 254), (170, 254)), self.SKIN_SH, 0)
         for x0, x1 in ((134, 144), (166, 156)):
             m = QPainterPath(P(x0, 216))
             m.lineTo(P(x1, 246))
-            stroke(g, m, alpha(SKIN_SH, 0.8), 1.6)
+            stroke(g, m, alpha(self.SKIN_SH, 0.8), 1.6)
         collar, (main, shade, hi) = self.kit["collar"], self.kit["collar_c"]
         if collar == "fur":
             fur = poly(*FUR_EDGE, (234, 292), (150, 278), (66, 292))
@@ -1024,16 +1040,16 @@ class Vorn:
         p = self.d
         for side in (-1, 1):
             ear = [(101, 118), (90, 114), (88, 138), (94, 152), (104, 154)]
-            fill(g, poly(*(ear if side < 0 else mirror(ear))), SKIN)
+            fill(g, poly(*(ear if side < 0 else mirror(ear))), self.SKIN)
         face = face_path()
-        fill(g, face, SKIN)
+        fill(g, face, self.SKIN)
         g.save()
         g.setClipPath(face)
         sh = [(184, 80), (210, 80), (210, 222), (150, 222), (160, 212), (174, 196), (186, 176), (190, 150), (188, 118)]
-        fill(g, poly(*sh), SKIN_SH, 0)  # light from the upper left
-        fill(g, poly((96, 78), (204, 78), (204, 96), (182, 96), (166, 92), (150, 98), (134, 92), (118, 96), (96, 98)), SKIN_SH, 0)
+        fill(g, poly(*sh), self.SKIN_SH, 0)  # light from the upper left
+        fill(g, poly((96, 78), (204, 78), (204, 96), (182, 96), (166, 92), (150, 98), (134, 92), (118, 96), (96, 98)), self.SKIN_SH, 0)
         for side in (-1, 1):  # shaved sides of the undercut
-            fill(g, poly(*([(96, 86), (112, 84), (108, 118), (96, 120)] if side < 0 else mirror([(96, 86), (112, 84), (108, 118), (96, 120)]))), alpha(HAIR_SH, 0.5), 0)
+            fill(g, poly(*([(96, 86), (112, 84), (108, 118), (96, 120)] if side < 0 else mirror([(96, 86), (112, 84), (108, 118), (96, 120)]))), alpha(self.HAIR_SH, 0.5), 0)
         stubble = QPainterPath(P(100, 168))  # rugged shadow beard along the jaw and chin
         stubble.quadTo(P(116, 190), P(130, 184))
         stubble.quadTo(P(150, 178), P(170, 184))
@@ -1041,8 +1057,8 @@ class Vorn:
         stubble.lineTo(P(200, 222))
         stubble.lineTo(P(100, 222))
         stubble.closeSubpath()
-        fill(g, stubble, alpha(HAIR_SH, 0.38), 0)
-        fill(g, poly((152, 142), (159, 167), (153, 171), (150, 150)), SKIN_SH, 0)  # nose shadow
+        fill(g, stubble, alpha(self.HAIR_SH, 0.38), 0)
+        fill(g, poly((152, 142), (159, 167), (153, 171), (150, 150)), self.SKIN_SH, 0)  # nose shadow
         g.restore()
 
         for cx, side in ((127, -1), (173, 1)):
@@ -1053,11 +1069,11 @@ class Vorn:
         stroke(g, tip, INK, 1.8)
         bridge = QPainterPath(P(147, 142))
         bridge.lineTo(P(148, 160))
-        stroke(g, bridge, alpha(SKIN_SH, 0.9), 1.4)
+        stroke(g, bridge, alpha(self.SKIN_SH, 0.9), 1.4)
         for a, b in (((176, 108), (179, 129)), ((182, 151), (188, 172))):  # scar through the brow and cheek
             sc = QPainterPath(P(*a))
             sc.lineTo(P(*b))
-            stroke(g, sc, SKIN, 4.5)
+            stroke(g, sc, self.SKIN, 4.5)
             stroke(g, sc, SCAR, 2.4)
 
         self._mouth(g)
@@ -1073,14 +1089,14 @@ class Vorn:
         top.lineTo(P(128 + sw, 98))
         top.lineTo(P(130, 82))
         top.cubicTo(P(118, 82), P(104, 90), P(96, 104))
-        fill(g, top, vgrad(38, 100, HAIR, HAIR_SH))
+        fill(g, top, vgrad(38, 100, self.HAIR, self.HAIR_SH))
         for a, b, c in [((116, 86), (110, 62), (126, 46)), ((150, 80), (146, 58), (152, 42)), ((184, 86), (194, 64), (180, 46))]:
             s = QPainterPath(P(*a))
             s.quadTo(P(*b), P(*c))
-            stroke(g, s, HAIR_SH, 1.6)
+            stroke(g, s, self.HAIR_SH, 1.6)
         hi = QPainterPath(P(120, 56))
         hi.quadTo(P(148, 44), P(178, 54))
-        stroke(g, hi, alpha(HAIR_HI, 0.9), 3)
+        stroke(g, hi, alpha(self.HAIR_HI, 0.9), 3)
         if p["blood"] > 0.02:  # Bloodfire: the hair glows from within and ignites
             fill(g, top, vgrad(38, 100, alpha(EMBER, 0.75 * p["blood"]), alpha(BLOOD, 0.35 * p["blood"])), 0)
             self._hair_fire(g, p["blood"])
@@ -1096,7 +1112,7 @@ class Vorn:
             fill(g, poly(*crown), vgrad(40, 90, GOLD, GOLD_SH), 1.8)
             gem = QPainterPath()
             gem.addEllipse(P(150, arc_y(150) - 7), 4, 4)
-            fill(g, gem, GEM, 1.2)
+            fill(g, gem, self.GEM, 1.2)
 
         if p["vein"] > 0.05:  # anime anger mark at the temple
             c = alpha(QColor("#e0263a"), p["vein"])
@@ -1127,8 +1143,8 @@ class Vorn:
             ix, iy = cx + (p["look"] + self.glance) * 6 + p["roll_x"], cy + p["roll_y"]
             k = p["blood"]  # Bloodfire: the eyes burn white
             iris = QRadialGradient(P(ix, iy), 7)
-            iris.setColorAt(0, mix(IRIS, QColor("white"), k))
-            iris.setColorAt(1, mix(IRIS_SH, EMBER_CORE, k))
+            iris.setColorAt(0, mix(self.IRIS, QColor("white"), k))
+            iris.setColorAt(1, mix(self.IRIS_SH, EMBER_CORE, k))
             g.setBrush(QBrush(iris))
             g.setPen(pen(INK, 1.2))
             g.drawEllipse(P(ix, iy), 6.6, 6.6)
@@ -1166,7 +1182,7 @@ class Vorn:
         inner = (cx - side * 13, by + p["brow"] * 6)
         outer = (cx + side * 20, by - 3 - p["brow"] * 1.5)
         b = poly((inner[0], inner[1] - 3.5), (outer[0], outer[1] - 1), (outer[0] - side * 2, outer[1] + 1.5), (inner[0], inner[1] + 3.5))
-        fill(g, b, HAIR_SH, 1.2)
+        fill(g, b, self.HAIR_SH, 1.2)
 
     def _mouth(self, g):
         p = self.d
@@ -1237,6 +1253,33 @@ class Vorn:
                 g.drawEllipse(P(rx, ry), 2.6, 2.6)
 
 
+def shades(part, c):
+    """A colour picked for `part` and the shades drawn from it: hair (colour, shade, highlight, deep shade), eyes (iris,
+    its shade, pupil), skin (skin, shadow)."""
+    black, white = QColor("black"), QColor("white")
+    if part == "hair":
+        return c, mix(c, black, 0.3), mix(c, white, 0.45), mix(c, black, 0.5)
+    if part == "eyes":
+        return c, mix(c, black, 0.6), mix(c, black, 0.85)
+    return c, mix(c, QColor("#5a2a1a"), 0.3)
+
+
+def tinted(outfit, color):
+    """An outfit in `color`'s hue: every colourful part turns to it, keeping how light and how colourful it was (greys,
+    blacks and whites stay). A grey pick makes the colourful parts grey."""
+    hue, grey = max(color.hslHueF(), 0.0), color.hslSaturationF() < 0.15
+
+    def tint(v):
+        if isinstance(v, tuple):
+            return tuple(tint(x) for x in v)
+        if isinstance(v, QColor) or (isinstance(v, str) and v.startswith("#")):
+            h, sat, light, a = QColor(v).getHslF()
+            new = QColor(v) if sat < 0.15 else QColor.fromHslF(hue, 0.0 if grey else sat, light, a)
+            return new.name() if isinstance(v, str) else new
+        return v
+    return {k: tint(v) for k, v in outfit.items()}
+
+
 def character_class(name):
     """The drawing class for a preset's CHARACTER: "vorn" or "mika"."""
     if name == "mika":
@@ -1245,6 +1288,9 @@ def character_class(name):
     return Vorn
 
 
-def make_character(name):
-    """The drawing for a preset's CHARACTER: "vorn" or "mika"."""
-    return character_class(name)()
+def make_character(name, colors=None):
+    """The drawing for a preset's CHARACTER ("vorn" or "mika"), in the preset's own COLORS if it has them."""
+    char = character_class(name)()
+    if colors:
+        char.recolor(colors)
+    return char

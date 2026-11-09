@@ -77,6 +77,10 @@ class Mika(Vorn):
     SHOULDER, UPPER, FORE = (92, 248), 112, 100
 
     OUTFITS, OUTFIT_SETTING = OUTFITS, "OUTFIT"  # her wardrobe and the setting that picks from it (Vorn.__init__ chooses)
+    SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, HAIR_DEEP = SKIN, SKIN_SH, HAIR, HAIR_SH, HAIR_HI, HAIR_DEEP  # (recolor())
+    IRIS, IRIS_SH, PUPIL = IRIS, IRIS_SH, PUPIL
+    LED, TINTED = LED, ("LED",)  # her headset's lights and glow: in the outfit's colour
+    SHADES = {"hair": ("HAIR", "HAIR_SH", "HAIR_HI", "HAIR_DEEP"), "eyes": ("IRIS", "IRIS_SH", "PUPIL"), "skin": ("SKIN", "SKIN_SH")}
     UNLOCKS, HOLIDAY = UNLOCKS, HOLIDAY
     IDLES = {**IDLES, **MIKA_IDLES}  # the shared ones and her own
     HAND = 1.35
@@ -86,7 +90,7 @@ class Mika(Vorn):
     def draw(self, g):
         p, t = self._effective(), self.t
         self.d = p
-        o = OUTFITS[self.outfit]
+        o = self.OUTFITS[self.outfit]
         g.setRenderHint(QPainter.Antialiasing)
         breath = math.sin(t * 2 * math.pi / 3.4)
         s = 1 + 0.04 * self.pop ** 2
@@ -99,8 +103,8 @@ class Mika(Vorn):
             g.translate(150, 480)
             g.scale(0.42, 1.0)
             glow = QRadialGradient(P(0, 0), 520)
-            glow.setColorAt(0, alpha(mix(GOLD, LED, 0.5), 0.28 + 0.05 * math.sin(t * 2)))
-            glow.setColorAt(1, alpha(LED, 0))
+            glow.setColorAt(0, alpha(mix(GOLD, self.LED, 0.5), 0.28 + 0.05 * math.sin(t * 2)))
+            glow.setColorAt(1, alpha(self.LED, 0))
             g.setPen(Qt.NoPen)
             g.setBrush(QBrush(glow))
             g.drawEllipse(P(0, 0), 520, 520)
@@ -140,8 +144,8 @@ class Mika(Vorn):
             return
         t = self.t
         glow = QRadialGradient(P(150, 420), 330)
-        glow.setColorAt(0, alpha(mix(LED, QColor("#7a0030"), b), 0.4 * a))
-        glow.setColorAt(1, alpha(LED, 0))
+        glow.setColorAt(0, alpha(mix(self.LED, QColor("#7a0030"), b), 0.4 * a))
+        glow.setColorAt(1, alpha(self.LED, 0))
         g.setPen(Qt.NoPen)
         g.setBrush(QBrush(glow))
         g.drawEllipse(P(150, 420), 230, 560)
@@ -167,11 +171,11 @@ class Mika(Vorn):
             hair.lineTo(P(x + sw * 0.8, 600 - (26 if i % 2 == 0 else 0) + (14 if i in (2, 4) else 0)))
         hair.lineTo(P(74 + sw, 600))
         hair.cubicTo(P(62 + sw, 470), P(72, 260), P(92, 120))
-        fill(g, hair, vgrad(60, 600, HAIR_SH, HAIR_DEEP))
+        fill(g, hair, vgrad(60, 600, self.HAIR_SH, self.HAIR_DEEP))
         for x0, x1 in ((112, 96), (150, 150), (188, 206)):
             strand = QPainterPath(P(x0, 240))
             strand.quadTo(P((x0 + x1) / 2 + sw * 0.5, 420), P(x1 + sw, 570))
-            stroke(g, strand, alpha(HAIR_DEEP, 0.8), 2)
+            stroke(g, strand, alpha(self.HAIR_DEEP, 0.8), 2)
         if self.d["blood"] > 0.02:
             fill(g, hair, alpha(QColor("#3a0014"), 0.35 * self.d["blood"]), 0)
 
@@ -182,8 +186,8 @@ class Mika(Vorn):
                 a = math.radians(self.legs[side]) * side
                 knee, ankle = ((hip[0] + (x - hip[0]) * math.cos(a) + (y - hip[1]) * math.sin(a),
                                 hip[1] - (x - hip[0]) * math.sin(a) + (y - hip[1]) * math.cos(a)) for x, y in (knee, ankle))
-            leg = self._limb(g, hip, knee, 35, 21, SKIN, SKIN_SH, width=1.8)
-            shin = self._limb(g, knee, ankle, 21, 13, SKIN, SKIN_SH, width=1.8)
+            leg = self._limb(g, hip, knee, 35, 21, self.SKIN, self.SKIN_SH, width=1.8)
+            shin = self._limb(g, knee, ankle, 21, 13, self.SKIN, self.SKIN_SH, width=1.8)
             g.save()  # socks or tights over the skin from sock_top down
             g.setClipPath(leg.united(shin))
             fill(g, poly((60, o["sock_top"]), (240, o["sock_top"]), (240, 960), (60, 960)), QColor(o["socks"]), 0)
@@ -309,7 +313,7 @@ class Mika(Vorn):
                 g.setBrush(QBrush(trim))
                 g.drawEllipse(P(x + (x - 150) * 0.3, 314), 3.5, 3.5)
         elif style == "jersey":
-            fill(g, poly((136, 228), (164, 228), (150, 262)), SKIN, 1.4)  # v-neck
+            fill(g, poly((136, 228), (164, 228), (150, 262)), self.SKIN, 1.4)  # v-neck
             for side in (-1, 1):
                 fill(g, poly(*([(82, 290), (96, 288), (102, 446), (90, 446)] if side < 0 else
                               mirror([(82, 290), (96, 288), (102, 446), (90, 446)]))), trim, 0)
@@ -365,7 +369,7 @@ class Mika(Vorn):
             fill(g, body, alpha(DARK, 0.25 * self.d["blood"]), 0)
 
     def _arms(self, g):
-        o = OUTFITS[self.outfit]
+        o = self.OUTFITS[self.outfit]
         pose = self.pose()
         near = 1 if self.toward > 0 else -1
         arm = self.arm_points()
@@ -383,8 +387,8 @@ class Mika(Vorn):
             if wide:
                 fill(g, poly((elbow[0] - 14, elbow[1]), (wrist[0] - 14, wrist[1]), (wrist[0] - 4, wrist[1] + 44),
                              (elbow[0] + 4, elbow[1] + 30)), vgrad(elbow[1], wrist[1] + 44, sleeve, mix(sleeve, INK, 0.3)), 1.6)
-            self._limb(g, elbow, wrist, 24 if wide else 16, 21 if wide else 12.5, SKIN if short else sleeve,
-                       SKIN_SH if short else INK, width=1.8)
+            self._limb(g, elbow, wrist, 24 if wide else 16, 21 if wide else 12.5, self.SKIN if short else sleeve,
+                       self.SKIN_SH if short else INK, width=1.8)
             self._limb(g, shoulder, elbow, 24 if wide else 22 if o["top"] == "hoodie" else 20, 22 if wide else 16, sleeve, INK, width=1.8)
             if o.get("sleeves") == "puff":  # puffed shoulders
                 puff = QPainterPath()
@@ -404,25 +408,25 @@ class Mika(Vorn):
             for i, ang in enumerate((-14, -4, 6, 16)):
                 r = math.radians(ang)
                 base = (-7 + i * 4.6, 12)
-                self._limb(g, base, (base[0] - math.sin(r) * 13, base[1] + math.cos(r) * 13), 2.6, 2.2, SKIN, width=1.2)
-            self._limb(g, (side * 7, 4), (side * 16, 13), 2.8, 2.4, SKIN, width=1.2)
+                self._limb(g, base, (base[0] - math.sin(r) * 13, base[1] + math.cos(r) * 13), 2.6, 2.2, self.SKIN, width=1.2)
+            self._limb(g, (side * 7, 4), (side * 16, 13), 2.8, 2.4, self.SKIN, width=1.2)
             palm = QPainterPath()
             palm.addRoundedRect(-9, -2, 18, 16, 5, 5)
-            fill(g, palm, SKIN, 1.3)
+            fill(g, palm, self.SKIN, 1.3)
             return
         if kind == "point":
-            self._limb(g, (side * 3, 12), (side * 3, 30), 2.8, 2.4, SKIN, width=1.2)
+            self._limb(g, (side * 3, 12), (side * 3, 30), 2.8, 2.4, self.SKIN, width=1.2)
         fist = QPainterPath()
         fist.addRoundedRect(-9, -2, 18, 18, 6, 6)
-        fill(g, fist, SKIN, 1.3)
+        fill(g, fist, self.SKIN, 1.3)
         for x in (-4, 0, 4):
             k = QPainterPath(P(x, 11))
             k.lineTo(P(x, 15))
-            stroke(g, k, alpha(SKIN_SH, 0.9), 1)
+            stroke(g, k, alpha(self.SKIN_SH, 0.9), 1)
 
     def _neck(self, g, o):
-        fill(g, poly((138, 186), (162, 186), (165, 228), (135, 228)), SKIN, 1.6)
-        fill(g, poly((140, 186), (160, 186), (160, 204), (140, 198)), SKIN_SH, 0)
+        fill(g, poly((138, 186), (162, 186), (165, 228), (135, 228)), self.SKIN, 1.6)
+        fill(g, poly((140, 186), (160, 186), (160, 204), (140, 198)), self.SKIN_SH, 0)
         if o["top"] == "jacket":  # high collar
             for side in (-1, 1):
                 fill(g, poly(*([(124, 222), (142, 214), (146, 240), (128, 244)] if side < 0 else
@@ -441,10 +445,10 @@ class Mika(Vorn):
         face.quadTo(P(162, 198), P(178, 182))
         face.cubicTo(P(192, 165), P(198, 140), P(196, 100))
         face.cubicTo(P(194, 52), P(106, 52), P(104, 100))
-        fill(g, face, SKIN, 1.8)
+        fill(g, face, self.SKIN, 1.8)
         g.save()
         g.setClipPath(face)
-        fill(g, poly((176, 90), (204, 90), (204, 210), (150, 210), (172, 186), (186, 160), (190, 120)), alpha(SKIN_SH, 0.7), 0)
+        fill(g, poly((176, 90), (204, 90), (204, 210), (150, 210), (172, 186), (186, 160), (190, 120)), alpha(self.SKIN_SH, 0.7), 0)
         blush = max(0.25, 0.35 + 0.4 * max(p["smile"], 0) + 0.3 * p["happy"] - 0.3 * p["vein"]) + 0.3 * b
         for x in (122, 178):
             g.setPen(Qt.NoPen)
@@ -458,7 +462,7 @@ class Mika(Vorn):
             self._eye(g, cx, 140, side)
         nose = QPainterPath(P(151, 156))
         nose.lineTo(P(149, 162))
-        stroke(g, nose, alpha(SKIN_SH, 1), 1.6)
+        stroke(g, nose, alpha(self.SKIN_SH, 1), 1.6)
         self._mouth(g)
 
         sw = math.sin(self.t * 1.7) * 1.5
@@ -467,11 +471,11 @@ class Mika(Vorn):
         for i, x in enumerate((196, 186, 175, 163, 150, 137, 125, 114, 104)):
             top.lineTo(P(x + sw * 0.5, (124 if i % 2 == 0 else 110) + (6 if i in (3, 4, 5) else 0)))
         top.closeSubpath()
-        fill(g, top, vgrad(40, 124, HAIR_HI, HAIR))
+        fill(g, top, vgrad(40, 124, self.HAIR_HI, self.HAIR))
         for side in (-1, 1):  # side locks framing her face, down to her chest
             m = (lambda pts: pts) if side < 0 else mirror
             lock = poly(*m([(98, 104), (110, 112), (112, 200), (106, 270 + sw), (98, 330 + sw), (90, 262), (88, 170)]))
-            fill(g, lock, vgrad(100, 330, HAIR, HAIR_SH))
+            fill(g, lock, vgrad(100, 330, self.HAIR, self.HAIR_SH))
         shine = QPainterPath(P(118, 66))
         shine.quadTo(P(150, 54), P(182, 66))
         stroke(g, shine, alpha(QColor("white"), 0.7), 3)
@@ -480,7 +484,7 @@ class Mika(Vorn):
         for side in (-1, 1):
             self._brow(g, 150 + side * 22, 140, side)
         self._headset(g)
-        self._headpiece(g, OUTFITS[self.outfit])
+        self._headpiece(g, self.OUTFITS[self.outfit])
         if p["vein"] > 0.05:  # anime anger mark
             c = alpha(QColor("#e0263a"), p["vein"])
             for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
@@ -521,7 +525,7 @@ class Mika(Vorn):
             fill(g, center, QColor("#ffe28a"), 1.2)
 
     def _headset(self, g):
-        led = mix(LED, CYAN, 0.0) if self.tier < 1 else mix(LED, QColor("white"), 0.25)
+        led = mix(self.LED, CYAN, 0.0) if self.tier < 1 else mix(self.LED, QColor("white"), 0.25)
         b = self.d["blood"]
         led = mix(led, QColor("#ff1030"), b)
         band = QPainterPath(P(92, 126))
@@ -569,13 +573,13 @@ class Mika(Vorn):
             g.setClipPath(eye)
             ix, iy = cx + (p["look"] + self.glance) * 4 + p["roll_x"] * 0.7, cy + 1 + p["roll_y"] * 0.7
             iris = QRadialGradient(P(ix, iy - 3), 13)
-            iris.setColorAt(0, mix(IRIS, QColor("#7a0026"), b))
-            iris.setColorAt(1, mix(IRIS_SH, QColor("#1a0008"), b))
+            iris.setColorAt(0, mix(self.IRIS, QColor("#7a0026"), b))
+            iris.setColorAt(1, mix(self.IRIS_SH, QColor("#1a0008"), b))
             g.setBrush(QBrush(iris))
             g.setPen(pen(INK, 1.1))
             g.drawEllipse(P(ix, iy), 10.5, 13.5)
             g.setPen(Qt.NoPen)
-            g.setBrush(QBrush(PUPIL))
+            g.setBrush(QBrush(self.PUPIL))
             g.drawEllipse(P(ix, iy + 1), 4 * p["pupil"] * (1 - 0.5 * b), 6 * p["pupil"] * (1 - 0.5 * b))
             if b < 0.6:  # the light in her eyes (gone in Lovesick)
                 g.setBrush(QBrush(alpha(QColor("white"), 1 - b)))
@@ -603,7 +607,7 @@ class Mika(Vorn):
         inner, outer = (cx - side * 10, by + p["brow"] * 4), (cx + side * 13, by - 2 - p["brow"] * 1.2)
         brow = QPainterPath(P(*inner))
         brow.quadTo(P(cx, by - 3), P(*outer))
-        stroke(g, brow, HAIR_DEEP, 2.4)
+        stroke(g, brow, self.HAIR_DEEP, 2.4)
 
     def _mouth(self, g):
         p, b = self.d, self.d["blood"]

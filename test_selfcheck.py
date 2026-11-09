@@ -364,20 +364,28 @@ with tempfile.TemporaryDirectory() as old_pc, tempfile.TemporaryDirectory() as n
     (old / "battle reports.txt").write_text("report", encoding="utf-8")
     (old / "Hall of Shame").mkdir()
     (old / "Hall of Shame" / "fail.jpg").write_bytes(b"jpg")
+    (old / "presets").mkdir()
+    (old / "presets" / "captain-rook.json").write_text('{"NAME": "Captain Rook"}', encoding="utf-8")  # one you created
+    (old / "presets" / "vorn.json").write_text('{"NAME": "Old Vorn"}', encoding="utf-8")  # (comes with the app)
     export = transfer.export_memory(old, old / "export.zip")
+    assert "presets/captain-rook.json" in zipfile.ZipFile(export).namelist() and "presets/vorn.json" not in zipfile.ZipFile(export).namelist()
     (new / "memory.json").write_text('{"respect": 3}', encoding="utf-8")
     backup = transfer.import_memory(new, export)
     assert json.loads((new / "memory.json").read_text(encoding="utf-8")) == {"respect": 77}
     assert (new / "Hall of Shame" / "fail.jpg").read_bytes() == b"jpg" and (new / "battle reports.txt").exists()
+    assert json.loads((new / "presets" / "captain-rook.json").read_text(encoding="utf-8")) == {"NAME": "Captain Rook"}
     assert json.loads(zipfile.ZipFile(backup).read("memory.json")) == {"respect": 3}  # the memory it replaced
     with zipfile.ZipFile(new / "evil.zip", "w") as z:
         z.writestr("memory.json", "{}")
         z.writestr("Hall of Shame/../../escaped.txt", "x")
         z.writestr("Hall of Shame\\..\\..\\escaped2.txt", "x")
         z.writestr("api_key.txt", "x")
+        z.writestr("presets/vorn.json", '{"NAME": "Fake Vorn"}')
+        z.writestr("presets/../escaped3.json", "{}")
     (new / "sub").mkdir()
     transfer.import_memory(new / "sub", new / "evil.zip")
-    assert not any((new / n).exists() for n in ("escaped.txt", "escaped2.txt", "sub/api_key.txt"))
+    assert not any((new / n).exists() for n in ("escaped.txt", "escaped2.txt", "sub/api_key.txt", "sub/presets/vorn.json",
+                                                "sub/escaped3.json"))
     with zipfile.ZipFile(new / "notvorn.zip", "w") as z:
         z.writestr("photo.jpg", "x")
     try:
@@ -548,7 +556,7 @@ assert type(main.make_character("vorn")).__name__ == "Vorn"
 from mika import OUTFITS, Mika  # noqa: E402
 
 mika_preset = json.loads((config.PRESETS / "mika.json").read_text(encoding="utf-8"))
-assert mika_preset["CHARACTER"] == "mika" and set(mika_preset) == set(config.PRESET_KEYS)
+assert mika_preset["CHARACTER"] == "mika" and set(config.PRESET_KEYS) - {"COLORS"} <= set(mika_preset) <= set(config.PRESET_KEYS)
 assert type(main.make_character("mika")).__name__ == "Mika" and Mika("nope").outfit in OUTFITS
 for outfit in OUTFITS:
     for mood in MOODS:
@@ -1292,6 +1300,95 @@ for c in pair:
     c.afk = True
     c.step(1 / 30, 0.0)
 assert all(c.yawn_at > c.t + 1 for c in pair) and abs((pair[0].yawn_at - pair[0].t) - (pair[1].yawn_at - pair[1].t)) > 1e-6
+
+# character creator: their own colours over the build's (Vorn's and Mika's own stay untouched), a created character's
+# own lines with the build's as a fallback, and a new preset that never overwrites one
+import character as character_mod  # noqa: E402
+from character import make_character, tinted  # noqa: E402
+from PySide6.QtGui import QColor  # noqa: E402
+from senses import Voice  # noqa: E402
+
+plain = Vorn("warlord")
+assert plain.HAIR == character_mod.HAIR and plain.OUTFITS is character_mod.VORN_OUTFITS
+red = make_character("vorn", {"hair": "#ff0000", "eyes": "#00ff00", "outfit": "#2a6cff"})
+assert red.HAIR == QColor("#ff0000") and red.IRIS == QColor("#00ff00") and red.SKIN == character_mod.SKIN  # (skin: his own)
+assert Vorn.HAIR == character_mod.HAIR and Vorn("warlord").HAIR == character_mod.HAIR  # others keep theirs
+assert red.render().pixelColor(int(main.CW / 2), int(main.HEAD_Y - 40)) != plain.render().pixelColor(int(main.CW / 2), int(main.HEAD_Y - 40))
+red.outfit = "warlord"
+cape = red.kit["cape"][0]
+assert abs(cape.hslHueF() - QColor("#2a6cff").hslHueF()) < 0.02 and red.kit["steel"][0] == plain.kit["steel"][0]  # tinted; greys stay
+red.recolor({})
+assert red.HAIR == character_mod.HAIR and red.OUTFITS is character_mod.VORN_OUTFITS and red.GEM == character_mod.GEM  # back
+pink = make_character("mika", {"eyes": "#00ff00", "outfit": "#ff8a1f"})
+assert pink.IRIS == QColor("#00ff00") and pink.PUPIL != pink.IRIS and pink.HAIR == _Mika.HAIR
+assert pink.OUTFITS["jacket"]["main"] == OUTFITS["jacket"]["main"]  # (a near-black stays)
+assert pink.OUTFITS["jacket"]["trim"].startswith("#") and pink.OUTFITS["jacket"]["trim"] != OUTFITS["jacket"]["trim"]
+assert tinted({"c": "#ff4fa3", "x": None, "t": ("#808080",)}, QColor("#777777"))["c"] == QColor.fromHslF(QColor("#ff4fa3").hslHueF(), 0.0, QColor("#ff4fa3").lightnessF()).name()
+assert "COLORS" in config.PRESET_KEYS and isinstance(config._DEFAULTS["COLORS"], dict)
+
+saved_presets, config.PRESETS = config.PRESETS, Path(tempfile.mkdtemp())
+for p in ("vorn", "mika"):
+    shutil.copy(saved_presets / f"{p}.json", config.PRESETS)
+commands._preset.cache_clear()
+try:
+    template = commands.LINES["mika"]
+    made = {"persona": "You are {name}, a storm witch. {power} is your fury.", "wake_names": ["Zara", " zahra ", "sarah"],
+            "lines": {"mute for": {"mood": "angry", "lines": ["Silence for {n}.", "Quiet for {minutes}.", "Odd {brace"]},
+                      "poke": {"mood": "surprised", "lines": ["Hey! Hands off the witch."]}}}
+    assert settings_ui.own_lines(made["lines"], template) == {"mute for": ["angry", ["Silence for {n}."]],
+                                                              "poke": ["surprised", ["Hey! Hands off the witch."]]}
+    first = settings_ui.save_character("Zara", "mika", "kokoro:af_heart", "Stormfury", {"hair": "#ffffff"}, "a storm witch", made)
+    second = settings_ui.save_character("Zara", "mika", "kokoro:af_heart", "Stormfury", {}, "a storm witch", {})
+    assert (first, second) == ("zara", "zara-2")  # never over an existing character
+    zara = json.loads((config.PRESETS / "zara.json").read_text(encoding="utf-8"))
+    assert zara["WAKE_NAMES"] == ["zara", "zahra", "sarah"] and zara["CHARACTER"] == "mika" and zara["COLORS"] == {"hair": "#ffffff"}
+    assert set(zara) >= set(config.PRESET_KEYS)
+    plainer = json.loads((config.PRESETS / "zara-2.json").read_text(encoding="utf-8"))  # Claude couldn't: her words, Mika's lines
+    assert "a storm witch" in plainer["PERSONA"] and "{name}" in plainer["PERSONA"] and plainer["LINES"] == {}
+    assert commands.reply("zara", "mute for", n="10 minutes") == ("angry", "Silence for 10 minutes.")  # her own
+    assert commands.lines_of("zara", "thrown") == template["thrown"]  # one she lacks: her build's (Mika's)
+    assert commands.lines_of("nobody", "poke") == commands.LINES["vorn"]["poke"]
+    # the window: fill it in, Claude writes them (faked here), and the new character is saved and announced
+    real_create = brain.create_character
+    brain.create_character = lambda *a: ({"persona": "You are {name}.", "wake_names": ["rook"], "lines": {}}, 0.06)
+    real_client, brain.make_client = brain.make_client, lambda: object()
+    spent, announced, warned = [], [], []
+    real_warning, settings_ui.QMessageBox.warning = settings_ui.QMessageBox.warning, lambda *a: warned.append(a[2])
+    try:
+        w = settings_ui.CreatorWindow(Voice(), spent.append, lambda preset, name: announced.append((preset, name)))
+        w.create()  # no name yet: they're told, nothing else happens
+        assert w.result is None and not announced and "name" in warned[0]
+        w.name.setText("Captain Rook")
+        w.about.setPlainText("a pirate")
+        w.build.setCurrentIndex(0)
+        w.picks.colors = {"outfit": "#1f6f8b"}
+        w.redress()
+        assert w.char.OUTFITS is not character_mod.VORN_OUTFITS and not w.preview.pixmap().isNull()  # the live preview
+        w.create()
+        for _ in range(100):
+            if w.result is not None:
+                break
+            time.sleep(0.05)
+        w.finish("Captain Rook", "vorn", "Overdrive", "a pirate")
+        assert announced == [("captain-rook", "Captain Rook")] and spent == [0.06]
+        rook = json.loads((config.PRESETS / "captain-rook.json").read_text(encoding="utf-8"))
+        assert rook["COLORS"] == {"outfit": "#1f6f8b"} and rook["POWER"] == "Overdrive" and rook["WAKE_NAMES"] == ["captain rook", "rook"]
+    finally:
+        brain.create_character, brain.make_client = real_create, real_client
+        settings_ui.QMessageBox.warning = real_warning
+finally:
+    config.PRESETS = saved_presets
+    commands._preset.cache_clear()
+prompts = []
+real_ask = brain._ask
+brain._ask = lambda client, model, content, schema, tools=None: (prompts.append((content[0]["text"], schema)), (
+    {"persona": "p", "wake_names": [], "lines": [{"moment": "poke", "mood": "smug", "lines": ["Ow."]}]}, 0.0))[1]
+try:
+    out, _ = brain.create_character(None, "m", "Rook", "Vorn", "Stormcall", "a pirate", "EXAMPLE PERSONA", commands.LINES["vorn"])
+finally:
+    brain._ask = real_ask
+assert out["lines"] == {"poke": {"moment": "poke", "mood": "smug", "lines": ["Ow."]}} and "EXAMPLE PERSONA" in prompts[0][0]
+assert prompts[0][1]["properties"]["lines"]["items"]["properties"]["moment"]["enum"] == list(commands.LINES["vorn"])
 
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"

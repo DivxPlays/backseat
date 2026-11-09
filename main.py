@@ -285,12 +285,12 @@ class Overlay(QWidget):
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
-        self.char, self.voice, self.respect, self.spent, self.ducker = make_character(config.CHARACTER), voice, respect, spent, Ducker()
+        self.char, self.voice, self.respect, self.spent, self.ducker = make_character(config.CHARACTER, config.COLORS), voice, respect, spent, Ducker()
         self.text, self.shown, self.cps, self.hide_at = "", 0.0, 40.0, 0.0
         self.moving, self.grab_at = False, QPoint()
         self.left = "left" in config.CORNER  # True = bubble on his right
         other = brain.partner()
-        self.chars = [self.char] + ([make_character(other["CHARACTER"])] if other else [])  # duo mode: both on screen
+        self.chars = [self.char] + ([make_character(other["CHARACTER"], other.get("COLORS"))] if other else [])  # duo mode
         self.names = [config.NAME] + ([other["NAME"]] if other else [])
         self.speaking = 0  # which of them is talking (their mouth follows the voice)
         self.later = {}  # {character index: (when, mood)}: duo mode, each one changes face in their own time
@@ -836,7 +836,7 @@ class Companion:
         """Their screams for when you throw them, in their own voices, a bit faster (a throw can't wait for the voice)."""
         for i, name in enumerate(self.names):
             voice = self.voices_of[name]
-            _, lines = commands.LINES.get(self.preset_of(i), commands.LINES["vorn"])["scream"]
+            _, lines = commands.lines_of(self.preset_of(i), "scream")
             try:
                 self.screams[i] = [(self.voice.synth(text, voice["VOICE"], "+15%", voice["VOICE_PITCH"]), text) for text in lines]
             except Exception:
@@ -1594,7 +1594,7 @@ def main():
             return
         restart()
 
-    settings = SettingsWindow(restart, comp.voice)
+    settings = SettingsWindow(restart, comp.voice, lambda dollars: comp.mem.spend(dollars, "create"))
     windows = {}
 
     def open_costs():

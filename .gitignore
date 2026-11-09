@@ -9,6 +9,9 @@ companion.log
 battle reports.txt
 Hall of Shame/
 memory backup *.zip
+presets/*.json
+!presets/vorn.json
+!presets/mika.json
 
 # rebuilt by run.bat
 .venv/

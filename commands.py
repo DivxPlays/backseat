@@ -2,8 +2,12 @@
 "switch to Mika", "stop looking", "how much have you cost me?". Only a whole sentence that is a command counts; anything
 else ("shut up, you're wrong about that map") goes to Claude as usual.
 """
+import json
 import random
 import re
+from functools import lru_cache
+
+import config
 
 WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
          "ten": 10, "fifteen": 15, "twenty": 20, "thirty": 30, "forty five": 45, "sixty": 60, "half an": 0.5, "a couple": 2,
@@ -153,9 +157,27 @@ LINES = {
 }
 
 
+@lru_cache(maxsize=None)
+def _preset(preset):
+    try:
+        return json.loads((config.PRESETS / f"{preset}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def lines_of(preset, key):
+    """(mood, lines) for `key` in this character's voice: Vorn's, Mika's, or a created character's own (Claude writes them
+    when the character is made); one it lacks comes from its build (Vorn's or Mika's body)."""
+    if preset in LINES:
+        return LINES[preset][key]
+    data = _preset(preset)
+    own = data.get("LINES", {}).get(key) if isinstance(data.get("LINES"), dict) else None
+    return tuple(own) if own else LINES.get(data.get("CHARACTER"), LINES["vorn"])[key]
+
+
 def reply(preset, key, **values):
-    """(mood, line) for a command, in the character's voice (another character borrows Vorn's)."""
-    mood, lines = LINES.get(preset, LINES["vorn"])[key]
+    """(mood, line) for a command, in the character's voice."""
+    mood, lines = lines_of(preset, key)
     return mood, random.choice(lines).format(**values)
 
 

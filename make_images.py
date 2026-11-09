@@ -10,8 +10,8 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"))  # else text is boxes
 
 from PIL import Image  # noqa: E402
-from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtGui import QColor, QImage, QLinearGradient, QPainter, QPixmap  # noqa: E402
+from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
 import config  # noqa: E402
 
@@ -130,8 +130,23 @@ def main_images():
     for c in overlay.chars:
         c.step(1.0, 0.0)
     overlay.shown = float(len(overlay.text))
-    backdrop([overlay.grab().toImage()], "duo.png")
+    backdrop([QWidget.grab(overlay).toImage()], "duo.png")  # (overlay.grab is the character you hold)
     Image.fromarray(main.Camera(overlay, lambda: (0, 0)).frame()).save(OUT / "camera.png")  # what Discord sees
+    import settings_ui  # the character creator, filled in, with its live preview
+    creator = settings_ui.CreatorWindow(Voice(), lambda dollars: None, lambda preset, name: None)
+    creator.timer.stop()
+    creator.name.setText("Captain Rook")
+    creator.about.setPlainText("A washed-up pirate captain who thinks every match is a naval battle. Gruff and dramatic, "
+                               "calls the player 'deckhand', secretly proud of them.")
+    creator.power.setText("Stormcall")
+    creator.voice_pick.setCurrentText("kokoro:bm_george")
+    creator.picks.colors = {"hair": "#c0392b", "eyes": "#3ee6ff", "outfit": "#1f6f8b"}
+    creator.picks.show_colors()
+    creator.redress()
+    creator.char.outfit = "warlord"
+    creator.preview.setPixmap(QPixmap.fromImage(pose(creator.char, "smug").render(0.9)))
+    creator.resize(creator.sizeHint())
+    creator.grab().save(str(OUT / "creator.png"))
     print("\n".join(f"{p.name}: {Image.open(p).size}" for p in sorted(OUT.glob("*.png"))))
 
 

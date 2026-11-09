@@ -2,9 +2,6 @@
 
 ## Planned for 2.0.0
 
-### Characters
-- **Character creator:** make your own character in Settings (name, personality, voice, hair, eye and outfit colours) without touching code.
-
 ### Gameplay
 - **Auto-clips:** keep the last 30 seconds of gameplay; on an epic play or a hilarious fail, save a clip with the character's roast voiced over it, so the Hall of Shame becomes shareable videos. Needs a screen recorder (ffmpeg or NVIDIA's instant replay), with your OK first.
 - **Accurate stats from the game itself:** kills and deaths from game logs or Steam where possible, instead of guessing from screenshots.
@@ -23,6 +20,7 @@
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+- Character creator: your own character on Vorn's or Mika's body (name, who they are, voice, power-up, hair, eye, skin and outfit colours, live preview); Claude writes their full personality, misheard names and their own voice-command lines (about 6 cents). Colours for Vorn and Mika too; created characters travel with Export memory.
 - Challenges and bounties: one thing for your next match they can check on screen, with a bounty (easy, hard, brutal) paid by whoever set it, a fine when you fail or dodge it, settled from your screen, and a record. Ask for one any time ("give me a challenge").
 - Fixes: the Discord ear no longer takes their own voices for a friend talking; test scripts can't pop up a crash box or write to companion.log.
 - Game profiles: each game looked up once with a web search (modes, maps, weapons, good play) and used in comments, hints, trivia and dares; trivia now from Sonnet, checked against the profile, no repeats. Games are found anywhere, not just Steam: Windows' Game Bar list, launcher folders, or fullscreen.

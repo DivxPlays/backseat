@@ -251,6 +251,33 @@ def minigame(client, model, name, game, kind, about="", topic="", avoid=()):
     return _ask(client, model, [{"type": "text", "text": ask}], MINIGAME_SCHEMA)
 
 
+def create_character(client, model, name, build, power, about, example, lines):
+    """A new character from the player's few words: their full personality (written like `example`, another character's),
+    the ways speech recognition may mishear their name, and their own short lines for voice commands, pokes and throws
+    (like `lines`: {key: (mood, [lines])}, placeholders kept). Returns (reply, dollars)."""
+    said = {"type": "object", "properties": {"moment": {"type": "string", "enum": list(lines)}, "mood": SCHEMA["properties"]["mood"],
+                                             "lines": {"type": "array", "items": {"type": "string"}}},
+            "required": ["moment", "mood", "lines"], "additionalProperties": False}  # (an object per moment: too big a grammar)
+    schema = {"type": "object", "properties": {"persona": {"type": "string"}, "wake_names": {"type": "array", "items": {"type": "string"}},
+                                               "lines": {"type": "array", "items": said}},
+              "required": ["persona", "wake_names", "lines"], "additionalProperties": False}
+    ask = (f"Create a new character for Backseat, a desktop app where an animated companion lives in the corner of the player's "
+           f"screen, watches them play games and talks to them out loud. They're drawn on {build}'s body. The player describes them:\n"
+           f"Name: {name}\nPower-up form: {power}\nWho they are: {about}\n\n"
+           "persona: their full character description, in the second person and the same structure as the example below (who "
+           "they are and how they watch the player; their personality and how they talk; how the respect score 0-100 colours "
+           "their tone; what their power-up looks and feels like; their past, which they make up and keep consistent), but "
+           "entirely their own: an original character. Write {name} for their name and {power} for their power-up. Keep the "
+           "trash talk about gaming; never slurs, never real threats. Example:\n" + example + "\n\n"
+           "wake_names: lower case: their name first, then 6 to 10 ways speech recognition might mishear it.\n\n"
+           "lines: one entry for each of these moments, with their own short spoken lines for it, in their voice: the same "
+           "mood and as many lines as the example, with every {placeholder} kept exactly as written. The example (another "
+           "character's):\n" + json.dumps([{"moment": k, "mood": m, "lines": ls} for k, (m, ls) in lines.items()], indent=0))
+    out, spent = _ask(client, model, [{"type": "text", "text": ask}], schema)
+    out["lines"] = {said["moment"]: said for said in out.get("lines", [])}
+    return out, spent
+
+
 COACH_SCHEMA = {"type": "object", "properties": {"headline": {"type": "string"}, "better": {"type": "string"},
                                                  "worse": {"type": "string"}, "tips": {"type": "array", "items": {"type": "string"}}},
                 "required": ["headline", "better", "worse", "tips"], "additionalProperties": False}
