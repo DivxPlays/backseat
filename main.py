@@ -452,6 +452,14 @@ class Companion:
         return line, audio
 
     def watcher(self):
+        while True:  # one failed screenshot (UAC prompt, lock screen, resolution change) must not end his comments for good
+            try:
+                self._watch()
+            except Exception:
+                logging.exception("watcher failed, restarting it")
+                time.sleep(5)
+
+    def _watch(self):
         prev = last_save = time.monotonic()
         while True:
             time.sleep(1)

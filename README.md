@@ -29,6 +29,7 @@ An animated warlord in the corner of your screen. He watches what you play, comm
 - When locked, mouse clicks pass straight through him to your game. He only grabs the mouse while unlocked with F6.
 - He looks at your screen when it changes a lot (at most every 15 s), or after 60 s of silence to roast you.
 - He stops looking and stops counting your time after 5 minutes without keyboard or mouse input.
+- If Windows blocks a screenshot (a UAC prompt, the lock screen, a game switching resolution), he waits a few seconds and carries on watching.
 - Hours played: time per app while he runs, plus lifetime Steam hours for Steam games (read from Steam's local files).
 - **Score:** he counts your deaths, wins, losses, fails and epic plays, per session and per game, and throws the numbers at you.
 - **Respect meter (0-100):** goes up when you play well and down when you embarrass yourself. Low respect means pure contempt; high respect means grudging, still-arrogant praise. It moves slowly.

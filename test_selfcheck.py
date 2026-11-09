@@ -201,5 +201,26 @@ assert "PERSONA" not in written and written["NAME"] == "Krag", written  # only c
 settings_ui.FILE = real_file
 assert "grunt" not in config.PERSONA.split("Never call")[0]  # he turned "a grunt" into a nickname for every line
 
+import logging  # noqa: E402
+import time  # noqa: E402
+
+watch_calls, real_sleep = [], time.sleep
+
+
+def flaky_watch():
+    watch_calls.append(1)
+    if len(watch_calls) == 1:
+        raise RuntimeError("BitBlt failed")  # what killed his comments for good
+    raise SystemExit  # a BaseException, so it ends the test loop
+
+
+time.sleep, _ = (lambda s: None), logging.disable(logging.CRITICAL)
+try:
+    main.Companion.watcher(SimpleNamespace(_watch=flaky_watch))
+except SystemExit:
+    pass
+time.sleep, _ = real_sleep, logging.disable(logging.NOTSET)
+assert len(watch_calls) == 2, watch_calls  # the watcher came back after the failed screenshot
+
 print("all self-checks passed", flush=True)
 os._exit(0)  # same exit as main.py: skip Qt's teardown order
