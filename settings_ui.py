@@ -313,11 +313,13 @@ class SettingsWindow(QDialog):
         w["GPU_BUSY"] = _spin(config.GPU_BUSY, 0, 100, " %")
         w["GAME_PROFILES"] = QCheckBox("Look each new game up on the web once (about 1 cent a game)")
         w["GAME_PROFILES"].setChecked(config.GAME_PROFILES)
+        w["AUTO_UPDATE"] = QCheckBox("Check GitHub for a newer version once a day (you're asked before it updates)")
+        w["AUTO_UPDATE"].setChecked(config.AUTO_UPDATE)
         brain = self._page([("Model for his automatic comments", w["MODEL"]), ("Model when you talk to him", w["SMART_MODEL"]),
                             ("Free local model for automatic comments\n(Ollama; blank = use Claude)", w["LOCAL_MODEL"]),
                             ("With the local model, Claude keeps score every\n(and on wins and deaths; 0 = never)", w["CHECK_EVERY"]),
                             ("Frame-rate guard: Claude comments instead when\na game has the GPU this busy (0 = off)", w["GPU_BUSY"]),
-                            ("Game profiles", w["GAME_PROFILES"]),
+                            ("Game profiles", w["GAME_PROFILES"]), ("Updates", w["AUTO_UPDATE"]),
                             ("Monthly budget (0 = no limit)", w["MONTHLY_BUDGET"])])
 
         w["LOOK_COOLDOWN"] = _spin(config.LOOK_COOLDOWN, 5, 600, " s")

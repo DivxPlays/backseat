@@ -106,6 +106,7 @@ BIRTHDAY = ""  # yours, as month-day ("02-10"): they celebrate it, with confetti
 NAG_EVERY = 45  # minimum minutes between nags
 WHISPER_MODEL = "base.en"  # speech-to-text model; "small.en" is more accurate but slower
 
+AUTO_UPDATE = True  # once a day, check GitHub for a newer version and offer it (tray > Update); never on a git clone
 MONTHLY_BUDGET = 100  # dollars of API use per month: cheap mode at 80%, only answers when asked at 100% (0 = no limit)
 DUCK_TO = 0.35  # while he talks, other apps' volume drops to this fraction (1 = don't lower it)
 CLIP_KEY = "windows+alt+g"  # auto-clips: the key that saves "what just happened" in a game: Windows Game Bar's (needs

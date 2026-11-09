@@ -1601,6 +1601,65 @@ try:
 finally:
     senses.sd.play, senses.sd.stop = real_sd
 
+# auto-update: the version on GitHub (from its main.py), offered only when newer; a git clone is never touched; an
+# update unpacks GitHub's ZIP safely and hands over to its installer, which waits for this copy to quit
+import io  # noqa: E402
+
+import updater  # noqa: E402
+
+main_py = Path(main.__file__).read_text(encoding="utf-8")
+assert updater.VERSION.search(main_py).group(1) == main.VERSION
+assert updater.newer("2.0.0", "1.2.0") and updater.newer("1.10.0", "1.9.9") and not updater.newer("1.2.0", "1.2.0")
+assert not updater.newer(None, "1.2.0") and not updater.newer("1.1.9", "1.2.0")
+assert updater.dev_copy(Path(main.__file__).parent) == (Path(main.__file__).parent / ".git").exists()
+
+
+class FakeResponse(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+
+def fake_zip(files):
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, "w") as z:
+        for name, text in files.items():
+            z.writestr(name, text)
+    return data.getvalue()
+
+
+real_urlopen, real_popen = updater.urllib.request.urlopen, updater.subprocess.Popen
+launched = []
+try:
+    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(main_py.replace(f'"{main.VERSION}"', '"9.9.9"').encode())
+    assert updater.latest() == "9.9.9"
+
+    def offline(*a, **k):
+        raise OSError("no internet")
+    updater.urllib.request.urlopen = offline
+    assert updater.latest() is None
+    updater.subprocess.Popen = lambda args, **k: launched.append(args)
+    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(fake_zip(
+        {"backseat-main/install.ps1": "# installer", "backseat-main/main.py": main_py}))
+    with tempfile.TemporaryDirectory() as here:
+        src = updater.update(here, pid=4242)
+        assert (src / "install.ps1").exists() and src.parent.name.startswith("backseat-update-")
+        script = launched[-1][-1]
+        assert launched[-1][0] == "powershell" and "Wait-Process -Id 4242" in script and f"-Dest '{Path(here).resolve()}'" in script
+        updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(fake_zip({"../escaped.txt": "x", "a/install.ps1": ""}))
+        try:
+            updater.update(here, pid=1)
+            raise AssertionError("unpacked a ZIP with a path outside its folder")
+        except ValueError:
+            pass
+        assert len(launched) == 1
+finally:
+    updater.urllib.request.urlopen, updater.subprocess.Popen = real_urlopen, real_popen
+assert "AUTO_UPDATE" in config._DEFAULTS and "presets /XC" not in Path("install.ps1").read_text(encoding="utf-8")
+assert "/XD .venv .git __pycache__ \"Hall of Shame\" presets" in Path("install.ps1").read_text(encoding="utf-8")  # your characters stay
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 

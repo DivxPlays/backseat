@@ -54,6 +54,7 @@ import music  # noqa: E402
 import holidays  # noqa: E402
 import transfer  # noqa: E402
 import unlocks  # noqa: E402
+import updater  # noqa: E402
 from camera import BACKGROUNDS, REACT, Camera  # noqa: E402
 import sfx  # noqa: E402
 import voices  # noqa: E402
@@ -242,6 +243,7 @@ class Bridge(QObject):
     awake = Signal()
     wear = Signal(int, str)  # voice command: which character (0 = the current one) puts on which outfit
     switch = Signal(str)  # voice command: switch to a preset, or "both" (restarts him)
+    update = Signal(str)  # a newer version is on GitHub
 
 
 def set_clickthrough(widget, on):
@@ -1879,6 +1881,47 @@ def main():
     boot.setCheckable(True)
     boot.setChecked(autostart_on())
     boot.toggled.connect(set_autostart)
+    update_item = menu.addAction("Check for updates...")
+
+    def check_updates(found=None):
+        """Tray > Check for updates (or the daily check found one): offer the newer version, then update and restart."""
+        if updater.dev_copy(HERE):
+            return QMessageBox.information(None, APP, f"This copy is a git clone ({HERE}): update it with git pull.")
+        found = found or updater.latest()
+        if found is None:
+            return QMessageBox.information(None, APP, "Couldn't reach GitHub. Try again later.")
+        if not updater.newer(found, VERSION):
+            return QMessageBox.information(None, APP, f"{APP} {VERSION} is the newest version.")
+        ask = (f"{APP} {found} is out (you have {VERSION}). Update now? It closes, updates in a window you'll see, and "
+               "starts again. Your memory, settings, key, Hall of Shame and characters stay as they are.")
+        if QMessageBox.question(None, f"Update {APP}", ask) != QMessageBox.Yes:
+            return
+        try:
+            updater.update(HERE)
+        except Exception as e:
+            logging.exception("update failed")
+            return QMessageBox.warning(None, APP, f"The update didn't download: {e}")
+        comp.mem.save()
+        app.quit()
+
+    def update_found(version):
+        update_item.setText(f"Update to {version}...")
+        tray.showMessage(APP, f"{APP} {version} is out. Right-click the tray icon > Update to {version}.")
+
+    update_item.triggered.connect(lambda: check_updates(updater.latest()))
+    comp.bridge.update.connect(update_found)
+
+    def daily_check():  # (in the background: GitHub may be slow or away)
+        today = datetime.now().date().isoformat()
+        if not config.AUTO_UPDATE or updater.dev_copy(HERE) or comp.mem.d.get("update_checked") == today:
+            return
+        comp.mem.d["update_checked"] = today
+        found = updater.latest()
+        if updater.newer(found, VERSION):
+            logging.info("update: %s is on GitHub", found)
+            comp.bridge.update.emit(found)
+
+    threading.Thread(target=daily_check, daemon=True).start()
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
         f"<h3>{APP} {VERSION}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
         "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "

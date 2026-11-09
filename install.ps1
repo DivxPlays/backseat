@@ -50,9 +50,12 @@ Write-Host "Using $python"
 #    move your memory with tray > Export memory / Import memory.
 if ($src -ne $Dest) {
     New-Item -ItemType Directory -Force $Dest | Out-Null
-    robocopy $src $Dest /E /XD .venv .git __pycache__ "Hall of Shame" `
+    robocopy $src $Dest /E /XD .venv .git __pycache__ "Hall of Shame" presets `
         /XF memory.json settings.json api_key.txt companion.log "battle reports.txt" "memory backup *.zip" /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Copying his files failed (robocopy code $LASTEXITCODE)." }
+    # characters: only ones this PC doesn't have yet (an update must not undo your Settings > Character changes)
+    robocopy (Join-Path $src "presets") (Join-Path $Dest "presets") *.json /XC /XN /XO /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "Copying the characters failed (robocopy code $LASTEXITCODE)." }
 }
 Get-ChildItem $Dest -Recurse -File -ErrorAction SilentlyContinue | Unblock-File  # files from a downloaded ZIP are marked as "from the internet"
 Set-Location $Dest
