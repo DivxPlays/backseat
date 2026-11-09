@@ -18,9 +18,6 @@ Export and import his memory (stats, respect, grudges, lore, notes, optionally t
 ## Full body
 A full-body character instead of the bust, with more animations: idle stance, arms crossed, pointing at you, laughing, slumping when you lose.
 
-## Black hair and black eyes
-Change his hair and eyes to black.
-
 ## Cheaper (or free) brain
 - Cheaper Claude: smaller screenshots (images are most of each call), skip displays that didn't change, cache the parts of the prompt that repeat every call, and look less often in menus.
 - Free option: a local vision model on your own GPU (for example through Ollama). No API bill, but slower, weaker roasts and hints, and it competes with your game for the GPU, so it could cost frames.

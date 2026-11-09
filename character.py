@@ -13,9 +13,10 @@ W, H = 300, 340  # logical canvas; the overlay scales it
 
 INK = QColor("#1b1418")
 SKIN, SKIN_SH = QColor("#d9a27c"), QColor("#a8694c")
-HAIR, HAIR_SH, HAIR_HI = QColor("#7a1f22"), QColor("#3a0b0f"), QColor("#c0504a")
+HAIR, HAIR_SH, HAIR_HI = QColor("#1d1b24"), QColor("#07060a"), QColor("#4b4f66")  # black, with a cool sheen so it keeps its shape
 SCLERA = QColor("#f1e9df")
-IRIS, IRIS_SH = QColor("#ff6a2a"), QColor("#7a0e00")
+IRIS, IRIS_SH = QColor("#2b2730"), QColor("#050406")  # black eyes; the white catchlight keeps them alive
+GEM = QColor("#d23a3a")
 STEEL, STEEL_SH, STEEL_HI = QColor("#454b58"), QColor("#1f232b"), QColor("#7a8396")
 BRONZE, BRONZE_SH = QColor("#c8893f"), QColor("#7a4a1a")
 FUR, FUR_SH, FUR_HI = QColor("#54453c"), QColor("#2b221d"), QColor("#8a7563")
@@ -384,7 +385,7 @@ class Vorn:
             fill(g, poly(*crown), vgrad(40, 90, GOLD, GOLD_SH), 1.8)
             gem = QPainterPath()
             gem.addEllipse(P(150, arc_y(150) - 7), 4, 4)
-            fill(g, gem, IRIS, 1.2)
+            fill(g, gem, GEM, 1.2)
 
         if p["vein"] > 0.05:  # anime anger mark at the temple
             c = alpha(QColor("#e0263a"), p["vein"])
