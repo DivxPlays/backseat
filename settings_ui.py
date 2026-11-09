@@ -112,9 +112,12 @@ class SettingsWindow(QDialog):
         w["MONTHLY_BUDGET"] = _spin(config.MONTHLY_BUDGET, 0, 100000, " $")
         w["LOCAL_MODEL"] = _combo(["", "qwen3-vl:8b-instruct", "qwen3-vl:4b-instruct"], config.LOCAL_MODEL, editable=True)
         w["CHECK_EVERY"] = _spin(config.CHECK_EVERY, 0, 120, " min")
+        w["GAME_PROFILES"] = QCheckBox("Look each new game up on the web once (about 1 cent a game)")
+        w["GAME_PROFILES"].setChecked(config.GAME_PROFILES)
         brain = self._page([("Model for his automatic comments", w["MODEL"]), ("Model when you talk to him", w["SMART_MODEL"]),
                             ("Free local model for automatic comments\n(Ollama; blank = use Claude)", w["LOCAL_MODEL"]),
                             ("With the local model, Claude keeps score every\n(and on wins and deaths; 0 = never)", w["CHECK_EVERY"]),
+                            ("Game profiles", w["GAME_PROFILES"]),
                             ("Monthly budget (0 = no limit)", w["MONTHLY_BUDGET"])])
 
         w["LOOK_COOLDOWN"] = _spin(config.LOOK_COOLDOWN, 5, 600, " s")
@@ -152,7 +155,7 @@ class SettingsWindow(QDialog):
         skip, games = QLineEdit(", ".join(config.SKIP_DISPLAYS)), QLineEdit(", ".join(config.GAMES))
         displays = self._page(keys + [("Displays to watch (all, or a number)", w["MONITOR"]),
                                       ("Displays to never look at (comma separated)", skip),
-                                      ("Non-Steam games that wake him (exe names)", games)])
+                                      ("Games they miss (exe names)", games)])
 
         w["MIC_DEVICE"] = _combo([""] + device_names("input"), config.MIC_DEVICE, editable=True)
         w["VOICE_DEVICE"] = _combo([""] + device_names("output"), config.VOICE_DEVICE, editable=True)

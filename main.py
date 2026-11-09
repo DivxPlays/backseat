@@ -16,7 +16,7 @@ import time
 import winreg
 from collections import deque
 from ctypes import wintypes
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -56,7 +56,8 @@ import voices  # noqa: E402
 from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
-from memory import Memory, app_name, fmt, foreground_app, foreground_center, idle_seconds, steam_app, steam_hours  # noqa: E402
+from memory import (Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen, idle_seconds,  # noqa: E402
+                    is_game, steam_app, steam_hours)  # noqa: E402
 from senses import SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, save_clip, save_moment  # noqa: E402
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
 
@@ -97,7 +98,9 @@ BANTER = ([1, 2, 3, 4, 5, 6], [2, 4, 3, 2, 1, 1])  # duo mode: how many lines an
 LOCAL_BANTER = 4
 CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one of these gets Claude to double-check
 CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
-GAME_GAP, ANSWER_TIME = 480, 20  # mini-games: at most every 8 minutes; how long the mic takes your trivia answer
+PROFILE_AGE = 90  # days before a game profile is looked up again
+GAME_GAP, ANSWER_TIME = 480, 20
+TRIVIA_TOPICS = ("map", "mode", "campaign level or mission", "class or character", "weapon", "map", "fact")  # (picked at random)  # mini-games: at most every 8 minutes; how long the mic takes your trivia answer
 MUSIC_GAP, LOOKUP_GAP = 300, 600  # Spotify: a comment on a new song at most every 5 minutes, a web lookup every 10
 COMEBACK_SAYS = ('{a} (the other one in your window) just said: "{line}". Fire back at {a} in one short sentence (under 15 '
                  "words), in your own style: roast what {a} said, or take the player's side against {a}. Your past is your "
@@ -629,7 +632,7 @@ class Companion:
         self.last_spoke, self.last_shame, self.last_breakdown = now, 0.0, 0.0
         self.streak_start = now  # when your current stretch without a break began
         self.last_nag = now - (config.NAG_EVERY - 10) * 60  # first nag can come 10 minutes in
-        self.app = ("", "", 0)
+        self.app, self.full = ("", "", 0), False  # the window in front (exe, title, pid); does it fill the screen
         self.focus = foreground_center()  # middle of the last window you used that isn't him: which display the game is on
         self.base_thumb = None
         self.history = deque(maxlen=3)  # the game's display from the last few looks, for post-match breakdowns
@@ -641,6 +644,8 @@ class Companion:
         self.screams = {}  # {character index: [(audio, text)]}, ready before anyone gets thrown
         self.menu_at, self.last_game = -999.0, time.monotonic()  # mini-games: when they last saw a menu, and last played
         self.trivia = self.dare = None  # the trivia question waiting for your answer; the dare for your next match
+        self.profiling = set()  # games already queued for a lookup this session
+        self.last_game_seen = None  # (key, name): for tray > Look up this game again (the tray itself takes the front)
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
@@ -725,6 +730,37 @@ class Companion:
         """The preset of the character at position i on screen (0: the current one, 1: duo mode's partner)."""
         return config.PRESET if i == 0 else self.partner["PRESET"]
 
+    def current_game(self):
+        """(key, name) of the game in front (a Steam game by its Steam name), or None when it isn't a game."""
+        exe, title, _ = self.app
+        if not is_game(exe, title, self.full):
+            return None
+        key, steam = app_name(exe, title), steam_app(exe)
+        return key, steam[1] if steam else title or key
+
+    def profile_due(self, game):
+        """True when this game has no profile yet (or an old one) and looking it up is allowed."""
+        if not config.GAME_PROFILES or self.client is None or game[0] in self.profiling:
+            return False
+        if config.MONTHLY_BUDGET and self.mem.spent() >= 0.8 * config.MONTHLY_BUDGET:
+            return False  # cheap mode
+        known = self.mem.game_profile(game[0])
+        return not known or datetime.now() - datetime.fromisoformat(known["made"]) > timedelta(days=PROFILE_AGE)
+
+    def profile(self, game):
+        """Look a game up once with a web search (about a cent) and remember it: modes, maps, weapons, good play."""
+        key, name = game
+        self.profiling.add(key)
+        try:
+            text, spent = brain.look_up_game(self.client, config.MODEL, name)
+        except Exception:
+            return logging.warning("couldn't look up %s", name, exc_info=True)
+        self.mem.spend(spent, "game")
+        if text:
+            self.mem.learn_game(key, name, text)
+            self.mem.save()
+        logging.info("game profile for %s ($%.4f): %s", name, spent, text)
+
     def minigame(self):
         """In a menu: one of them asks you a trivia question about your game (the mic then takes your answer for
         ANSWER_TIME s, no wake word) or dares you to do something in your next match."""
@@ -733,11 +769,21 @@ class Companion:
         i = random.randrange(len(self.names))
         who, game = self.names[i], self.app[1] or app_name(*self.app[:2])
         kind = "trivia" if random.random() < 0.7 else "dare"
-        out, spent = brain.minigame(self.client, config.MODEL, who, game, kind)
-        self.mem.spend(spent, "game")
-        logging.info("mini-game %s ($%.4f) -> %s", kind, spent, out)
-        if not out or not out["line"].strip():
-            return
+        known = self.mem.game_profile(app_name(*self.app[:2]))
+        about, asked = (known["profile"] if known else ""), self.mem.d.setdefault("trivia_asked", [])
+        for _ in range(3):  # (a trivia answer has to be in their profile of the game, word for word, or it's asked again)
+            model = config.TRIVIA_MODEL if kind == "trivia" else config.MODEL
+            out, spent = brain.minigame(self.client, model, who, known["name"] if known else game, kind, about,
+                                        random.choice(TRIVIA_TOPICS), asked[-15:])
+            self.mem.spend(spent, "game")
+            logging.info("mini-game %s ($%.4f) -> %s", kind, spent, out)
+            if out and out["line"].strip() and (kind == "dare" or not about or out["answer"].lower() in about.lower()):
+                break
+        else:
+            return  # no question it could stand behind
+        if kind == "trivia":
+            asked.append(out["answer"])
+            del asked[:-50]
         said = f"You ({who}): {out['line']}" if self.partner else f"You: {out['line']}"
         self.recent = (self.recent + [said])[-12:]
         _, audio = self.speak(out["mood"], out["line"], "none", who)
@@ -962,6 +1008,8 @@ class Companion:
             kind = "ask"
         if kind == "minigame":
             return self.minigame()
+        if kind == "profile":  # a game seen for the first time: look it up quietly in the background
+            return self.profile(arg)
         if kind == "poke":  # you poked, grabbed or threw one of them (free): a quick line, unless it's gone stale
             i, what, when = arg
             if time.monotonic() - when < 3 and not self.voice.busy() and i < len(self.names):
@@ -1197,6 +1245,9 @@ class Companion:
             top = self.mem.top_artists(3)
             if top:
                 text += " Their most-played artists: " + ", ".join(f"{a} ({fmt(s)})" for a, s in top) + "."
+        known = self.mem.game_profile(app_name(exe, title))
+        if known:  # what they looked up about the game in front
+            text += f"\nAbout {known['name']} (the game on screen): {known['profile']}"
         record = self.mem.d.get("trivia")
         if record and (record["right"] or record["wrong"]):  # mini-games
             text += f"\nTheir trivia record with you: {record['right']} right, {record['wrong']} wrong."
@@ -1328,11 +1379,11 @@ class Companion:
             dt, prev = now - prev, now
             exe, title, pid = foreground_app()
             if pid != os.getpid():
-                self.app, self.focus = (exe, title, pid), foreground_center()
+                self.app, self.focus, self.full = (exe, title, pid), foreground_center(), foreground_fullscreen()
             if self.unmute_at and now >= self.unmute_at:  # "shut up for 10 minutes" is over
                 self.set_mute(False)
             if not self.awake:  # started with Windows: wait for a game, without tracking or looking
-                if steam_app(self.app[0]) or app_name(*self.app[:2]) in [g.lower() for g in config.GAMES]:
+                if self.current_game():
                     self.wake_up()
                 continue
             afk = idle_seconds() > config.AFK_AFTER
@@ -1342,6 +1393,11 @@ class Companion:
                 self.mem.tick(app_name(*self.app[:2]), dt, self.on_screen)
             if now - last_save > 30:
                 self.check_season()  # (midnight may have brought a holiday)
+                game = self.current_game()
+                self.last_game_seen = game or self.last_game_seen
+                if game and self.profile_due(game):
+                    self.profiling.add(game[0])
+                    self.jobs.put(("profile", game))
                 self.check_unlocks()
                 self.mem.saw(self.on_screen)  # whoever is on screen knows how you've spent your time up to now
                 self.mem.save()
@@ -1525,6 +1581,17 @@ def main():
     menu.addAction("Open Hall of Shame").triggered.connect(lambda: (HALL.mkdir(exist_ok=True), os.startfile(HALL)))
     menu.addAction("Open this week's highlights").triggered.connect(weekly)
     menu.addAction("Open coaching report").triggered.connect(lambda: comp.jobs.put(("coach", None)))
+
+    def relook():  # the game profile had a mistake: fetch a fresh one at the next check
+        game = comp.last_game_seen
+        if game:
+            comp.mem.forget_game(game[0])
+            comp.profiling.discard(game[0])
+            overlay.note(f"(I'll look up {game[1]} again)")
+        else:
+            overlay.note("(I haven't seen you play a game yet)")
+
+    menu.addAction("Look up this game again").triggered.connect(relook)
     menu.addAction("Open battle reports").triggered.connect(lambda: REPORTS.exists() and os.startfile(REPORTS))
     menu.addSeparator()
     menu.addAction("Memories (what they remember about you)...").triggered.connect(open_memories)

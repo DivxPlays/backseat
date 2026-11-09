@@ -54,6 +54,7 @@ Your reply is spoken aloud by a voice engine and is latency-sensitive; begin you
 - lore: usually an empty string. When you tell a story about your past, one short new fact from it."""
 
 MODEL = "claude-haiku-5-5"  # his automatic comments and roasts (most calls): ~0.05 cents each
+TRIVIA_MODEL = "claude-sonnet-5-5"  # mini-game trivia questions, ~0.8 cents each (Haiku gets the facts wrong)
 SMART_MODEL = "claude-opus-5-5"  # when you talk to him or press the look key: better hints, ~2 cents each
 LOCAL_MODEL = ""  # a free vision model in Ollama (e.g. "qwen3-vl:8b-instruct") for his automatic comments; "" = Claude does them
 CHECK_EVERY = 5  # with the local model: every this many minutes Claude takes a comment and keeps score (it also double-checks
@@ -88,6 +89,7 @@ KEY_MUTE = "f4"  # shut-up mode: he keeps watching and keeping score, but only t
 
 WAKE_WORD = True  # say "Hey Vorn, ..." instead of holding the talk key (the mic stays on; speech is processed on this PC)
 WAKE_LEVEL = 0.02  # mic loudness that counts as speech; raise it if game sound or music keeps setting him off
+GAME_PROFILES = True  # look each game up once on the web (about 1 cent): its modes, maps, weapons, what good players do
 MUSIC = True  # they notice what you play on Spotify (read from the Spotify app on this PC) and comment on it now and then
 MUSIC_SEARCH = True  # and look a new song up on the web first (one search, about 1 cent; at most every 10 minutes)
 INTERRUPT = True  # talk over him and he pauses to listen (stops if you say his name). Needs a headset: turn off with speakers
@@ -100,7 +102,7 @@ WHISPER_MODEL = "base.en"  # speech-to-text model; "small.en" is more accurate b
 
 MONTHLY_BUDGET = 100  # dollars of API use per month: cheap mode at 80%, only answers when asked at 100% (0 = no limit)
 DUCK_TO = 0.35  # while he talks, other apps' volume drops to this fraction (1 = don't lower it)
-GAMES = []  # exe names of non-Steam games that wake him when he starts with Windows, e.g. ["valorant.exe"]
+GAMES = []  # exe names of games they can't spot by themselves (Steam, Game Bar, launcher folders and fullscreen they do), e.g. ["valorant.exe"]
 
 # Anything saved from the Settings window overrides the defaults above (unknown or broken entries are ignored), then the
 # chosen character's preset (presets/<PRESET>.json) sets who the character is.

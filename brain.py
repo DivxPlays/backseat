@@ -200,21 +200,49 @@ def look_up_song(client, model, artist, song):
     return (out["note"].strip() if out else ""), spent
 
 
+GAME_SCHEMA = {"type": "object", "properties": {"profile": {"type": "string"}}, "required": ["profile"], "additionalProperties": False}
+
+
+def look_up_game(client, model, game):
+    """A game profile from one web search (about a cent on Haiku): what it is and what good players do.
+    Returns (the profile, dollars)."""
+    ask = (f'Look up the video game "{game}" with web search (search for that exact title; a newer game with a similar name '
+           "is a different game). In under 80 words, as plain notes (not in character): genre and modes; its main maps or "
+           "levels; its weapons, classes or characters worth knowing; and three concrete things good players do. If the "
+           "search only finds other games, use what you know about this one. Write only the notes: no remarks about the "
+           "search.")
+    tool = "web_search_20250305" if "haiku" in model else "web_search_20260209"  # Haiku only runs the basic search tool
+    try:
+        out, spent = _ask(client, model, [{"type": "text", "text": ask}], GAME_SCHEMA, [{"type": tool, "name": "web_search", "max_uses": 1}])
+    except anthropic.BadRequestError:  # no web search on this model: what it knows without one
+        logging.warning("web search unavailable for a game, answering without it", exc_info=True)
+        out, spent = _ask(client, model, [{"type": "text", "text": ask}], GAME_SCHEMA)
+    return (out["profile"].strip() if out else ""), spent
+
+
 MINIGAME_SCHEMA = {"type": "object", "properties": {"mood": SCHEMA["properties"]["mood"], "line": {"type": "string"},
                                                     "answer": {"type": "string"}},
                    "required": ["mood", "line", "answer"], "additionalProperties": False}
 
 
-def minigame(client, model, name, game, kind):
+def minigame(client, model, name, game, kind, about="", topic="", avoid=()):
     """A mini-game for a menu or queue, from `name`: a trivia question about `game` (answer: the right answer) or a dare
-    for their next match (answer: the dare, plainly). Returns (reply, dollars)."""
+    for their next match (answer: the dare, plainly). about: their profile of the game; topic: what to ask about;
+    avoid: answers already asked. Returns (reply, dollars)."""
     if kind == "trivia":
         ask = (f"Mini-game while the player sits in a menu. As {name}, in character, ask them one short trivia question about "
                f"{game} (or about gaming in general if you don't know {game} well), under 25 words. Pick a question with one "
                "clear answer you're sure of. answer: the correct answer, short.")
+        if about:
+            ask += (f" Ask about one {topic or 'fact'} named in what you know about {game} below, and make the answer exactly "
+                    f"that name, word for word as written there; nothing made up, nothing about order or rankings: {about}")
+        if avoid:
+            ask += " Don't ask anything whose answer is one of these (already asked): " + ", ".join(avoid) + "."
     else:
         ask = (f"Mini-game while the player sits in a menu. As {name}, in character, dare them to do one specific thing in "
                f"their next match of {game}, under 20 words. answer: the dare itself, short and plain (to check it later).")
+        if about:
+            ask += f" What you know about {game} (use its real maps, weapons or modes): {about}"
     return _ask(client, model, [{"type": "text", "text": ask}], MINIGAME_SCHEMA)
 
 

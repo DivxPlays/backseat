@@ -868,23 +868,97 @@ with tempfile.TemporaryDirectory() as d:
     assert m.d["trivia"] == {"right": 2, "wrong": 1}
 asked, expected = [], []
 real_game = brain.minigame
-brain.minigame = lambda client, model, name, game, kind: (asked.append((name, game, kind)),
-                                                         ({"mood": "smug", "line": f"{name} asks about {game}?", "answer": "5"}, 0.0005))[1]
+answers = iter(["5"] * 9)
+brain.minigame = lambda client, model, name, game, kind, about="", topic="", avoid=(): (asked.append((name, game, kind, model, list(avoid))),
+                                                         ({"mood": "smug", "line": f"{name} asks about {game}?", "answer": next(answers)}, 0.0005))[1]
 try:
     game_comp = SimpleNamespace(client=object(), names=["Vorn", "Mika"], partner={"PRESET": "mika"}, app=("cod4.exe", "Call of Duty 4", 1),
-                                mem=SimpleNamespace(spend=lambda *a: None, spent=lambda: 0.0), recent=[], trivia=None, dare=None,
+                                mem=SimpleNamespace(spend=lambda *a: None, spent=lambda: 0.0, game_profile=lambda key: None, d={}),
+                                recent=[], trivia=None, dare=None,
                                 speak=lambda mood, line, event, who: (line, None), wake_heard=lambda *a: None,
                                 bridge=SimpleNamespace(note=SimpleNamespace(emit=lambda t: None)))
     game_comp.listeners = [SimpleNamespace(on_heard=game_comp.wake_heard, expect=lambda s, called: expected.append((s, called)))]
     main.random.random = lambda: 0.1  # trivia
     main.Companion.minigame(game_comp)
     who = game_comp.trivia["who"]
-    assert asked[-1][1:] == ("Call of Duty 4", "trivia") and game_comp.trivia["a"] == "5" and expected == [(20, f"Hey {who}")]
+    assert asked[-1][1:4] == ("Call of Duty 4", "trivia", config.TRIVIA_MODEL) and game_comp.trivia["a"] == "5"
+    assert expected == [(20, f"Hey {who}")] and game_comp.mem.d["trivia_asked"] == ["5"]
     main.random.random = lambda: 0.9  # a dare
     main.Companion.minigame(game_comp)
-    assert asked[-1][2] == "dare" and game_comp.dare["dare"] == "5" and len(expected) == 1  # (no answer to listen for)
+    assert asked[-1][2:4] == ("dare", config.MODEL) and game_comp.dare["dare"] == "5" and len(expected) == 1  # (no answer to listen for)
+    # with a profile: an answer that isn't in it is made up, so it asks again; answers already asked are passed on
+    game_comp.mem.game_profile = lambda key: {"name": "Call of Duty 4: Modern Warfare", "profile": "Maps: Crash, Backlot."}
+    main.random.random, answers, game_comp.trivia = (lambda: 0.1), iter(["Shipment", "Backlot"]), None
+    main.Companion.minigame(game_comp)
+    assert game_comp.trivia["a"] == "Backlot" and asked[-1][4] == ["5"] and game_comp.mem.d["trivia_asked"] == ["5", "Backlot"]
+    answers, game_comp.trivia, n = iter(["Nuketown"] * 3), None, len(asked)
+    main.Companion.minigame(game_comp)
+    assert game_comp.trivia is None and len(asked) == n + 3  # three made-up answers: no question at all
 finally:
     brain.minigame, main.random.random = real_game, real_random
+
+# game profiles: which game is in front (Steam, your list, Windows' Game Bar, a launcher folder, or fullscreen); each is
+# looked up once (or again when old, or on request)
+import memory  # noqa: E402
+
+saved_games, config.GAMES = config.GAMES, ["valorant.exe"]
+saved_bar = memory._game_bar
+memory._game_bar = lambda bucket: (frozenset({r"d:\epic\fortnite\fortniteclient.exe", r"c:\mc\javaw.exe"}),
+                                   frozenset({"fortniteclient.exe", "robloxplayerbeta.exe"}))
+try:
+    def game_in_front(exe, title="", full=False):
+        return main.Companion.current_game(SimpleNamespace(app=(exe, title, 1), full=full))
+
+    assert game_in_front("C:/Riot/valorant.exe", "VALORANT") == ("valorant.exe", "VALORANT")  # your list
+    assert game_in_front("C:/x/claude.exe", "Claude") is None and game_in_front("C:/x/claude.exe", "Claude", True) is None
+    assert game_in_front(r"D:\EPIC\Fortnite\FortniteClient.exe", "Fortnite") == ("fortniteclient.exe", "Fortnite")  # Game Bar
+    assert game_in_front(r"C:\Roblox\version-9\RobloxPlayerBeta.exe", "Roblox")  # (by name too: Roblox moves when it updates)
+    assert game_in_front(r"C:\mc\javaw.exe", "Minecraft") and not game_in_front(r"C:\other\javaw.exe", "Some tool")  # (by path)
+    assert game_in_front(r"C:\Program Files\Epic Games\RocketLeague\RocketLeague.exe", "Rocket League")  # a launcher folder
+    assert not game_in_front(r"C:\Program Files\Epic Games\Launcher\EpicGamesLauncher.exe", "Epic Games Launcher")
+    assert game_in_front(r"C:\Games\Indie\indie.exe", "Indie", True) and not game_in_front(r"C:\Games\Indie\indie.exe", "Indie")
+    assert not game_in_front(r"C:\Program Files\Google\Chrome\chrome.exe", "YouTube", True)  # a fullscreen video
+    assert not game_in_front(r"C:\Windows\SystemApps\LockApp.exe", "", True) and not game_in_front("", "", True)
+finally:
+    config.GAMES, memory._game_bar = saved_games, saved_bar
+assert isinstance(memory._game_bar(-1)[0], frozenset) and isinstance(memory.foreground_fullscreen(), bool)  # the real ones run
+with tempfile.TemporaryDirectory() as d:
+    m = Memory(Path(d, "memory.json"))
+    looked = []
+    real_look = brain.look_up_game
+    brain.look_up_game = lambda client, model, name: (looked.append(name), ("FPS. Maps: Crash, Backlot.", 0.0125))[1]
+    try:
+        prof = SimpleNamespace(client=object(), mem=m, profiling=set())
+        game = ("iw3mp.exe", "Call of Duty 4: Modern Warfare")
+        assert main.Companion.profile_due(prof, game)  # never looked up
+        main.Companion.profile(prof, game)
+        assert looked == [game[1]] and m.game_profile("iw3mp.exe")["profile"] == "FPS. Maps: Crash, Backlot." and m.spent() > 0.012
+        assert not main.Companion.profile_due(prof, game)  # known (and queued once this session)
+        prof.profiling.clear()
+        assert not main.Companion.profile_due(prof, game)  # known and fresh
+        m.d["game_profiles"]["iw3mp.exe"]["made"] = "2025-01-01T00:00"
+        assert main.Companion.profile_due(prof, game)  # old: look it up again
+        m.forget_game("iw3mp.exe")
+        assert m.game_profile("iw3mp.exe") is None and main.Companion.profile_due(prof, game)  # tray > Look up this game again
+        saved_profiles, config.GAME_PROFILES = config.GAME_PROFILES, False
+        assert not main.Companion.profile_due(prof, game)  # turned off
+        config.GAME_PROFILES = saved_profiles
+        saved_budget, config.MONTHLY_BUDGET = config.MONTHLY_BUDGET, 0.014
+        assert not main.Companion.profile_due(prof, game)  # cheap mode
+        config.MONTHLY_BUDGET = saved_budget
+    finally:
+        brain.look_up_game = real_look
+prompts = []
+real_ask = brain._ask
+brain._ask = lambda client, model, content, schema, tools=None: (prompts.append(content[0]["text"]), ({"mood": "smug", "line": "q", "answer": "a"}, 0.0))[1]
+try:
+    brain.minigame(None, "m", "Mika", "CoD4", "trivia", "Maps: Crash, Backlot.")
+    brain.minigame(None, "m", "Vorn", "CoD4", "dare")
+    brain.minigame(None, "m", "Mika", "CoD4", "trivia", "Maps: Crash, Backlot.", "map", ["Crash"])
+finally:
+    brain._ask = real_ask
+assert "Maps: Crash, Backlot." in prompts[0] and "What you know" not in prompts[1]  # trivia from the profile, when there is one
+assert "one map named" in prompts[2] and "already asked): Crash" in prompts[2] and "already asked" not in prompts[0]
 
 # coaching: this week against last from the stats (today included), a report at most weekly, and the page
 import coaching  # noqa: E402

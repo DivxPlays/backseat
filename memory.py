@@ -4,6 +4,8 @@ import json
 import os
 import re
 import threading
+import time
+import winreg
 from ctypes import wintypes
 from datetime import date, datetime
 from functools import lru_cache
@@ -80,7 +82,8 @@ class Memory:
                            ("sessions", []), ("days", {}), ("respect", 10), ("lore", []), ("spend", {}),
                            ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {}),
                            ("unlocked", []), ("talks", 0), ("alone", {}), ("seen", {}), ("held", []),
-                           ("last_with", {}), ("music", {}), ("songs", {})):
+                           ("last_with", {}), ("music", {}), ("songs", {}),
+                           ("game_profiles", {})):
             self.d.setdefault(key, empty)
         self.d["session_count"] += 1
         active = self.d.get("character", "vorn")  # each character keeps their own memory of you (MINE); the rest is shared
@@ -106,6 +109,20 @@ class Memory:
             d["days"][today] = d["days"].get(today, 0) + dt
             for old in sorted(d["days"])[:-MAX_DAYS]:
                 del d["days"][old]
+
+    def game_profile(self, key):
+        """What a web search found about a game ({"name", "profile", "made"}), or None."""
+        with self.lock:
+            return self.d["game_profiles"].get(key)
+
+    def learn_game(self, key, name, profile):
+        with self.lock:
+            self.d["game_profiles"][key] = {"name": name, "profile": profile, "made": datetime.now().isoformat(timespec="minutes")}
+
+    def forget_game(self, key):
+        """Look this game up again next time (a profile can carry mistakes)."""
+        with self.lock:
+            self.d["game_profiles"].pop(key, None)
 
     def trivia_result(self, right):
         """A trivia answer judged: your record (shared, both of them know it)."""
@@ -409,6 +426,52 @@ def steam_app(exe):
     return None
 
 
+NOT_GAMES = {  # never games, even fullscreen: browsers, chat, music, video, launchers, the desktop, tools
+    "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe", "vivaldi.exe", "arc.exe", "discord.exe",
+    "spotify.exe", "claude.exe", "explorer.exe", "steam.exe", "steamwebhelper.exe", "epicgameslauncher.exe",
+    "galaxyclient.exe", "battle.net.exe", "eadesktop.exe", "origin.exe", "upc.exe", "ubisoftconnect.exe",
+    "riotclientservices.exe", "riotclientux.exe", "launcher.exe", "launchbox.exe", "bigbox.exe", "vlc.exe",
+    "mpc-hc.exe", "mpc-hc64.exe", "potplayermini64.exe", "wmplayer.exe", "obs64.exe", "code.exe", "devenv.exe",
+    "windowsterminal.exe", "powershell.exe", "cmd.exe", "python.exe", "pythonw.exe"}
+GENERIC = {"javaw.exe", "java.exe", "python.exe", "pythonw.exe"}  # (Game Bar matches these by full path only)
+LAUNCHER_DIRS = re.compile(r"[\\/](epic games|gog galaxy[\\/]games|gog games|riot games|ea games|origin games|"
+                           r"ubisoft game launcher[\\/]games|xboxgames|rockstar games)[\\/]", re.I)
+NOT_FULLSCREEN_DIRS = (os.environ.get("SystemRoot", r"C:\Windows").lower(), r"c:\program files\windowsapps")
+
+
+@lru_cache(maxsize=1)
+def _game_bar(bucket):  # bucket: re-read every 5 minutes
+    """(paths, exe names) of the games Windows' Game Bar has recognized (HKCU\\System\\GameConfigStore)."""
+    paths = set()
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"System\GameConfigStore\Children") as root:
+            for i in range(winreg.QueryInfoKey(root)[0]):
+                try:
+                    with winreg.OpenKey(root, winreg.EnumKey(root, i)) as k:
+                        paths.add(winreg.QueryValueEx(k, "MatchedExeFullPath")[0].lower())
+                except OSError:
+                    continue
+    except OSError:
+        pass
+    paths.discard("")
+    return frozenset(paths), frozenset(Path(p).name for p in paths) - GENERIC
+
+
+def is_game(exe, title="", fullscreen=False):
+    """Is this a game? A Steam game, one on your GAMES list, one Windows' Game Bar knows, one in a launcher's games
+    folder (Epic, GOG, Riot, EA, Ubisoft, Xbox, Rockstar), or anything else filling the whole screen (except NOT_GAMES
+    and Windows' own apps)."""
+    name = Path(exe).name.lower() if exe else ""
+    if steam_app(exe) or app_name(exe, title) in [g.lower() for g in config.GAMES]:
+        return True
+    if not name or name in NOT_GAMES:
+        return False
+    paths, names = _game_bar(int(time.monotonic() // 300))
+    if exe.lower() in paths or name in names or LAUNCHER_DIRS.search(exe):
+        return True
+    return fullscreen and not exe.lower().startswith(NOT_FULLSCREEN_DIRS)
+
+
 def playtime_minutes(localconfig, appid):
     node = localconfig
     for key in ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps", appid):
@@ -432,7 +495,6 @@ def steam_hours(exe):
     if not app:
         return None
     try:
-        import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as k:
             root = Path(winreg.QueryValueEx(k, "SteamPath")[0])
         newest = max(root.glob("userdata/*/config/localconfig.vdf"), key=lambda p: p.stat().st_mtime)
@@ -477,6 +539,29 @@ class _Rect(ctypes.Structure):
 
 
 user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(_Rect)]
+
+
+class _MonitorInfo(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", _Rect), ("rcWork", _Rect), ("dwFlags", wintypes.DWORD)]
+
+
+user32.MonitorFromWindow.restype = wintypes.HANDLE
+user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+user32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_MonitorInfo)]
+user32.IsZoomed.argtypes = [wintypes.HWND]
+
+
+def foreground_fullscreen():
+    """True when the window in front covers its whole display and isn't just maximized: a fullscreen or borderless
+    game (or a video, which NOT_GAMES rules out)."""
+    hwnd, r = user32.GetForegroundWindow(), _Rect()
+    info = _MonitorInfo(ctypes.sizeof(_MonitorInfo))
+    if not hwnd or user32.IsZoomed(hwnd) or not user32.GetWindowRect(hwnd, ctypes.byref(r)):
+        return False
+    if not user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, 2), ctypes.byref(info)):  # 2: the nearest display
+        return False
+    m = info.rcMonitor
+    return r.left <= m.left and r.top <= m.top and r.right >= m.right and r.bottom >= m.bottom
 
 
 def foreground_center():
