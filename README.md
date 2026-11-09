@@ -2,7 +2,7 @@
 
 # Backseat: your trash-talking gaming companions
 
-Version 2.0.0 · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
+Version 2.0.0 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
 Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
@@ -212,7 +212,7 @@ Right-click the tray icon > **Settings...** to change his name, colours, voice (
 
 ## Updates
 
-Once a day (when he starts) he checks GitHub for a newer version (the version number in `main.py` on GitHub). When there is one, a Windows notification says so and the tray menu shows **Update to x.y.z**; tray > **Check for updates** asks any time. Updating asks you first, then closes him, downloads the new version from GitHub, runs its installer in a window you can watch (memory, settings, key, Hall of Shame and your characters stay as they are) and starts him again. A new version comes out when the version number goes up, not with every change. A copy made with `git clone` is never updated this way: use `git pull`. Settings > Brain & budget > Updates turns the daily check off.
+Once a day (when he starts) he checks GitHub for a newer version (the version number in `main.py` on GitHub). When there is one, a Windows notification says so and the tray menu shows **Update to x.y.z**; tray > **Check for updates** asks any time. Updating asks you first, then closes him, downloads the new version from GitHub, runs its installer in a window you can watch (memory, settings, key, Hall of Shame and your characters stay as they are) and starts him again. A new version comes out when the version number goes up, not with every change. Each version has a stage, from least to most finished: pre-alpha, alpha, pre-beta, beta, release (tray > About shows it, for example "2.0.0 Beta", and so does the release's tag, `v2.0.0-beta`); a beta's own release counts as an update too. A copy made with `git clone` is never updated this way: use `git pull`. Settings > Brain & budget > Updates turns the daily check off.
 
 ## What's on GitHub
 

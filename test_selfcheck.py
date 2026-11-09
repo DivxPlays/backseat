@@ -1610,6 +1610,16 @@ import updater  # noqa: E402
 main_py = Path(main.__file__).read_text(encoding="utf-8")
 assert updater.VERSION.search(main_py).group(1) == main.VERSION
 assert updater.newer("2.0.0", "1.2.0") and updater.newer("1.10.0", "1.9.9") and not updater.newer("1.2.0", "1.2.0")
+# stages: alpha < pre-beta < beta < release, for the same number; a higher number beats any stage
+assert main.STAGE in updater.STAGES and main.FULL_VERSION == (main.VERSION if main.STAGE == "release" else f"{main.VERSION}-{main.STAGE}")
+assert updater.newer("2.0.0", "2.0.0-beta") and not updater.newer("2.0.0-beta", "2.0.0") and updater.newer("2.0.0-beta", "2.0.0-pre-beta")
+assert updater.newer("2.1.0-alpha", "2.0.0") and not updater.newer("2.0.0-alpha", "2.0.0-pre-beta")
+assert updater.newer("2.0.0-alpha", "2.0.0-pre-alpha") and updater.pretty("1.0.0-pre-alpha") == "1.0.0 Pre-Alpha"
+assert updater.pretty("2.0.0-pre-beta") == "2.0.0 Pre-Beta" and updater.pretty("2.0.0") == "2.0.0" and updater.pretty("2.0.0-beta") == "2.0.0 Beta"
+import release  # noqa: E402
+
+assert release.full_version('APP, VERSION, AUTHOR = "Backseat", "3.1.0", "X"\nSTAGE = "alpha"\n') == "3.1.0-alpha"
+assert release.full_version('APP, VERSION, AUTHOR = "Backseat", "3.1.0", "X"\nSTAGE = "release"\n') == "3.1.0"
 assert not updater.newer(None, "1.2.0") and not updater.newer("1.1.9", "1.2.0")
 assert updater.dev_copy(Path(main.__file__).parent) == (Path(main.__file__).parent / ".git").exists()
 
@@ -1637,6 +1647,8 @@ try:
     assert updater.latest() == "9.9.9"  # the latest release's tag
     updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(b"<html>rate limited</html>")
     assert updater.latest() is None
+    updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(json.dumps({"tag_name": "v2.1.0-alpha"}).encode())
+    assert updater.latest() == "2.1.0-alpha"
     updater.urllib.request.urlopen = lambda req, timeout=0: FakeResponse(json.dumps({"tag_name": "nightly"}).encode())
     assert updater.latest() is None
 

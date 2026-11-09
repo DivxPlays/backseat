@@ -21,6 +21,8 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 APP, VERSION, AUTHOR = "Backseat", "2.0.0", "DivxPlays"  # x.y.Z fixes, x.Y.0 features; bumped when the user agrees
+STAGE = "beta"  # how finished this version is: pre-alpha, alpha, pre-beta, beta or release (stable)
+FULL_VERSION = VERSION if STAGE == "release" else f"{VERSION}-{STAGE}"  # "2.0.0-beta": the git tag and what updates compare
 RUNNING = __name__ == "__main__"  # (imported by the self-checks or make_images.py: no log file, no crash box)
 if RUNNING:
     logging.basicConfig(filename=HERE / "companion.log", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -1941,9 +1943,9 @@ def main():
         found = found or updater.latest()
         if found is None:
             return QMessageBox.information(None, APP, "Couldn't reach GitHub. Try again later.")
-        if not updater.newer(found, VERSION):
-            return QMessageBox.information(None, APP, f"{APP} {VERSION} is the newest version.")
-        ask = (f"{APP} {found} is out (you have {VERSION}). Update now? It closes, updates in a window you'll see, and "
+        if not updater.newer(found, FULL_VERSION):
+            return QMessageBox.information(None, APP, f"{APP} {updater.pretty(FULL_VERSION)} is the newest version.")
+        ask = (f"{APP} {updater.pretty(found)} is out (you have {updater.pretty(FULL_VERSION)}). Update now? It closes, updates in a window you'll see, and "
                "starts again. Your memory, settings, key, Hall of Shame and characters stay as they are.")
         if QMessageBox.question(None, f"Update {APP}", ask) != QMessageBox.Yes:
             return
@@ -1956,8 +1958,8 @@ def main():
         app.quit()
 
     def update_found(version):
-        update_item.setText(f"Update to {version}...")
-        tray.showMessage(APP, f"{APP} {version} is out. Right-click the tray icon > Update to {version}.")
+        update_item.setText(f"Update to {updater.pretty(version)}...")
+        tray.showMessage(APP, f"{APP} {updater.pretty(version)} is out. Right-click the tray icon > Update to {updater.pretty(version)}.")
 
     update_item.triggered.connect(lambda: check_updates(updater.latest()))
     comp.bridge.update.connect(update_found)
@@ -1968,13 +1970,13 @@ def main():
             return
         comp.mem.d["update_checked"] = today
         found = updater.latest()
-        if updater.newer(found, VERSION):
+        if updater.newer(found, FULL_VERSION):
             logging.info("update: %s is on GitHub", found)
             comp.bridge.update.emit(found)
 
     threading.Thread(target=daily_check, daemon=True).start()
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
-        f"<h3>{APP} {VERSION}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
+        f"<h3>{APP} {updater.pretty(FULL_VERSION)}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
         "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "
         "Hearing: Whisper on your PC.</p><p><a href='https://github.com/DivxPlays/backseat'>github.com/DivxPlays/backseat</a></p>")))
     menu.addAction("Quit").triggered.connect(app.quit)
