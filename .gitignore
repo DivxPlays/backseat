@@ -22,3 +22,26 @@ __pycache__/
 
 # downloaded on first use
 models/
+
+# added by the Claude starter kit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.iso
+*.xex
+*.xbe
+*.chd
+*.cso
+*.nsp
+*.xci
+*.wbfs
+*.rvz
+*.log
+Thumbs.db
+.DS_Store
+.claude/settings.local.json
+
+# the kit's project settings are shared on purpose (the line above ignores every settings.json)
+!.claude/settings.json

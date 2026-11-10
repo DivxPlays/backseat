@@ -11,5 +11,7 @@ The app is called **Backseat** (it was called Vorn until 2026-11-08; the local f
 - The GitHub CLI isn't on Git Bash's PATH: use `"/c/Program Files/GitHub CLI/gh.exe"`. Push with:
   `git -c credential.helper= -c 'credential.helper=!"/c/Program Files/GitHub CLI/gh.exe" auth git-credential' push`
 - Never commit secrets or personal data: api_key.txt, memory.json, settings.json, companion.log, battle reports.txt, Hall of Shame/ (all in .gitignore). Before pushing, check for a real key: `git grep --cached -E "sk-ant-[A-Za-z0-9_-]{20,}"` must find nothing.
+- Commits use the GitHub no-reply alias in this checkout's git config: never the personal email, and never write either address into a file.
+- The starter kit's guard (the `kit` plugin) blocks commits that carry keys, secret files, disc images, files over 50 MB or files forced past `.gitignore`, and pushes of commits made with an email that isn't the no-reply alias. If it blocks one, fix the cause; never work around it. `.claude/settings.json` (status line, secret-file deny rules) is committed on purpose: `.gitignore` makes an exception for it.
 - The characters are original designs: Warlord Vorn and Mika. Never recreate Vegeta, Saiyans, Super Saiyan or any other Dragon Ball design, name or form, or Yuno Gasai or anything from Future Diary (Mika is an original yandere: no pink twin-tails, no diary, no "Yukki").
 - Don't launch Backseat (main.py) unless the user asks. It bills the API while running.
