@@ -118,6 +118,7 @@ CHECKED = {"win", "loss", "death", "epic", "fail"}  # the local model naming one
 CHECK_GAP = 120  # seconds: double-checks at most this often (the local model calls every kill a win)
 PROFILE_AGE = 90  # days before a game profile is looked up again
 GAME_GAP, ANSWER_TIME = 480, 20
+THUMB_EVERY = 3  # s between screen checks for "something changed" (each grabs every display: ~115 ms on two big screens)
 BOUNTIES = {"easy": (5, 2, "a decent match does it"), "hard": (8, 4, "it takes a good match"),  # challenges: respect won
             "brutal": (12, 6, "only their best match does it")}  # if done, lost if failed or dodged; how hard
 CHALLENGE_TIME = 1800  # s: a challenge not done by then was dodged
@@ -974,9 +975,14 @@ class Companion:
                            f"{c['fine']} respect for dodging it. {c['who']} rubs it in.)")
 
     def gpu_busy(self):
-        """Frame-rate guard: True in a game with the graphics card at GPU_BUSY % or more, where the free local model
-        thinking on the same card would cost frames."""
-        if not config.GPU_BUSY or not self.current_game():
+        """True when the free local model should leave this comment to Claude: in a game, unless LOCAL_IN_GAMES is on
+        (it thinks on the game's graphics card for seconds and holds gigabytes of its memory), and then still with the
+        card at GPU_BUSY % or more (the frame-rate guard)."""
+        if not self.current_game():
+            return False
+        if not config.LOCAL_IN_GAMES:
+            return True
+        if not config.GPU_BUSY:
             return False
         load = gpu_load()
         if load is None or load < config.GPU_BUSY:
@@ -1793,7 +1799,8 @@ class Companion:
                 time.sleep(5)
 
     def _watch(self):
-        prev = last_save = last_music = time.monotonic()
+        prev = last_save = last_music = last_thumb = time.monotonic()
+        was_game = False
         while True:
             time.sleep(1)
             now = time.monotonic()
@@ -1801,6 +1808,10 @@ class Companion:
             exe, title, pid = foreground_app()
             if pid != os.getpid():
                 self.app, self.focus, self.full = (exe, title, pid), foreground_center(), foreground_fullscreen()
+            in_game = self.current_game() is not None
+            if in_game and not was_game and config.LOCAL_MODEL and not config.LOCAL_IN_GAMES:  # a game came up: the local
+                threading.Thread(target=brain.local_unload, args=(config.LOCAL_MODEL,), daemon=True).start()  # model's
+            was_game = in_game  # video memory goes back to it
             if self.unmute_at and now >= self.unmute_at:  # "shut up for 10 minutes" is over
                 self.set_mute(False)
             if not self.awake:  # started with Windows: wait for a game, without tracking or looking
@@ -1857,9 +1868,9 @@ class Companion:
                 self.last_nag = now
                 self.jobs.put(("nag", None))
                 continue
-            if self.paused or quiet < config.LOOK_COOLDOWN * (2 if self.muted else 1):
+            if self.paused or quiet < config.LOOK_COOLDOWN * (2 if self.muted else 1) or now - last_thumb < THUMB_EVERY:
                 continue
-            thumb = self.eyes.thumb()
+            last_thumb, thumb = now, self.eyes.thumb()
             if self.base_thumb is None:
                 self.base_thumb = thumb
             if changed(self.base_thumb, thumb, config.CHANGE_THRESHOLD):
@@ -1879,6 +1890,9 @@ def main():
         if not boot:  # (started with Windows while he's already up: just bow out)
             user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
         return
+    import psutil
+    psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)  # your game comes first for the CPU (speech recognition,
+    # the Discord camera); their voice still plays on time (audio threads keep their own high priority)
     if boot:
         logging.info("started with Windows%s", ": hidden until a game starts" if waiting else "")
     if waiting or (run_entry_on() and schtasks("/query", "/tn", TASK).returncode != 0):  # 2.0.0's way: on to the task

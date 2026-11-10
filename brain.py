@@ -137,13 +137,28 @@ def prompt(context, recent, situation, jpegs):
     return text
 
 
+LOCAL_CONTEXT = 16384  # tokens: a comment's prompt is about 7,000 (two displays' screenshots included). Ollama's own
+# default here was 65,536, which held 10 GB of video memory instead of 6.7
+
+
+def local_unload(model):
+    """Take the local model off the graphics card now (a game came to the front); the next local comment loads it again."""
+    req = urllib.request.Request(f"{OLLAMA}/api/generate", json.dumps({"model": model, "keep_alive": 0}).encode(),
+                                 {"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10).close()
+    except OSError:  # (Ollama isn't running: nothing is loaded)
+        pass
+
+
 def local_think(model, context, recent, situation, jpegs, only=None):
     """think() on a free vision model running on this PC through Ollama. Returns (reply, 0.0); raises if Ollama fails.
     `only` (a preset, duo mode) voices just that one character: given both, the small model mixes up whose past is whose."""
     if only:  # "You (Mika): ..." would tell a model voicing Vorn that he said it
         recent = [re.sub(r"^You \((.+?)\): ", r"\1: ", r) for r in recent]
     form = SCHEMA if only else schema()
-    body = {"model": model, "stream": False, "format": form, "keep_alive": "15m", "options": {"num_predict": 500},
+    body = {"model": model, "stream": False, "format": form, "keep_alive": "15m",
+            "options": {"num_predict": 500, "num_ctx": LOCAL_CONTEXT},
             "messages": [{"role": "system", "content": system(only)},
                          {"role": "user", "content": prompt(context, recent, situation, jpegs), "images": jpegs}]}
     req = urllib.request.Request(f"{OLLAMA}/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})

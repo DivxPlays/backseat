@@ -3,6 +3,18 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## 2.1.1 (not released yet)
+
+### Fixed
+- **Games lagged badly with the free local model, and so did the characters (seen in Fortnite).** The local model
+  thought on the game's graphics card for about 3 seconds a comment and held 10 GB of its memory the whole time. Now,
+  while a game is in front, Claude Haiku makes the comments and the model is taken off the graphics card (Settings >
+  Brain & budget > Local model in games turns the old way back on), and it loads with a smaller context (6.7 GB
+  instead of 10).
+- Less work in the background while you play: the Discord camera draws 15 frames a second instead of 24 (it took half a
+  CPU core), the screen is checked for changes every 3 seconds instead of every second, and Backseat runs at
+  below-normal CPU priority, so the game comes first.
+
 ## 2.1.0 Beta (2026-11-09)
 
 "Clip that!", milestones, fresher lines and a Report a problem button, plus two fixes from the log. Still beta: the new

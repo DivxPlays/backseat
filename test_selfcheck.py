@@ -1531,9 +1531,14 @@ try:
 finally:
     memory_mod.subprocess.run = real_run
 assert memory_mod.gpu_load() is None or 0 <= memory_mod.gpu_load() <= 100  # the real one runs
-real_load, saved_busy = main.gpu_load, config.GPU_BUSY
+real_load, saved_busy, saved_in_games = main.gpu_load, config.GPU_BUSY, config.LOCAL_IN_GAMES
 try:
-    config.GPU_BUSY = 90
+    config.LOCAL_IN_GAMES = False  # the default: in any game Claude comments, however idle the card (Fortnite lagged)
+    for in_game in (True, False):
+        main.gpu_load = lambda: 5
+        guard = SimpleNamespace(current_game=lambda: ("fortnite.exe", "Fortnite") if in_game else None)
+        assert main.Companion.gpu_busy(guard) == in_game
+    config.LOCAL_IN_GAMES, config.GPU_BUSY = True, 90  # local in games too: only the frame-rate guard steps in
     for in_game, load, busy in ((True, 97, True), (True, 60, False), (False, 99, False), (True, None, False)):
         main.gpu_load = lambda: load
         guard = SimpleNamespace(current_game=lambda: ("cod4.exe", "CoD4") if in_game else None)
@@ -1541,7 +1546,26 @@ try:
     main.gpu_load, config.GPU_BUSY = (lambda: 99), 0  # turned off
     assert not main.Companion.gpu_busy(SimpleNamespace(current_game=lambda: ("cod4.exe", "CoD4")))
 finally:
-    main.gpu_load, config.GPU_BUSY = real_load, saved_busy
+    main.gpu_load, config.GPU_BUSY, config.LOCAL_IN_GAMES = real_load, saved_busy, saved_in_games
+
+# the local model leaves the graphics card when a game comes up, and loads with a context that fits a comment (not 65k)
+sent = []
+real_urlopen = brain.urllib.request.urlopen
+try:
+    def fake_urlopen(req, timeout=None):
+        sent.append(json.loads(req.data))
+        return SimpleNamespace(close=lambda: None)
+    brain.urllib.request.urlopen = fake_urlopen
+    brain.local_unload("qwen3-vl:8b-instruct")
+    assert sent == [{"model": "qwen3-vl:8b-instruct", "keep_alive": 0}]
+
+    def down(req, timeout=None):
+        raise OSError("connection refused")
+    brain.urllib.request.urlopen = down
+    brain.local_unload("qwen3-vl:8b-instruct")  # Ollama not running: nothing to do, no error
+finally:
+    brain.urllib.request.urlopen = real_urlopen
+assert 7000 < brain.LOCAL_CONTEXT <= 32768 and main.THUMB_EVERY >= 2 and __import__("camera").FPS <= 15
 
 # sound effects: real recordings per build (at the voice's sample rate), before some lines, on pokes, grabs and landings
 # (never over a line), and with idle animations (at most every IDLE_GAP s, none in shut-up mode)

@@ -1,7 +1,7 @@
 """Discord camera: the current character (or Vorn and Mika together) as a virtual webcam, with subtitles and a background.
 
 Frames go to OBS's virtual camera through pyvirtualcam; pick "OBS Virtual Camera" in Discord's video settings.
-Drawn in its own thread at 1280x720, 24 fps, from the same animated character the overlay shows.
+Drawn in its own thread at 1280x720, 15 fps, from the same animated character the overlay shows.
 """
 import logging
 import threading
@@ -16,7 +16,7 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QLinearGradient, 
 import config
 from character import H, W, make_character
 
-CAM_W, CAM_H, FPS = 1280, 720, 24
+CAM_W, CAM_H, FPS = 1280, 720, 15  # (each frame is ~23 ms of drawing: at 24 fps it took half a CPU core from your game)
 BACKGROUNDS = ("dark", "green", "game", "webcam")
 # the face the one listening makes: never the speaker's own, so the two never look like copies
 REACT = {"laugh": "smug", "angry": "surprised", "smug": "disgusted", "surprised": "laugh", "disgusted": "smug", "idle": "idle"}
