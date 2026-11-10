@@ -8,6 +8,9 @@ Version 2.1.0 (beta) · Made by DivxPlays (tray > About Backseat shows the versi
 
 **[Download](https://github.com/DivxPlays/backseat/releases/latest)** · [Trailer](https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4) · [Setup](#setup) · [Controls and hotkeys](#controls) · [Voice commands](#voice-commands-free) · [How it behaves](#how-it-behaves) · [Cost](#cost) · [Settings](#tweaking) · [Updates](#updates) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/DivxPlays/backseat/issues) · [License](#license)
 
+> [!NOTE]
+> **Made with the help of AI.** Backseat is made with the help of AI: Anthropic's Claude (in Claude Code) writes and tests much of the code, the tools and these documents, working with DivxPlays.
+
 **Contents**
 
 - [Setup](#setup)
