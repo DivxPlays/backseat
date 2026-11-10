@@ -18,9 +18,9 @@ Built and self-checked, but not yet seen working on a real day:
 - 2.2.0: a recap card after a real game, What's new after a real update, "Is Backseat slowing my game?" during a match,
   the installer's key check with a brand-new key, a duo with a created character, and the new holidays on their days.
 
-## Ideas for 2.2.0 (not decided: pick the ones you want)
+## Ideas for 2.3.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Planned; #1 was fixed in 2.1.1; #3 is built for 2.2.0.
+GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.2.0: no new issues; #2 is in Planned; #1 was fixed in 2.1.1 and #3 in 2.2.0.
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.

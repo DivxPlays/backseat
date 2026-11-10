@@ -18,8 +18,8 @@ The app is called **Backseat** (it was called Vorn until 2026-11-08; the local f
 - **Runs on a fresh PC** (the user asked on 2026-11-10): before every release, run `Install-Backseat.bat` the way a new
   user does, on a fresh Windows: `powershell -File .claude/clean-pc-test.ps1 -Package <Install-Backseat.bat from the
   release> -Run Install-Backseat.bat -Wait 240`, and look at its screenshots and console text. It doesn't ship if it
-  shows an error or needs anything installed by hand. Known on 2026-11-10: it fails, because `install.ps1` installs
-  Python with winget, and winget isn't on a fresh PC.
+  shows an error or needs anything installed by hand. It passed for 2.1.1 and 2.2.0 (2026-11-10): without Python
+  3.12, `install.ps1` unpacks Python's NuGet package into Backseat's folder (winget isn't on a fresh PC).
 - **Other platforms:** Windows only for now. If Linux (or Steam Deck), Android or iOS support is added, test each
   one before every release too (Linux in WSL2, natively or under Wine or Proton; Android on the emulator; iOS on
   GitHub's macOS runners), set up the first time it's needed, after asking the user before installing anything.
