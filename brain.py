@@ -27,11 +27,12 @@ SCHEMA = {
         "killer": {"type": "string"},
         "lore": {"type": "string"},
         "challenge": {"type": "string", "enum": ["none", "done", "failed"]},
+        "ranked": {"type": "string", "enum": ["yes", "no", "unsure"]},
         "squad": {"type": "array", "items": {"type": "object", "properties": {
             "friend": {"type": "string"}, "event": {"type": "string", "enum": ["death", "fail", "epic"]}},
             "required": ["friend", "event"], "additionalProperties": False}},
     },
-    "required": ["mood", "line", "event", "respect", "save_moment", "remember", "game_note", "killer", "lore", "challenge", "squad"],
+    "required": ["mood", "line", "event", "respect", "save_moment", "remember", "game_note", "killer", "lore", "challenge", "ranked", "squad"],
     "additionalProperties": False,
 }
 PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50)}  # $ per million tokens
@@ -47,7 +48,7 @@ def cost(model, usage):
 REPORT_SCHEMA = {"type": "object", "properties": {"report": {"type": "string"}}, "required": ["report"], "additionalProperties": False}
 WEB_SEARCH = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 2}]
 QUIET_REPLY = {"mood": "disgusted", "line": "Hmph. Not worth my breath.", "event": "none", "respect": "same",
-               "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": "", "challenge": "none", "squad": []}
+               "save_moment": False, "remember": "", "game_note": "", "killer": "", "lore": "", "challenge": "none", "ranked": "unsure", "squad": []}
 
 
 SWEARING = ("\n\nLanguage: swear freely (fuck, shit, bitch, ass, damn): the player and their friends want it raw and asked for it. "
@@ -232,19 +233,36 @@ def report(client, model, session_text):
 
 
 SONG_SCHEMA = {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"], "additionalProperties": False}
+def _searched(client, model, ask, schema):
+    """`ask` answered with one web search (about a cent on Haiku: the search fee is most of it; ~9 cents on Sonnet), or
+    from what the model knows when it has no web search. Returns (reply or None, dollars)."""
+    tool = "web_search_20250305" if "haiku" in model else "web_search_20260209"  # Haiku only runs the basic search tool
+    try:
+        return _ask(client, model, [{"type": "text", "text": ask}], schema, [{"type": tool, "name": "web_search", "max_uses": 1}])
+    except anthropic.BadRequestError:
+        logging.warning("web search unavailable, answering without it", exc_info=True)
+        return _ask(client, model, [{"type": "text", "text": ask}], schema)
+
+
 def look_up_song(client, model, artist, song):
-    """Learn about a song with one web search (about a cent on Haiku: the search fee is most of it; ~9 cents on Sonnet).
-    Returns (a short note, dollars)."""
+    """Learn about a song with one web search. Returns (a short note, dollars)."""
     ask = (f'Look up the song "{song}" by {artist} with web search. In under 35 words, as plain notes (not in character): '
            "what it is (genre, year, album), what it's about, and one notable thing about the artist. If you can't find it, "
            "say the little you can.")
-    tool = "web_search_20250305" if "haiku" in model else "web_search_20260209"  # Haiku only runs the basic search tool
-    try:
-        out, spent = _ask(client, model, [{"type": "text", "text": ask}], SONG_SCHEMA, [{"type": tool, "name": "web_search", "max_uses": 1}])
-    except anthropic.BadRequestError:  # no web search on this model: what it knows without one
-        logging.warning("web search unavailable for a song, answering without it", exc_info=True)
-        out, spent = _ask(client, model, [{"type": "text", "text": ask}], SONG_SCHEMA)
+    out, spent = _searched(client, model, ask, SONG_SCHEMA)
     return (out["note"].strip() if out else ""), spent
+
+
+def look_up_patch(client, model, game, today):
+    """The newest patch notes of a game that was just updated, from one web search. Returns (short notes, dollars); the
+    notes are "" when the search finds none from the last few weeks."""
+    ask = (f'The video game "{game}" was just updated (today is {today}). Look up its newest patch notes with web search '
+           "(search for that exact title). In under 60 words, as plain notes (not in character): the patch's name or number "
+           "and date, then the changes that matter most to players (balance, new content, big fixes). If you find no notes "
+           'from the last few weeks, write only "none". Write only the notes: no remarks about the search.')
+    out, spent = _searched(client, model, ask, SONG_SCHEMA)
+    note = out["note"].strip() if out else ""
+    return ("" if note.lower().strip(' ."') == "none" else note), spent
 
 
 GAME_SCHEMA = {"type": "object", "properties": {"profile": {"type": "string"}}, "required": ["profile"], "additionalProperties": False}
@@ -258,12 +276,7 @@ def look_up_game(client, model, game):
            "levels; its weapons, classes or characters worth knowing; and three concrete things good players do. If the "
            "search only finds other games, use what you know about this one. Write only the notes: no remarks about the "
            "search.")
-    tool = "web_search_20250305" if "haiku" in model else "web_search_20260209"  # Haiku only runs the basic search tool
-    try:
-        out, spent = _ask(client, model, [{"type": "text", "text": ask}], GAME_SCHEMA, [{"type": tool, "name": "web_search", "max_uses": 1}])
-    except anthropic.BadRequestError:  # no web search on this model: what it knows without one
-        logging.warning("web search unavailable for a game, answering without it", exc_info=True)
-        out, spent = _ask(client, model, [{"type": "text", "text": ask}], GAME_SCHEMA)
+    out, spent = _searched(client, model, ask, GAME_SCHEMA)
     return (out["profile"].strip() if out else ""), spent
 
 

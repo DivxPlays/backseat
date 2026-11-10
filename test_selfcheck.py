@@ -683,7 +683,20 @@ assert v.blood > 0.95 and not v.render().isNull() and not v.render(0.3, bust=Tru
 # Discord camera: frames for one character or both, every background, subtitles; an ultrawide game screen is cropped, not squashed
 import camera as cam_mod  # noqa: E402
 
-assert cam_mod.fit(Image.new("RGB", (5120, 1440)), 1280, 720).size == (1280, 720)
+assert cam_mod.middle({"left": -5120, "top": 0, "width": 5120, "height": 1440}, 1280, 720) == \
+    {"left": -3840, "top": 0, "width": 2560, "height": 1440}  # only the part shown is grabbed
+assert cam_mod.middle({"left": 0, "top": 0, "width": 1920, "height": 1200}, 1280, 720) == \
+    {"left": 0, "top": 60, "width": 1920, "height": 1080}
+assert cam_mod.shrink(Image.new("RGB", (2560, 1440)), 1280, 720).size == (1280, 720)
+assert cam_mod.shrink(Image.new("RGB", (1920, 1080)), 1280, 720).size == (1280, 720)
+quiet_one = Vorn()
+quiet_one.act, quiet_one.blink = None, 0.0
+c = cam_mod.Camera(SimpleNamespace(char=quiet_one, text="", shown=0.0), lambda: (0, 0))
+assert not c.lively()  # nobody talking or moving: every other frame is the last one again
+quiet_one.act = "stretch"
+assert c.lively()  # an idle animation is drawn smoothly
+quiet_one.act, c.overlay.text = None, "Pathetic."
+assert c.lively()  # and so is talking (lip-sync)
 stub = SimpleNamespace(char=Vorn(), text="Pathetic aim, again.", shown=8.0)
 for mode in ("current", "both"):
     for bg in cam_mod.BACKGROUNDS:
@@ -867,7 +880,9 @@ for text, outfits, want in [
         ("I want a challenge for the next match", V, ("challenge", None)), ("Got a dare for me?", M, ("challenge", None)),
         ("That challenge was impossible", V, None), ("Clip that!", V, ("clip", None)), ("save that for me", M, ("clip", None)),
         ("Put that in the hall of shame.", V, ("clip", None)), ("That was clip worthy", M, ("clip", None)),
-        ("Clip that guy's head off", V, None)]:
+        ("Clip that guy's head off", V, None), ("Ranked mode.", V, ("ranked", True)), ("It's ranked", M, ("ranked", True)),
+        ("we're playing competitive", V, ("ranked", True)), ("ranked off", V, ("ranked", False)), ("It's casual.", M, ("ranked", False)),
+        ("I hate ranked", V, None)]:
     assert commands.parse(text, outfits, chars) == want, (text, commands.parse(text, outfits, chars), want)
 assert commands.duration(600) == "10 minutes" and commands.duration(3600) == "an hour" and commands.money(12.07) == "12 dollars and 7 cents"
 done = []
@@ -888,6 +903,16 @@ for said, want in [("Hey Mika, wear the hoodie.", ("wear", 1, "hoodie")), ("Hey 
     assert (want is None or want in done) and any(d[0] == "say" and d[1] == who for d in done), (said, done)
     assert not any(d[0] == "switch" for d in done) or "switch to" in said  # "both of you" while they're both here: no restart
 assert "1 dollar and 50 cents" in fake.recent[-5] and "10 minutes" in fake.recent[-9]  # what they said back is in the dialogue
+fake.set_ranked = lambda state: done.append(("ranked", state))
+done.clear()
+assert main.Companion.command(fake, "Hey Mika, it's ranked.") and ("ranked", "you") in done  # you said so: it stays on
+assert any(d[0] == "say" and d[1] == "Mika" and d[2] in commands.LINES["mika"]["ranked on"][1] for d in done), done
+# ranked mode from the screen: on when a ranked match shows, off when a casual one does, unless you turned it on yourself
+assert main.ranked_after("", "yes") == "seen" and main.ranked_after("seen", "unsure") == "seen" and main.ranked_after("seen", "no") == ""
+assert main.ranked_after("you", "no") == "you" and main.ranked_after("", "no") == "" and main.ranked_after("", "unsure") == ""
+assert main.RANKED_BREAKS == {"death", "win", "loss", "menu"} and "- ranked:" in config.RULES
+assert brain.SCHEMA["properties"]["ranked"]["enum"] == ["yes", "no", "unsure"] and brain.QUIET_REPLY["ranked"] == "unsure"
+assert "ranked" in brain.schema()["required"]
 done.clear()
 assert not main.Companion.command(fake, "Hey Vorn, how was your day?") and not done  # a normal question goes to Claude
 # a locked outfit: they say how far you are and nothing changes; once earned, they put it on
@@ -1136,6 +1161,36 @@ with tempfile.TemporaryDirectory() as d:
         config.MONTHLY_BUDGET = saved_budget
     finally:
         brain.look_up_game = real_look
+    # patch day: a game's build changing (Steam's build number, else the exe's size and date) brings its patch notes
+    lib = Path(d, "Steam")
+    Path(lib, "steamapps", "common", "Deep Rock").mkdir(parents=True)
+    Path(lib, "steamapps", "appmanifest_548430.acf").write_text(
+        '"AppState" { "appid" "548430" "name" "Deep Rock Galactic" "installdir" "Deep Rock" "buildid" "1830214" }')
+    drg = str(Path(lib, "steamapps", "common", "Deep Rock", "FSD.exe"))
+    Path(drg).write_bytes(b"x")
+    assert memory.game_build(drg) == "steam 1830214"
+    solo = Path(d, "Epic Games", "Fortnite", "FortniteClient-Win64-Shipping.exe")
+    solo.parent.mkdir(parents=True)
+    solo.write_bytes(b"12345")
+    first = memory.game_build(str(solo))
+    assert first.startswith("exe 5 ") and memory.game_build(str(Path(d, "gone.exe"))) == ""
+    assert not m.patched("fortnite", first) and not m.patched("fortnite", first)  # first seen, then the same: no patch
+    solo.write_bytes(b"123456")
+    assert m.patched("fortnite", memory.game_build(str(solo))) and not m.patched("fortnite", "")  # updated; unknown isn't
+    real_ask = brain._ask
+    asked = []
+    for found, want in (("Chapter 7 patch 37.10 (Nov 9): shotgun nerf, new map.", "Chapter 7 patch 37.10 (Nov 9): shotgun nerf, new map."),
+                        ("None.", "")):
+        brain._ask = lambda client, model, content, schema, tools=None, found=found: (asked.append((content[0]["text"], tools)),
+                                                                                       ({"note": found}, 0.011))[1]
+        try:
+            prof.client = object()
+            assert main.Companion.read_patch(prof, ("fortnite", "Fortnite")) == want
+        finally:
+            brain._ask = real_ask
+    assert "Fortnite" in asked[0][0] and asked[0][1][0]["name"] == "web_search"  # one web search
+    assert m.patch_notes("fortnite")[0].startswith("Chapter 7")  # remembered ("none" found later doesn't erase it)
+    assert "{game}" in main.SITUATIONS["patch"] and "{notes}" in main.SITUATIONS["patch"] and "patch" in main.AUTO
 prompts = []
 real_ask = brain._ask
 brain._ask = lambda client, model, content, schema, tools=None: (prompts.append(content[0]["text"]), ({"mood": "smug", "line": "q", "answer": "a"}, 0.0))[1]

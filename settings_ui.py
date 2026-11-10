@@ -313,7 +313,7 @@ class SettingsWindow(QDialog):
         w["GPU_BUSY"] = _spin(config.GPU_BUSY, 0, 100, " %")
         w["LOCAL_IN_GAMES"] = QCheckBox("Use it in games too (off: Claude comments in games\nand the model leaves the graphics card)")
         w["LOCAL_IN_GAMES"].setChecked(config.LOCAL_IN_GAMES)
-        w["GAME_PROFILES"] = QCheckBox("Look each new game up on the web once (about 1 cent a game)")
+        w["GAME_PROFILES"] = QCheckBox("Look each new game up on the web once, and its patch notes after an update (about 1 cent each)")
         w["GAME_PROFILES"].setChecked(config.GAME_PROFILES)
         w["STEAM_KEY"] = QLineEdit(config.STEAM_KEY)
         w["STEAM_KEY"].setEchoMode(QLineEdit.Password)

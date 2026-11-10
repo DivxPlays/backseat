@@ -1,7 +1,8 @@
 """Discord camera: the current character (or Vorn and Mika together) as a virtual webcam, with subtitles and a background.
 
 Frames go to OBS's virtual camera through pyvirtualcam; pick "OBS Virtual Camera" in Discord's video settings.
-Drawn in its own thread at 1280x720, 15 fps, from the same animated character the overlay shows.
+Drawn in its own thread at 1280x720, 15 fps (7.5 while nobody talks or moves: each frame is sent twice), from the same
+animated character the overlay shows.
 """
 import logging
 import threading
@@ -14,24 +15,27 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QLinearGradient, QPainter, QPainterPath
 
 import config
+import character
 from character import H, W, make_character
 
-CAM_W, CAM_H, FPS = 1280, 720, 15  # (each frame is ~23 ms of drawing: at 24 fps it took half a CPU core from your game)
+CAM_W, CAM_H, FPS = 1280, 720, 15  # (a frame is ~11 ms of drawing: at 15 fps about a sixth of a CPU core, half that idle)
 BACKGROUNDS = ("dark", "green", "game", "webcam")
 # the face the one listening makes: never the speaker's own, so the two never look like copies
 REACT = {"laugh": "smug", "angry": "surprised", "smug": "disgusted", "surprised": "laugh", "disgusted": "smug", "idle": "idle"}
 
 
-def fit(img, w, h):
-    """Crop to the w:h shape from the middle, then scale (an ultrawide game screen loses its sides, not its height)."""
-    iw, ih = img.size
-    if iw / ih > w / h:
-        cw = int(ih * w / h)
-        img = img.crop(((iw - cw) // 2, 0, (iw - cw) // 2 + cw, ih))
-    else:
-        ch = int(iw * h / w)
-        img = img.crop((0, (ih - ch) // 2, iw, (ih - ch) // 2 + ch))
-    return img.resize((w, h))
+def middle(mon, w, h):
+    """The w:h part from the middle of a display (an ultrawide game screen loses its sides, not its height): only that
+    part is grabbed (a 5120x1440 screen: half of it, ~60 ms down to ~20 per grab)."""
+    mw, mh = mon["width"], mon["height"]
+    cw, ch = (int(mh * w / h), mh) if mw / mh > w / h else (mw, int(mw * h / w))
+    return {"left": mon["left"] + (mw - cw) // 2, "top": mon["top"] + (mh - ch) // 2, "width": cw, "height": ch}
+
+
+def shrink(img, w, h):
+    """Scale to w x h, fast: halve it first while it's at least twice the size."""
+    k = min(img.width // w, img.height // h)
+    return (img.reduce(k) if k > 1 else img).resize((w, h), Image.BILINEAR)
 
 
 class Camera:
@@ -80,8 +84,8 @@ class Camera:
         with mss.MSS() as s:
             mon = next((m for m in s.monitors[1:] if m["left"] <= x < m["left"] + m["width"] and m["top"] <= y < m["top"] + m["height"]),
                        s.monitors[1])
-            shot = s.grab(mon)
-        img = fit(Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX"), CAM_W, CAM_H)
+            shot = s.grab(middle(mon, CAM_W, CAM_H))
+        img = shrink(Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX"), CAM_W, CAM_H)
         return QImage(img.tobytes(), CAM_W, CAM_H, CAM_W * 3, QImage.Format_RGB888).copy()
 
     def run(self):
@@ -89,20 +93,29 @@ class Camera:
             import pyvirtualcam
             with pyvirtualcam.Camera(CAM_W, CAM_H, FPS, backend="obs") as cam:
                 self.error = ""
-                last_bg, last = 0.0, time.monotonic()
+                last_bg, last, n, frame = 0.0, time.monotonic(), 0, None
                 while self.running:
                     now = time.monotonic()
                     if config.CAMERA_BACKGROUND == "game" and now - last_bg > 0.5:
                         last_bg, self.background = now, self.game_screen()
                     if self.other:
                         self.other.step(now - last, 0.0)
-                    last = now
-                    cam.send(self.frame())
+                    last, n = now, n + 1
+                    if frame is None or n % 2 or self.lively():  # quiet: every other frame is the last one again
+                        frame = self.frame()
+                    cam.send(frame)
                     cam.sleep_until_next_frame()
         except Exception as e:  # no OBS, camera busy, ...
             self.error = str(e)
             self.running = False
             logging.warning("Discord camera stopped: %s", e)
+
+    def lively(self):
+        """True while someone talks (subtitles up), is thrown, blinks, burns or plays an idle animation, or holiday weather
+        falls: then every frame is drawn (breathing and a resting face look the same at half the rate)."""
+        chars = getattr(self.overlay, "chars", [self.overlay.char]) + ([self.other] if self.other else [])
+        return bool(self.overlay.text or character.WEATHER) or any(
+            c.talk > 0.03 or c.rag > 0.05 or c.act or c.blink > 0 or c.blood > 0.05 for c in chars)
 
     def frame(self):
         img = QImage(CAM_W, CAM_H, QImage.Format_RGB888)

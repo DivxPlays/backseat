@@ -1,5 +1,5 @@
 """Voice commands handled on this PC, free and instant: "Hey Vorn, shut up for 10 minutes", "Hey Mika, wear the hoodie",
-"switch to Mika", "stop looking", "how much have you cost me?". Only a whole sentence that is a command counts; anything
+"switch to Mika", "stop looking", "how much have you cost me?", "ranked mode". Only a whole sentence that is a command counts; anything
 else ("shut up, you're wrong about that map") goes to Claude as usual.
 """
 import json
@@ -34,6 +34,11 @@ COMMANDS = [
                   r"(?:challenge|bounty|dare)(?: for (?:me|this|the next|my next) (?:match|game|round))?|(?:challenge|dare) me"),
     ("clip", r"(?:clip|save|frame|record) (?:that|this|it)(?: one)?|(?:that'?s|that is|that was) (?:a clip|clip ?worthy)|"
              r"(?:put|throw) (?:that|this|it) in the hall of shame|hall of shame (?:that|this|it)"),
+    ("ranked on", r"(?:(?:turn on |start |go to |switch to )?ranked(?: mode)?(?: on)?|(?:this|it) ?(?:is|'?s) (?:a )?(?:ranked|competitive)"
+                  r"(?: (?:match|game))?|(?:we|i) ?(?:are|am|'?re|'?m) (?:playing |in )?(?:ranked|competitive)|focus mode)"),
+    ("ranked off", r"(?:ranked(?: mode)? off|(?:turn off|stop|end|exit|no more) ranked(?: mode)?|(?:this|it) ?(?:is|'?s) "
+                   r"(?:not ranked|unranked|casual)|(?:we|i) ?(?:are|am|'?re|'?m) (?:playing )?(?:casual|unranked)|not ranked|"
+                   r"unranked|casual(?: mode)?)"),
     ("switch", r"(?:(?:switch|change|swap|go)(?: back)? to|let me talk to|i want) (?:just |only )?(?P<who>.+?)(?: mode| only)?"),
     ("switch", r"(?P<who>both of you|duo mode)"),
 ]
@@ -74,7 +79,8 @@ def parse(text, outfits=(), characters=None):
     """(command, value) if the whole of `text` is a voice command, else None.
     outfits: the outfit names of the one being talked to; characters: {preset: the names they answer to} for switching.
     Commands: ("mute", seconds or None), ("unmute", None), ("vision", True/False), ("cost", None),
-    ("outfit", a name or None for a different one), ("switch", a preset or "both"), ("challenge", None), ("clip", None)."""
+    ("outfit", a name or None for a different one), ("switch", a preset or "both"), ("challenge", None), ("clip", None),
+    ("ranked", True/False)."""
     t = clean(text)
     for kind, pattern in COMMANDS:
         m = re.fullmatch(pattern, t)
@@ -92,6 +98,8 @@ def parse(text, outfits=(), characters=None):
             return kind, None
         if kind.startswith("vision"):
             return "vision", kind == "vision on"
+        if kind.startswith("ranked"):
+            return "ranked", kind == "ranked on"
         if kind == "new outfit":
             return "outfit", None
         if kind == "wear":
@@ -133,6 +141,9 @@ LINES = {
         "grabbed": ("surprised", ["Put me down this instant!", "Unhand me, peasant!"]),
         "thrown": ("angry", ["You THREW me? I will remember this.", "My armor. My dignity. Mostly my dignity."]),
         "scream": ("surprised", ["Raaaaaaagh!", "Unhand meeeeee!", "Aaaaaargh!"]),
+        "ranked on": ("smug", ["Ranked. I'll hold my tongue until you die. Shouldn't be long.",
+                               "Fine. Silence while you play. Make my patience worth it."]),
+        "ranked off": ("smug", ["Casual again. Good. I have notes.", "Ranked's over. Now I can tell you everything you did wrong."]),
     },
     "mika": {
         "mute": ("smug", ["Okay, I'll be quiet... but I'm still watching you. Always.", "Shh, I'm being good. Talk to me when you miss me."]),
@@ -156,6 +167,8 @@ LINES = {
         "grabbed": ("laugh", ["Wheee! Don't you dare drop me!", "Ooh, carrying me? So bold."]),
         "thrown": ("angry", ["You threw me?! I'm writing this down.", "Ow! You'll pay for that in cuddles."]),
         "scream": ("surprised", ["Kyaaaaaaah!", "Wheeeeeeee!", "Eeeeeeeek!"]),
+        "ranked on": ("smug", ["Ranked? I'll be quiet and just... watch you. Closely.", "Focus mode! I'll cheer silently. Mostly."]),
+        "ranked off": ("laugh", ["Yay, casual! I can talk to you again!", "No more ranked? Good. You're all mine again."]),
     },
 }
 

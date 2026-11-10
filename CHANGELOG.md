@@ -3,6 +3,29 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## Unreleased
+
+README at release: ranked mode (How it behaves: a bullet; Controls: "Ranked mode" in the tray row, and "ranked mode" /
+"it's ranked" / "ranked off" in the voice commands); patch day (How it behaves: a bullet; Cost: about a cent per game
+update; Settings: the Game profiles box now says it looks up patch notes too); Discord camera: "15 fps" becomes "15 fps
+(7.5 while nobody talks or moves)".
+
+### New
+- **Ranked mode.** In a ranked or competitive match they keep quiet while you play: they speak only when you die,
+  between rounds, in menus and when the match is over, in one short line, and they still keep score (deaths, wins,
+  the Hall of Shame). They spot a ranked match on screen by themselves (a "Ranked" or "Competitive" label), or say
+  "Hey Vorn, ranked mode" (or "it's ranked"); "ranked off", a casual mode on screen, or leaving the game ends it. Also
+  in the tray. No mini-games, music talk, break nags or idle sounds until it's over.
+- **Patch day.** When a game was updated since they last saw you in it (its Steam build, or the game's program file
+  for other launchers), they look up its patch notes with one web search (about a cent) and give their take on what
+  changed; later comments know the notes too. It's part of Settings > Game profiles.
+
+### Fixed
+- **The Discord camera costs less** (#2). Drawing it measured about 11 ms a frame: about a sixth of a CPU core at 15
+  fps, with hardly any delay to the overlay. With your game screen behind them, each grab copied the whole display;
+  now only the part that's shown is grabbed (58 ms down to 30 on a 5120x1440 screen). And while nobody talks or
+  moves, every other frame is the last one sent again, which cuts the drawing by about a third.
+
 ## 2.2.0 Beta (2026-11-10)
 
 Recap cards after your games, any two characters as a duo, five more holidays, a check for whether Backseat is slowing

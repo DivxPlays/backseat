@@ -117,7 +117,7 @@ class Memory:
                            ("spend_days", {}), ("spend_level", {}), ("hall", []), ("pinned", []), ("profile", ""), ("friends", {}),
                            ("unlocked", []), ("talks", 0), ("alone", {}), ("seen", {}), ("held", []),
                            ("last_with", {}), ("music", {}), ("songs", {}),
-                           ("game_profiles", {})):
+                           ("game_profiles", {}), ("builds", {})):
             self.d.setdefault(key, empty)
         self.d.setdefault("met", min(self.d["days"], default=date.today().isoformat()))  # (milestones; before 2.1.0: the
         # first day still kept)
@@ -155,6 +155,26 @@ class Memory:
     def learn_game(self, key, name, profile):
         with self.lock:
             self.d["game_profiles"][key] = {"name": name, "profile": profile, "made": datetime.now().isoformat(timespec="minutes")}
+
+    def patched(self, key, build):
+        """True when a game's build changed since it was last seen here (it was updated); remembers the new one. A game
+        seen for the first time isn't patched."""
+        if not build:
+            return False
+        with self.lock:
+            seen = self.d["builds"].setdefault(key, {})
+            old, seen["build"] = seen.get("build"), build
+            return old is not None and old != build
+
+    def learn_patch(self, key, notes):
+        with self.lock:
+            self.d["builds"].setdefault(key, {}).update(notes=notes, date=date.today().isoformat())
+
+    def patch_notes(self, key):
+        """(the game's latest patch notes, the day they were looked up), or None."""
+        with self.lock:
+            b = self.d["builds"].get(key, {})
+            return (b["notes"], b["date"]) if b.get("notes") else None
 
     def forget_game(self, key):
         """Look this game up again next time (a profile can carry mistakes)."""
@@ -498,6 +518,25 @@ def steam_app(exe):
         if st.get("installdir", "").lower() == folder.lower():
             return st.get("appid"), st.get("name", folder)
     return None
+
+
+def game_build(exe):
+    """What changes when a game is updated: its Steam build number, else its exe's size and date ("" if unknown).
+    shortcut: a game that updates only its data files and not its exe (outside Steam) isn't noticed."""
+    app = steam_app(exe)
+    if app:
+        acf = Path(re.match(r"(.*?)[\\/]steamapps[\\/]", exe, re.I).group(1), "steamapps", f"appmanifest_{app[0]}.acf")
+        try:
+            build = _lower(parse_vdf(acf.read_text(encoding="utf-8", errors="ignore")).get("AppState")).get("buildid")
+        except OSError:
+            build = None
+        if build:
+            return f"steam {build}"
+    try:
+        s = os.stat(exe)
+    except (OSError, ValueError):
+        return ""
+    return f"exe {s.st_size} {int(s.st_mtime)}"
 
 
 NOT_GAMES = {  # never games, even fullscreen: browsers, chat, music, video, launchers, the desktop, tools

@@ -2,8 +2,7 @@
 
 ## Planned
 
-- **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
-  frames, draw it in its own process or resend unchanged frames.
+Nothing right now: pick from the ideas below.
 
 ## Not yet tested in real use
 
@@ -17,10 +16,12 @@ Built and self-checked, but not yet seen working on a real day:
 - 2.1.1: the lag fixes in a full Fortnite match (normal priority, the local model off the graphics card in games).
 - 2.2.0: a recap card after a real game, What's new after a real update, "Is Backseat slowing my game?" during a match,
   the installer's key check with a brand-new key, a duo with a created character, and the new holidays on their days.
+- 2.3.0 (unreleased): ranked mode in a real ranked match (spotted on screen, quiet mid-play, talking at deaths and after),
+  a patch-day reaction after a real game update, and the Discord camera's cost in a game (#2: measured outside games only).
 
 ## Ideas for 2.3.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.2.0: no new issues; #2 is in Planned; #1 was fixed in 2.1.1 and #3 in 2.2.0.
+GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.2.0: no new issues; #1 was fixed in 2.1.1, #3 in 2.2.0, and #2 is built for 2.3.0.
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
@@ -56,6 +57,12 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+
+2.3.0 (in progress):
+- Ranked mode: in a ranked match (spotted on screen, or "ranked mode") they only talk at breaks, and keep score.
+- Patch day: a game updated since they last saw it gets its patch notes looked up (one web search) and their take.
+- Fix (#2): the Discord camera grabs only the part of your screen it shows, and sends quiet frames twice instead of
+  drawing each one.
 
 2.2.0 (2026-11-10):
 - More holidays: Lunar New Year, Valentine's outfits, St. Patrick's, Easter and Thanksgiving, each with outfits for both and its own weather.

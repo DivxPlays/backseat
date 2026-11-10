@@ -72,7 +72,8 @@ from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
 from memory import (SHAME, Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen,  # noqa: E402
-                    gpu_load, idle_seconds, is_game, milestone, steam_app, steam_hours, tally, week as memory_week)
+                    game_build, gpu_load, idle_seconds, is_game, milestone, steam_app, steam_hours, tally,
+                    week as memory_week)
 from senses import (SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, new_clip,  # noqa: E402
                     save_clip, save_moment, videos_folder)
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
@@ -114,8 +115,13 @@ SITUATIONS = {
     "recap": "The player just finished {time} of {game} and left it. What you saw in that stretch: {score}. Give your verdict "
              "on the whole session in one or two short sentences (under 25 words), in character: it goes on their recap "
              "card for their friends to see. (A look back: event none, respect same.)",
+    "patch": "{game} was updated since you last saw the player in it. Its newest patch notes, from a web search: {notes} "
+             "React in one or two short sentences (under 25 words), in character: the change that matters most to how "
+             "they play, and your take on it.",
 }
-AUTO = {"change", "quiet", "lore", "nag", "breakdown", "music", "recap"}  # jobs he starts himself; they stop when the budget runs out
+AUTO = {"change", "quiet", "lore", "nag", "breakdown", "music", "recap", "patch"}  # jobs he starts himself; they stop when the budget runs out
+RANKED_BREAKS = {"death", "win", "loss", "menu"}  # ranked mode: they only speak at a break (dead, round or match over, menus)
+RANKED_SAYS = " (A ranked match: the player needs focus. Keep it to one short line, under 10 words.)"
 BANTER = ([1, 2, 3, 4, 5, 6], [2, 4, 3, 2, 1, 1])  # duo mode: how many lines an exchange runs (weights): usually short,
 # now and then a real argument. The small local model goes up to LOCAL_BANTER (each line is a call of its own)
 LOCAL_BANTER = 4
@@ -359,6 +365,7 @@ class Bridge(QObject):
     switch = Signal(str)  # voice command: switch to a preset, or "both" (restarts him)
     update = Signal(str)  # a newer version is on GitHub
     slow = Signal(str, str)  # "Is it slowing my game?" measured: verdict, details
+    ranked = Signal(bool)  # ranked mode went on or off (the tray's check mark)
 
 
 def set_clickthrough(widget, on):
@@ -860,6 +867,7 @@ class Companion:
         self.jobs = queue.Queue()
         self.recent = []
         self.paused = self.muted = self.busy = self.started = False
+        self.ranked = ""  # ranked mode: "seen" (a ranked match on screen), "you" (you said so) or "" (off)
         self.updated_to = None  # just updated: the greeting mentions it ("2.2.0 Beta")
         self.unmute_at = 0.0  # "shut up for 10 minutes": when he may talk again (0 = not on a timer)
         self.dressers = []  # the characters on screen (set once the overlay exists), for outfit commands
@@ -888,6 +896,7 @@ class Companion:
         self.profiling = set()  # games already queued for a lookup this session
         self.last_game_seen = None  # (key, name): for tray > Look up this game again (the tray itself takes the front)
         self.music_news, self.last_music_said, self.last_lookup = None, 0.0, -LOOKUP_GAP
+        self.patch_news = None  # (key, name) of a game that was updated since they last saw it, for their take
         self.voices = voices.Voices()  # friends' voice fingerprints (the model loads on first use)
         self.listeners = []  # "Hey Vorn" listeners: your mic, and your friends' voices from Discord
         self.partner = brain.partner()  # duo mode: the other character, on screen too
@@ -1060,6 +1069,20 @@ class Companion:
             self.mem.learn_game(key, name, text)
             self.mem.save()
         logging.info("game profile for %s ($%.4f): %s", name, spent, text)
+
+    def read_patch(self, game):
+        """The newest patch notes of a game that was just updated: one web search (about a cent), remembered so later
+        comments know them too. Returns the notes, or "" when none were found."""
+        try:
+            notes, spent = brain.look_up_patch(self.client, config.MODEL, game[1], datetime.now().date().isoformat())
+        except Exception:
+            logging.warning("couldn't look up %s's patch notes", game[1], exc_info=True)
+            return ""
+        self.mem.spend(spent, "game")
+        if notes:
+            self.mem.learn_patch(game[0], notes)
+        logging.info("patch notes for %s ($%.4f): %s", game[1], spent, notes)
+        return notes
 
     def minigame(self, who=None, kind=None):
         """In a menu: one of them asks you a trivia question about your game (the mic then takes your answer for
@@ -1237,6 +1260,15 @@ class Companion:
         self.bridge.note.emit(f"(shut-up mode: I'll only talk when you talk to me. {config.KEY_MUTE.upper()} to undo)"
                               if self.muted else "(free to speak my mind again)")
 
+    def set_ranked(self, state):
+        """Ranked mode on ("seen" or "you") or off (""): in a ranked match they only talk at a break, and keep score."""
+        if bool(state) != bool(self.ranked):
+            self.bridge.note.emit("(ranked mode: quiet while you play; they speak when you die, between rounds, in menus "
+                                  "and after the match)" if state else "(ranked mode off)")
+            self.bridge.ranked.emit(bool(state))
+            logging.info("ranked mode %s", state or "off")
+        self.ranked = state
+
     def command(self, said):
         """A voice command, handled here for free and instantly (see commands.py). True if `said` was one."""
         m = WakeListener.pattern([n for names in self.wake_of.values() for n in names]).match(said)
@@ -1267,6 +1299,9 @@ class Companion:
             key = "vision on" if value else "vision off"
         elif kind == "cost":
             values = {"spent": commands.money(self.mem.spent())}
+        elif kind == "ranked":
+            self.set_ranked("you" if value else "")
+            key = "ranked on" if value else "ranked off"
         elif kind == "challenge":  # "give me a challenge": the one you asked sets it (their line is the reply)
             self.recent.append(f"Player: {said}")
             self.jobs.put(("minigame", (who, "dare")))
@@ -1409,6 +1444,9 @@ class Companion:
             plays = self.listening.plays.get(tuple(arg), 1)
             situation = SITUATIONS["music"].format(song=arg[1], artist=arg[0]) + (
                 f" They've played it {plays} times this session: it's on repeat." if plays >= 3 else "")
+        if kind == "patch":  # the game was updated: its patch notes, then their take
+            notes = self.read_patch(arg)
+            situation = SITUATIONS["patch"].format(game=arg[1], notes=notes or "(none found yet: mock the silent patch).")
         if kind == "recap":  # a game you played a while is over: their verdict, for the recap card
             situation = SITUATIONS["recap"].format(time=fmt(arg["seconds"]), game=arg["game"], score=tally(arg["events"]))
         if kind == "start" and self.coached:
@@ -1443,10 +1481,12 @@ class Companion:
         if to:  # duo mode: without this the other one answers too ("My day?") when only one was asked
             other = next(n for n in self.names if n != to)
             situation += f" (This was said to {to}: only {to} speaks, in one turn. {other} stays silent.)"
-        lines = random.choices(*BANTER)[0] if self.partner and not to else 1  # duo mode: this exchange's length
+        lines = random.choices(*BANTER)[0] if self.partner and not to and not self.ranked else 1  # duo mode: this exchange's length
         if self.partner and not to:
             situation += (f" (This exchange runs {lines} line{'s' if lines > 1 else ''}"
                           + (": a real back-and-forth, they go at each other.)" if lines >= 4 else ".)"))
+        if self.ranked and kind not in ("start", "recap", "breakdown"):  # (the match is over for a recap or a breakdown)
+            situation += RANKED_SAYS
         if kind in AUTO or kind == "start":  # lines they start themselves: a new opening, no pet words, the hour now and then
             with self.mem.lock:
                 said = [s for x in self.mem.d["sessions"][-3:] for s in x.get("lines", [])][-60:]
@@ -1492,7 +1532,7 @@ class Companion:
                     # move respect, set off Bloodfire, frame the Hall of Shame, trigger breakdowns or write notes or stories
                     # (it reads your memory, it doesn't write it); Claude does those
                     out.update(event="none", respect="same", save_moment=False, killer="", remember="", game_note="", lore="",
-                               challenge="none", squad=[])
+                               challenge="none", ranked="unsure", squad=[])
                     said, voice = (out["turns"][0] if alone else None), alone
                     while said and said["line"].strip() and len(out["turns"]) < min(lines, LOCAL_BANTER):  # they go back and forth
                         voice = brain.me() if voice is self.partner else self.partner  # each from their own head: own past only
@@ -1521,6 +1561,7 @@ class Companion:
         if trivia:  # your trivia answer, judged: right if they gave respect for it
             self.mem.trivia_result(out.get("respect") == "up")
         logging.info("%s%s ($%.4f) -> %s", kind, " (check)" if check else " (local)" if spent == 0 and local else "", spent, out)
+        self.set_ranked(ranked_after(self.ranked, out.get("ranked")))
         turns = turns_of(out, self.names)  # [(speaker, mood, line)]: one for a solo character, a short exchange in duo mode
         if to:  # only the one you called speaks, even if the model wrote a line for the other
             turns = [t for t in turns if t[0] == to] or turns
@@ -1557,7 +1598,8 @@ class Companion:
             self.last_breakdown = time.monotonic()
             self.jobs.put(("breakdown", None))
         self.mem.save()
-        if self.muted and kind == "change":  # shut-up mode: he keeps score, he just keeps it to himself
+        if kind == "change" and (self.muted or (self.ranked and out.get("event") not in RANKED_BREAKS)):  # shut-up mode, or
+            # ranked mid-play: he keeps score, he just keeps it to himself
             if shame:
                 self.hall_entry(shame, turns[0][2], title or app, self.synth(turns[0][2]))
             return
@@ -1631,6 +1673,9 @@ class Companion:
         known = self.mem.game_profile(app_name(exe, title))
         if known:  # what they looked up about the game in front
             text += f"\nAbout {known['name']} (the game on screen): {known['profile']}"
+        patch = self.mem.patch_notes(app_name(exe, title))
+        if patch:
+            text += f"\nIts latest patch notes (looked up {patch[1]}): {patch[0]}"
         record = self.mem.d.get("trivia")
         if record and (record["right"] or record["wrong"]):  # mini-games
             text += f"\nTheir trivia record with you: {record['right']} right, {record['wrong']} wrong."
@@ -1854,7 +1899,10 @@ class Companion:
                 continue
             with self.mem.lock:
                 score, respect = dict(self.mem.session["events"]), self.mem.d["respect"]
+            game_was = stretch and stretch["key"]
             stretch, recap = game_stretch(stretch, self.current_game(), now, score, respect)
+            if self.ranked and game_was and game_was != (stretch and stretch["key"]):  # you left that game: ranked is over
+                self.set_ranked("")
             if recap and not (self.muted or self.paused):
                 self.jobs.put(("recap", recap))
             afk = idle_seconds() > config.AFK_AFTER
@@ -1875,6 +1923,9 @@ class Companion:
                 if game and self.profile_due(game):
                     self.profiling.add(game[0])
                     self.jobs.put(("profile", game))
+                cheap = config.MONTHLY_BUDGET and self.mem.spent() >= 0.8 * config.MONTHLY_BUDGET
+                if game and self.mem.patched(game[0], game_build(self.app[0])) and config.GAME_PROFILES and self.client and not cheap:
+                    self.patch_news = game  # updated since they last saw it: their take once they're free
                 self.check_unlocks()
                 self.mem.saw(self.on_screen)  # whoever is on screen knows how you've spent your time up to now
                 self.mem.save()
@@ -1890,11 +1941,16 @@ class Companion:
             talking_to_him = self.ears.recording or any(listener.active() for listener in self.listeners)
             if afk or broke or self.busy or not self.jobs.empty() or self.voice.busy() or talking_to_him or quiet < config.LOOK_COOLDOWN:
                 continue
-            if not (self.muted or self.paused) and minigame_due(now, self.menu_at, self.last_game, self.current_game() is not None):
+            hold = self.ranked and in_game  # ranked match: no mini-games, music talk, nags or idle roasts
+            if not (self.muted or self.paused or hold) and minigame_due(now, self.menu_at, self.last_game, in_game):
                 self.last_game = now
                 self.jobs.put(("minigame", None))
                 continue
-            if self.music_news and not self.muted and now - self.last_music_said > MUSIC_GAP:
+            if self.patch_news and not (self.muted or self.paused or hold):
+                self.jobs.put(("patch", self.patch_news))
+                self.patch_news = None
+                continue
+            if self.music_news and not (self.muted or hold) and now - self.last_music_said > MUSIC_GAP:
                 playing, self.music_news = self.music_news, None
                 if self.listening.now == playing and random.random() < (0.8 if self.listening.plays[playing] >= 3 else 0.35):
                     self.last_music_said = now  # (more likely when it's on repeat)
@@ -1903,7 +1959,7 @@ class Companion:
             start, end = config.BEDTIME
             hour = datetime.now().hour
             late = start <= hour < end if start < end else (hour >= start or hour < end)
-            if not self.muted and now - self.last_nag > config.NAG_EVERY * 60 and (late or now - self.streak_start > config.BREAK_AFTER * 60):
+            if not (self.muted or hold) and now - self.last_nag > config.NAG_EVERY * 60 and (late or now - self.streak_start > config.BREAK_AFTER * 60):
                 self.last_nag = now
                 self.jobs.put(("nag", None))
                 continue
@@ -1914,7 +1970,7 @@ class Companion:
                 self.base_thumb = thumb
             if changed(self.base_thumb, thumb, config.CHANGE_THRESHOLD):
                 self.jobs.put(("change", None))
-            elif quiet > config.QUIET_ROAST and not self.muted:
+            elif quiet > config.QUIET_ROAST and not (self.muted or hold):
                 self.jobs.put(("lore" if random.random() < 0.3 else "quiet", None))
 
 
@@ -1922,6 +1978,14 @@ RECAPS = HALL / "Recaps"  # session recap cards
 RECAP_MIN, RECAP_GAP = 600, 120  # s: a game played 10+ minutes, then no game in front for 2 minutes, gets a recap card
 RECAP_LABELS = {"win": ("win", "wins"), "loss": ("loss", "losses"), "death": ("death", "deaths"), "fail": ("fail", "fails"),
                 "epic": ("epic play", "epic plays")}
+
+
+def ranked_after(state, seen):
+    """Ranked mode after a reply's reading of the screen (seen: "yes", "no" or "unsure"): on ("seen") when it shows a
+    ranked match, off when it clearly shows a casual one, unless you turned it on yourself ("you")."""
+    if seen == "yes" and not state:
+        return "seen"
+    return "" if seen == "no" and state == "seen" else state
 
 
 def game_stretch(stretch, game, now, events, respect):
@@ -2017,8 +2081,8 @@ def slow_report(core, cores, ram_mb, vram_gb, game, camera, local_in_games):
     if not game:
         details.append("No game was in front the whole time: start the check, then play for the full 30 seconds.")
     if camera != "off":
-        details.append("The Discord camera is on: drawing it takes about a third of a CPU core. Turn it off in tray > "
-                       "Discord camera while nobody's watching it.")
+        details.append("The Discord camera is on: drawing it takes up to a sixth of a CPU core (a quarter with your game "
+                       "screen behind them). Turn it off in tray > Discord camera while nobody's watching it.")
     if vram_gb >= 1:
         details.append(f"The free local model holds {vram_gb:.1f} GB of your graphics card's memory"
                        + (": turn off Settings > Brain & budget > Local model in games, and it leaves the card while "
@@ -2091,7 +2155,7 @@ def main():
 
     overlay.poked.connect(poked)
     overlay.scream = comp.scream  # thrown: they scream
-    overlay.hush = lambda: comp.muted  # shut-up mode: no idle sounds
+    overlay.hush = lambda: comp.muted or bool(comp.ranked)  # shut-up and ranked mode: no idle sounds
     set_clickthrough(overlay, True)  # also creates his window, even while he's hidden waiting for a game
 
     def set_stream(on):  # off = WDA_EXCLUDEFROMCAPTURE: hidden from OBS, recordings and his own screenshots
@@ -2201,6 +2265,10 @@ def main():
     menu.addAction(f"Move / lock ({config.KEY_MOVE.upper()})").triggered.connect(toggle_move)
     menu.addAction(f"Pause / resume watching ({config.KEY_PAUSE.upper()})").triggered.connect(lambda: comp.toggle_pause())
     menu.addAction(f"Shut-up mode ({config.KEY_MUTE.upper()})").triggered.connect(lambda: comp.toggle_mute())
+    ranked = menu.addAction("Ranked mode (quiet while you play)")
+    ranked.setCheckable(True)
+    ranked.triggered.connect(lambda on: comp.set_ranked("you" if on else ""))
+    bridge.ranked.connect(ranked.setChecked)
     stream = menu.addAction("Show me on stream / recordings")
     stream.setCheckable(True)
     stream.setChecked(comp.show_on_stream)
