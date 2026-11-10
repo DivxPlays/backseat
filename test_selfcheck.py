@@ -1731,6 +1731,9 @@ bat = Path("Install Backseat.bat").read_bytes()
 assert b"\r\n" in bat and updater.ZIP.encode() in bat and b'if exist "%~dp0install.ps1" goto here' in bat  # one-file installer
 assert "AUTO_UPDATE" in config._DEFAULTS and "presets /XC" not in Path("install.ps1").read_text(encoding="utf-8")
 assert "/XD .venv .git __pycache__ \"Hall of Shame\" presets" in Path("install.ps1").read_text(encoding="utf-8")  # your characters stay
+# HTTPS is checked the way Windows does (a fresh Windows has no root certificates until something asks for them)
+assert "truststore.inject_into_ssl()" in Path("main.py").read_text(encoding="utf-8")
+assert "truststore==" in Path("requirements.txt").read_text(encoding="utf-8")
 # Python comes as its own zip with a pinned hash: a fresh Windows has no winget, and python.org's setup took 15+ min (#1)
 installer = Path("install.ps1").read_text(encoding="utf-8")
 assert "winget install" not in installer and "nuget.org/api/v2/package/python/3.12.10" in installer

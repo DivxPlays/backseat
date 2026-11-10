@@ -1880,6 +1880,9 @@ class Companion:
 
 
 def main():
+    import truststore
+    truststore.inject_into_ssl()  # check HTTPS the way Windows does: a fresh Windows fetches root certificates only when
+    # asked, so Python's own check failed there (voice models, auto-update and Steam stats couldn't download)
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     k32.CreateMutexW.restype = wintypes.HANDLE
     k32.CloseHandle.argtypes = [wintypes.HANDLE]

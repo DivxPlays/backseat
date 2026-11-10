@@ -13,6 +13,10 @@ unpacks Python's own package (15 MB) into Backseat's folder.
   yet. Without Python 3.12, it now downloads Python's own package (15 MB, checked against a known fingerprint) and
   unpacks it into Backseat's folder in seconds: no setup program, no admin prompt (python.org's setup program took
   15 minutes or more on a fresh Windows).
+- **On a new PC, Backseat couldn't download what it needs from the web.** A fresh Windows fetches the certificates
+  that prove a website is genuine only when something asks for them, and Python's own check never asked, so the local
+  voices, the voice fingerprints for your friends, update checks and Steam stats failed with a certificate error (he
+  fell back to the online voice). Backseat now checks websites the way Windows does.
 - **Games lagged badly with the free local model, and so did the characters (seen in Fortnite).** The local model
   thought on the game's graphics card for about 3 seconds a comment and held 10 GB of its memory the whole time. Now,
   while a game is in front, Claude Haiku makes the comments and the model is taken off the graphics card (Settings >
