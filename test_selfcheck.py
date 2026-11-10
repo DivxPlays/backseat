@@ -1740,6 +1740,32 @@ assert "winget install" not in installer and "nuget.org/api/v2/package/python/3.
 assert re.search(r'Get-FileHash \$zip -Algorithm SHA256\)\.Hash -ne "[0-9A-F]{64}"', installer)
 assert r'"$Dest\python\python.exe"' in installer  # found there next time (auto-update reruns the installer)
 
+# The installer checks the key with one tiny call: a rejected key is asked for again; no credit or no internet keeps it
+import anthropic  # noqa: E402
+import httpx2  # noqa: E402
+
+key_req = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+
+
+def key_client(err):
+    class Messages:
+        def create(self, **kw):
+            assert kw["max_tokens"] == 1
+            if err:
+                raise err
+    return type("FakeClient", (), {"messages": Messages()})()
+
+
+assert brain.key_problem(key_client(None)) == ("", False)
+assert brain.key_problem(key_client(anthropic.AuthenticationError(
+    "invalid x-api-key", response=httpx2.Response(401, request=key_req), body=None)))[1]
+why, again = brain.key_problem(key_client(anthropic.BadRequestError(
+    "Your credit balance is too low", response=httpx2.Response(400, request=key_req), body=None)))
+assert "no credit" in why and not again
+why, again = brain.key_problem(key_client(anthropic.APIConnectionError(request=key_req)))
+assert "Couldn't reach" in why and not again
+assert "brain.key_problem(brain.make_client())" in installer and "sys.exit(3 if again else 0)" in installer
+
 # accurate stats: your SteamID from Steam's files, a game's stats from Steam (a wrong key or private profile is told
 # apart from a game without stats), and this session's real kills, deaths and wins as the rise in the running totals
 import urllib.error  # noqa: E402
@@ -1940,8 +1966,19 @@ assert milestone({"total_seconds": 0, "met": "2024-02-29"}, date(2025, 3, 1))[0]
 task_made = main.task_xml(r"PC\me", "pythonw.exe", "main.py --startup", r"C:\Backseat")
 assert "<Priority>4</Priority>" in task_made and "<Priority>7</Priority>" not in task_made
 
-# About: a real version number and who made it
+# What's new: once after an update (memory with days from before has no seen version yet), never on a fresh install
+news_text = "## 2.2.0 Beta (2026-11-11)\n\nNew things.\n\n## 2.1.1 Beta (2026-11-10)\n\nFixes.\n"
+fresh_mem, old_mem = {"days": {}}, {"days": {"2026-11-01": 60}}
+assert updater.whats_new(fresh_mem, "2.2.0-beta", news_text) is None and fresh_mem["seen_version"] == "2.2.0-beta"
+assert updater.whats_new(old_mem, "2.2.0-beta", news_text) == "New things."
+assert updater.whats_new(old_mem, "2.2.0-beta", news_text) is None  # only once
+assert updater.whats_new({"seen_version": "2.1.1-beta", "days": {}}, "2.2.0-beta", news_text) == "New things."
+assert "What's new" in main.news_window("2.2.0 Beta", "### New\n- **A thing.**").windowTitle()
+
+# About: a real version number and who made it, and that it's made with the help of AI (#3; the trailer's end card too)
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
+assert "Made with the help of AI" in Path("main.py").read_text(encoding="utf-8")
+assert "Made with the help of AI" in Path("make_trailer.py").read_text(encoding="utf-8")
 
 # Bloodfire: epic plays, two wins in a row, or reaching 100 respect; he ignites, then cools down
 assert main.bloodfire(0, "epic", 40, 43) == (1, "bloodfire")

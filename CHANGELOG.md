@@ -3,6 +3,19 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## Unreleased
+
+README at release: the installer checks your API key (Setup, step 3); "What's new" after an update (Updates); the
+About box says Backseat is made with the help of AI.
+
+### New
+- **What's new after an update.** The first time a new version starts, a window shows what changed, and their
+  greeting mentions the update in their own words.
+- **The installer checks your API key** with one tiny call (about a hundred-thousandth of a dollar). A key Anthropic
+  doesn't accept is asked for again, and an account with no credit yet is pointed to Billing, instead of the
+  characters staying quiet with no reason given.
+- The About box and the trailer's end card say Backseat is made with the help of AI (#3).
+
 ## 2.1.1 Beta (2026-11-10)
 
 Fixes for games lagging with Backseat running, and for installing on a new PC. The install fixes were tried on a fresh

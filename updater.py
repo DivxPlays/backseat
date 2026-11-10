@@ -33,6 +33,22 @@ def pretty(version):
     return ".".join(m.groups()[:3]) + (f" {m.group(4).title()}" if m.group(4) else "")
 
 
+def changelog(version, text):
+    """The CHANGELOG.md entry for a version ("2.0.0-beta": the "## 2.0.0 Beta (date)" section), or None."""
+    m = re.search(rf"^## {re.escape(pretty(version))} \(.*?\)\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    return m.group(1).strip() if m else None
+
+
+def whats_new(d, version, text):
+    """The CHANGELOG.md entry to show once after an update; None on a fresh install, when already seen, or with no entry.
+    Marks the version seen in d (his memory)."""
+    seen = d.get("seen_version")
+    d["seen_version"] = version
+    if seen == version or not (seen or d.get("days")):  # (no version seen but days with him: updated from 2.1.1 or older)
+        return None
+    return changelog(version, text)
+
+
 def latest(timeout=10):
     """The newest released version ("2.0.0-beta", from the latest GitHub release's tag "v2.0.0-beta"), or None (offline,
     GitHub unreachable, or no release yet)."""

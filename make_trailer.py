@@ -423,6 +423,9 @@ def main():
                 g.setFont(font(24, QFont.Normal))
                 g.setPen(QColor(241, 233, 223, int(200 * a)))
                 g.drawText(QRectF(0, 325, WIDTH, 50), Qt.AlignCenter, "Free download for Windows  ·  bring your own Anthropic API key")
+                g.setFont(font(18, QFont.Normal))
+                g.setPen(QColor(241, 233, 223, int(160 * a)))
+                g.drawText(QRectF(0, 362, WIDTH, 40), Qt.AlignCenter, "Made with the help of AI: Anthropic's Claude writes and tests much of the code")
             slide = (1 - min(1.0, lt / 1.0)) ** 2 * 300
             draw_char(g, chars["Vorn"], WIDTH / 2 - cw - 20 - slide, HEIGHT - ch * 0.62, scale)
             draw_char(g, chars["Mika"], WIDTH / 2 + 20 + slide, HEIGHT - ch * 0.62, scale)

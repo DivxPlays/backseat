@@ -108,6 +108,23 @@ def make_client():
     return anthropic.Anthropic(api_key=key, timeout=60, max_retries=1) if key else None
 
 
+def key_problem(client):
+    """The installer's key check, one tiny call (a hundred-thousandth of a dollar): ("", False) when the key works,
+    (why, True) when Anthropic rejects it (ask for it again), (why, False) when it's fine but can't be used yet."""
+    try:
+        client.messages.create(model=config.MODEL, max_tokens=1, messages=[{"role": "user", "content": "hi"}])
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError):
+        return "Anthropic didn't accept that key. Copy it again from console.anthropic.com > API keys (it starts with sk-ant-).", True
+    except anthropic.BadRequestError as e:
+        if "credit" in str(e).lower():
+            return ("The key works, but your Anthropic account has no credit yet: add some at console.anthropic.com > "
+                    "Billing, or Vorn and Mika stay quiet."), False
+        return "", False  # any other refusal isn't about the key
+    except (anthropic.APIConnectionError, anthropic.APIStatusError):
+        return "Couldn't reach Anthropic to check the key (no internet?). It's saved: Backseat says so if it doesn't work.", False
+    return "", False
+
+
 def _ask(client, model, content, schema, tools=None):
     # Haiku has no server-side refusal fallback; the other models re-run a declined request on a fallback model
     extra = {} if "haiku" in model else {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}

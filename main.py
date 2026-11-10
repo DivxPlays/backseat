@@ -48,7 +48,8 @@ import anthropic  # noqa: E402
 import keyboard  # noqa: E402
 from PySide6.QtCore import QObject, QPoint, QPointF, QRectF, Qt, QTimer, Signal  # noqa: E402
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap  # noqa: E402
-from PySide6.QtWidgets import QApplication, QFileDialog, QLineEdit, QMenu, QMessageBox, QSystemTrayIcon, QWidget  # noqa: E402
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLineEdit, QMenu, QMessageBox, QPushButton,  # noqa: E402
+                               QSystemTrayIcon, QTextBrowser, QVBoxLayout, QWidget)
 
 import brain  # noqa: E402
 import commands  # noqa: E402
@@ -854,6 +855,7 @@ class Companion:
         self.jobs = queue.Queue()
         self.recent = []
         self.paused = self.muted = self.busy = self.started = False
+        self.updated_to = None  # just updated: the greeting mentions it ("2.2.0 Beta")
         self.unmute_at = 0.0  # "shut up for 10 minutes": when he may talk again (0 = not on a timer)
         self.dressers = []  # the characters on screen (set once the overlay exists), for outfit commands
         self.awake = not waiting  # started with Windows: stay hidden until a game starts
@@ -1443,6 +1445,9 @@ class Companion:
                 said = [s for x in self.mem.d["sessions"][-3:] for s in x.get("lines", [])][-60:]
             hour = kind == "nag" or (random.random() < 0.25 and not any(TIME_TALK.search(s) for s in said[-8:] if s.startswith("You")))
             situation += stale_note(said, set(re.findall(r"[a-z']{5,}", f"{title} {app} {' '.join(self.names)}".lower())), hour)
+        if kind == "start" and self.updated_to:  # the What's new window is open: they mention the update in their own words
+            situation += f" (You were just updated to {APP} {self.updated_to}: mention it in a few words, in character.)"
+            self.updated_to = None
         celebrate = None
         if kind in ("start", "quiet", "change") and not (self.muted and kind != "start"):  # a milestone: at the next greeting
             with self.mem.lock:  # or comment; marked once it's been said
@@ -1879,6 +1884,23 @@ class Companion:
                 self.jobs.put(("lore" if random.random() < 0.3 else "quiet", None))
 
 
+def news_window(version, entry):
+    """What's new: the version's CHANGELOG.md entry, shown once after an update."""
+    box = QDialog()
+    box.setWindowTitle(f"What's new in {APP} {version}")
+    box.setWindowIcon(QIcon(str(HERE / "vorn.ico")))
+    lay = QVBoxLayout(box)
+    text = QTextBrowser()
+    text.setOpenExternalLinks(True)
+    text.setMarkdown(entry)
+    lay.addWidget(text)
+    ok = QPushButton("Got it")
+    ok.clicked.connect(box.accept)
+    lay.addWidget(ok, alignment=Qt.AlignRight)
+    box.resize(660, 520)
+    return box
+
+
 def main():
     import truststore
     truststore.inject_into_ssl()  # check HTTPS the way Windows does: a fresh Windows fetches root certificates only when
@@ -1993,6 +2015,15 @@ def main():
 
     settings = SettingsWindow(restart, comp.voice, lambda dollars: comp.mem.spend(dollars, "create"))
     windows = {}
+    if not waiting:  # (started with Windows and hidden: it waits for a normal start)
+        changes = HERE / "CHANGELOG.md"
+        with comp.mem.lock:
+            news = updater.whats_new(comp.mem.d, FULL_VERSION, changes.read_text(encoding="utf-8") if changes.exists() else "")
+        comp.mem.save()
+        if news:
+            comp.updated_to = updater.pretty(FULL_VERSION)
+            windows["news"] = news_window(comp.updated_to, news)
+            windows["news"].show()
 
     def open_costs():
         windows["costs"] = CostsWindow(comp.mem)  # built fresh each time, so the numbers are current
@@ -2183,6 +2214,7 @@ def main():
     menu.addAction("Report a problem...").triggered.connect(report_problem)
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
         f"<h3>{APP} {updater.pretty(FULL_VERSION)}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
+        "<p>Made with the help of AI: Anthropic's Claude (in Claude Code) writes and tests much of the code.</p>"
         "<p>Brain: Claude by Anthropic. Voices: Kokoro on your PC, or Microsoft online voices. "
         "Hearing: Whisper on your PC.</p><p>Free software under the GNU GPL v3, with no warranty: you may change and share it "
         "under its terms.</p><p><a href='https://github.com/DivxPlays/backseat'>github.com/DivxPlays/backseat</a></p>")))

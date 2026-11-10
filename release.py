@@ -3,13 +3,12 @@ commit is tagged v<version> with only the tag pushed (the branch goes after):  .
 Its notes are how to install plus the version's CHANGELOG.md entry. It attaches Backseat.zip (the app with its installer
 inside; what auto-update downloads) and Install-Backseat.bat (the one-file installer: on its own it downloads the latest
 Backseat.zip itself)."""
-import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from updater import STAGE, VERSION, pretty
+from updater import STAGE, VERSION, changelog, pretty
 
 GH = r"C:\Program Files\GitHub CLI\gh.exe"
 HERE = Path(__file__).parent
@@ -40,12 +39,6 @@ INSTALL = ("## Install\n\nDownload **Install-Backseat.bat** below and double-cli
            "- **No update offered?** Settings > Brain & budget > Updates must be on. A copy made with `git clone` updates "
            "with `git pull` instead.\n\n"
            "Problems: [Issues](https://github.com/DivxPlays/backseat/issues).\n\n")
-
-
-def changelog(version, text):
-    """The CHANGELOG.md entry for a version ("2.0.0-beta": the "## 2.0.0 Beta (date)" section), or None."""
-    m = re.search(rf"^## {re.escape(pretty(version))} \(.*?\)\n(.*?)(?=^## |\Z)", text, re.M | re.S)
-    return m.group(1).strip() if m else None
 
 
 def build():

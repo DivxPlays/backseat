@@ -2,6 +2,13 @@
 
 ## Planned
 
+2.2.0 (picked 2026-11-10):
+- **Pick any duo partner:** pair any two characters, created ones included (today a created character pairs only with Vorn).
+- **Session recap card:** after a game, a picture with that session's stats and their verdict, ready to post (no ffmpeg).
+- **"Is it slowing my game?":** a tray button that measures Backseat's CPU and graphics card use for 30 seconds during
+  a match and says what to turn off.
+- **More holidays:** Lunar New Year, Valentine's outfits, St. Patrick's, Easter, Thanksgiving.
+
 - **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
   frames, draw it in its own process or resend unchanged frames.
 
@@ -18,21 +25,16 @@ Built and self-checked, but not yet seen working on a real day:
 
 ## Ideas for 2.2.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Planned; #1 was fixed in 2.1.1.
+GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Planned; #1 was fixed in 2.1.1; #3 is built for 2.2.0.
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
 - **Shareable clips:** an .mp4 with them and their roast burned in, ready to send (needs ffmpeg, a download).
 
 ### Characters
-- **Pick any duo partner:** pair any two characters, created ones included (today a created character pairs only with Vorn).
-- **More holidays:** Lunar New Year, Valentine's outfits, St. Patrick's, Easter, Thanksgiving.
 - **Power-up colours** for created characters, and their **own outfit choice** instead of sharing Vorn's or Mika's.
 
 ### Quality
-- **"What's new" after an update** (asked for on 2026-11-10): the first time a new version starts, a small window
-  shows its CHANGELOG.md entry (it ships inside Backseat.zip, so no download), in their voice for one line. Friends who
-  update through the tray never see the release notes otherwise.
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
 - **An .exe installer instead of the .bat** (asked for on 2026-11-09): one Install-Backseat.exe to download and run,
@@ -59,6 +61,11 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+
+2.2.0 (in progress):
+- "What's new" after an update: a window with the version's changes, and the greeting mentions the update.
+- The installer checks your API key with one tiny call (asks again for a rejected key, points a no-credit account to Billing).
+- The About box and the trailer's end card say Backseat is made with the help of AI (#3).
 
 2.1.1 (2026-11-10):
 - Fix (#1): the installer stopped on a fresh Windows (no winget). Without Python 3.12 it now unpacks Python's own package into Backseat's folder; a fresh Windows reaches the API key prompt in about 3 minutes.

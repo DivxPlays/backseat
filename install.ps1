@@ -83,14 +83,19 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 & .venv\Scripts\python.exe -m pip install --disable-pip-version-check -r requirements.txt
 if ($LASTEXITCODE -ne 0) { throw "Installing what he needs failed. Check your internet connection and run this again." }
 
-# 4. Your API key, kept only in api_key.txt on this PC
-if (-not (Test-Path "api_key.txt")) {
+# 4. Your API key, kept only in api_key.txt on this PC, checked with one tiny call (a hundred-thousandth of a dollar)
+while (-not (Test-Path "api_key.txt")) {
     Write-Host ""
     Write-Host "Paste your Anthropic API key (console.anthropic.com > API keys) and press Enter." -ForegroundColor Yellow
     $secure = Read-Host -AsSecureString "API key"
     $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)).Trim()
-    if ($key) { [IO.File]::WriteAllText((Join-Path $Dest "api_key.txt"), $key) }
-    else { Write-Host "No key entered. Put it in $Dest\api_key.txt later." }
+    if (-not $key) { Write-Host "No key entered. Put it in $Dest\api_key.txt later."; break }
+    [IO.File]::WriteAllText((Join-Path $Dest "api_key.txt"), $key)
+    $why = & .venv\Scripts\python.exe -c "import sys, brain; why, again = brain.key_problem(brain.make_client()); print(why); sys.exit(3 if again else 0)"
+    if ($LASTEXITCODE -eq 3) { Write-Host $why -ForegroundColor Red; Remove-Item "api_key.txt" }  # asks again
+    elseif ($LASTEXITCODE -ne 0) { Write-Host "Couldn't check the key. It's saved: Backseat says so if it doesn't work." }
+    elseif ($why) { Write-Host $why -ForegroundColor Yellow }
+    else { Write-Host "Key checked: it works." -ForegroundColor Green }
 }
 
 # 5. Shortcuts
