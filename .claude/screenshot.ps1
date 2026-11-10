@@ -1,6 +1,6 @@
 # The kit's screenshot tool: saves a PNG of a program's window, for the README's pictures (docs/images/).
-# Usage: powershell -File .claude/screenshot.ps1 -Out docs/images/menu.png (-Process name | -Title "part of the title") [-Wide169] [-Blur boxes]
-#        powershell -File .claude/screenshot.ps1 -Out docs/images/menu.png -Blur "72,385,500,22"   (blur a saved picture)
+# Usage: powershell -ExecutionPolicy Bypass -File .claude/screenshot.ps1 -Out docs/images/menu.png (-Process name | -Title "part of the title") [-Wide169] [-Blur boxes]
+#        powershell -ExecutionPolicy Bypass -File .claude/screenshot.ps1 -Out docs/images/menu.png -Blur "72,385,500,22"   (blur a saved picture)
 #   -Process  the process name without .exe (e.g. stilwater); -Title matches part of the window title instead
 #   -Wide169  keep only the middle 16:9 of a wider window (an ultrawide's side bars, where a game draws nothing)
 #   -Blur     "x,y,width,height" boxes in the picture's pixels, separated by ";", pixelated beyond reading: a file

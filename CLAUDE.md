@@ -23,6 +23,8 @@ The app is called **Backseat** (it was called Vorn until 2026-11-08; the local f
 - **Other platforms:** Windows only for now. If Linux (or Steam Deck), Android or iOS support is added, test each
   one before every release too (Linux in WSL2, natively or under Wine or Proton; Android on the emulator; iOS on
   GitHub's macOS runners), set up the first time it's needed, after asking the user before installing anything.
+  The tests are in `.claude/`: `linux-test.ps1`, `android-test.ps1` and `ios-test.ps1`, each with `-Setup`
+  the first time; `/kit:release` runs them.
 - **Always suggest features** (the user asked on 2026-11-10): when a piece of work is done, suggest 1 to 3 new
   features or improvements that aren't planned yet, each with one line on why. There's always more to add. The ones
   the user likes go on the roadmap.

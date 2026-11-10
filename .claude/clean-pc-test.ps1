@@ -1,6 +1,6 @@
 # The kit's clean-PC test: runs a release the way a new user's first run goes, on a fresh Windows (Windows Sandbox:
 # no Python, no Visual C++ libraries, no dev tools, nothing from this PC), then throws that Windows away.
-# Usage: powershell -File .claude/clean-pc-test.ps1 -Package <zip or folder, as users download it> -Run <what a user
+# Usage: powershell -ExecutionPolicy Bypass -File .claude/clean-pc-test.ps1 -Package <zip or folder, as users download it> -Run <what a user
 #          starts, e.g. RedlineLauncher.exe or "Install Backseat.bat"> [-Wait 90] [-Map <read-only folder>] [-Out build/clean-pc]
 #   -Wait  seconds to watch it run after starting (screenshots at a third, two thirds and the end)
 #   -Map   a folder the test needs, shared read-only at C:\Map (e.g. the user's own game disc for a recomp)
