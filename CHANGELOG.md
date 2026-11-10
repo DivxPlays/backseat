@@ -3,13 +3,11 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
-## Unreleased
+## 2.2.0 Beta (2026-11-10)
 
-README at release: the installer checks your API key (Setup, step 3); "What's new" after an update (Updates); the
-About box says Backseat is made with the help of AI; tray > Is Backseat slowing my game? (Controls); tray > Character >
-Duo mode with (duo mode, the tray row in Controls; "Both (duo mode)" is gone); recap cards, with
-docs/images/recap-card.png, and tray > Recap cards (How it behaves, Controls; one Haiku call per game, in Cost); five
-more holidays, with docs/images/holidays-more.png next to holidays.png (Holidays: dates, outfits and weather).
+Recap cards after your games, any two characters as a duo, five more holidays, a check for whether Backseat is slowing
+your game, a What's new window (this one), and an installer that checks your API key. Still beta: all of it is
+self-checked, none of it has been tried on a real gaming night yet.
 
 ### New
 - **Five more holidays**, each with an outfit for both and its own weather around them: Lunar New Year (rising

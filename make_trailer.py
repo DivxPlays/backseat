@@ -29,6 +29,10 @@ for key, value in config._DEFAULTS.items():  # the defaults, never your own sett
 import sfx  # noqa: E402
 from character import H, W, Vorn  # noqa: E402
 from mika import Mika  # noqa: E402
+import character  # noqa: E402
+import holidays  # noqa: E402
+
+SEASONS = list(character.VORN_HOLIDAY)  # the holiday parade, in the order the looks were added
 from senses import MOUTH_FPS, SR, Voice, mouth_track  # noqa: E402
 
 HERE = Path(__file__).parent
@@ -64,6 +68,8 @@ SCENES = [
          lines=[(0.6, "Vorn", "angry", "Bloodfire!")], sounds=[(2.2, "mika", "giggle")]),
     dict(time=6.0, kind="outfits", caption="{outfits} outfits: holidays, anime looks and ones you earn.",
          shots=[(FN_B, 36 * 60 + 48, 6.0)], dim=0.55),
+    dict(time=6.0, kind="holidays", caption="Seven holidays, each with its own look and weather.",
+         sounds=[(1.0, "mika", "giggle"), (4.2, "vorn", "scoff")]),
     dict(time=5.5, kind="throw", caption="Ctrl+drag to throw them.", shots=[(FN_B, 16 * 60 + 8, 5.5)], sounds=[(1.8, "mika", "giggle")]),
     dict(time=7.0, kind="menu", caption="Mini-games in menus and queues: trivia, challenges, bounties.",
          shots=[(FN_B, 22 * 60 + 46, 7.0)],
@@ -75,6 +81,9 @@ SCENES = [
          lines=[(1.2, "Rook", "smug", "Ahoy, deckhand. Try not to sink this time.")]),
     dict(time=6.5, kind="clip", caption="Every fail saved, with the roast on top.", card=DEATH, blur=NAME_BOX,
          lines=[(0.8, "Vorn", "laugh", "Third place, framed forever. You're welcome.")]),
+    dict(time=7.5, kind="recap", caption="A recap card after every game, ready to post.",
+         lines=[(0.8, "Vorn", "smug", "Seven deaths, two wins, one lucky shot you'll brag about for a week. Still pathetic, "
+                                      "but less so.")]),
     dict(time=6.5, kind="end", sounds=[(1.0, "vorn", "scoff")]),
 ]
 FADE = 0.3  # s of fade between scenes
@@ -358,6 +367,10 @@ def main():
         c.glance_at = c.turn_at = 1e9
     vorn_looks, mika_looks = list(Vorn.OUTFITS), list(Mika.OUTFITS)
     outfits_total = len(vorn_looks) + len(mika_looks)
+    calendar = holidays.calendar(2027)
+    weather_of = {key: day[4] for key, day in calendar.items()}
+    names_of = {key: day[3] for key, day in calendar.items()}
+    recap = QImage(str(HERE / "docs" / "images" / "recap-card.png"))  # (make_images.py draws it: run that first)
     creator = creator_image()
     shots = Shots()
 
@@ -379,8 +392,10 @@ def main():
         g.setRenderHint(QPainter.Antialiasing)
         g.setRenderHint(QPainter.SmoothPixmapTransform)
         kind = s["kind"]
-        if kind != "outfits":  # (their usual looks, outside the outfit parade)
+        if kind not in ("outfits", "holidays"):  # (their usual looks, outside the outfit parades)
             chars["Vorn"].outfit, chars["Mika"].outfit = "warlord", "jacket"
+        season = SEASONS[int(lt / (s["time"] / len(SEASONS))) % len(SEASONS)] if kind == "holidays" else None
+        character.WEATHER = weather_of[season] if season else None  # (drawn by each character around them)
         talking = [sp for sp in speech if sp[0] <= t < sp[1]]
         for name, c in chars.items():  # mouths and faces follow what's being said
             line = next((sp for sp in talking if sp[2] == name), None)
@@ -435,6 +450,21 @@ def main():
             for k, (c, x) in enumerate(((chars["Vorn"], WIDTH / 2 - cw - 40), (chars["Mika"], WIDTH / 2 + 40))):
                 c.set_mood(("smug", "laugh", "idle")[(step + k) % 3])
                 draw_char(g, c, x, HEIGHT - ch + 20, scale)
+        elif kind == "holidays":  # each holiday's looks in its own weather, its name under the caption
+            chars["Vorn"].outfit, chars["Mika"].outfit = Vorn.HOLIDAY[season], Mika.HOLIDAY[season]
+            for k, (c, x) in enumerate(((chars["Vorn"], WIDTH / 2 - cw - 40), (chars["Mika"], WIDTH / 2 + 40))):
+                c.set_mood(("smug", "laugh")[k])
+                draw_char(g, c, x, HEIGHT - ch + 20, scale)
+            g.setFont(font(26, QFont.DemiBold))
+            g.setPen(QColor("#e8c27a"))
+            g.drawText(QRectF(44, 122, 800, 44), Qt.AlignLeft, names_of[season])
+        elif kind == "recap":  # the card slides in; Vorn reads his verdict off it
+            slide = (1 - min(1.0, lt / 0.6)) ** 2 * 700
+            card = QRectF(150 + slide, 168, 980, 980 * 630 / 1200)
+            g.drawImage(card, recap)
+            g.setPen(QPen(QColor("#3a2e33"), 3))
+            g.setBrush(Qt.NoBrush)
+            g.drawRoundedRect(card, 10, 10)
         elif kind == "throw":
             v, m = chars["Vorn"], chars["Mika"]
             draw_char(g, m, WIDTH - cw - 30, duo_y, scale)
@@ -502,7 +532,7 @@ def main():
                 chars["Vorn"].bloodfire(4.0)
                 chars["Mika"].bloodfire(4.0)
         for sp in talking:  # their lines, in a bubble on their side
-            if not sp[6] or sp[7] is not s:
+            if not sp[6] or sp[7] is not s or kind == "recap":  # (the card shows the recap's line)
                 continue
             shown = (t - sp[0]) / max(0.3, sp[1] - sp[0]) * len(sp[6]) * 1.15
             if kind == "clip":
