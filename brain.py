@@ -62,6 +62,8 @@ def partner():
     if not config.DUO:
         return None
     name = "mika" if config.PRESET == "vorn" else "vorn"
+    if config.PARTNER and config.PARTNER != config.PRESET and (config.PRESETS / f"{config.PARTNER}.json").exists():
+        name = config.PARTNER  # the one you picked (a created character too)
     try:
         return {**json.loads((config.PRESETS / f"{name}.json").read_text(encoding="utf-8")), "PRESET": name}
     except (OSError, ValueError):
@@ -156,6 +158,15 @@ def prompt(context, recent, situation, jpegs):
 
 LOCAL_CONTEXT = 16384  # tokens: a comment's prompt is about 7,000 (two displays' screenshots included). Ollama's own
 # default here was 65,536, which held 10 GB of video memory instead of 6.7
+
+
+def local_vram():
+    """Bytes of video memory the local models hold right now (0 when none is loaded or Ollama isn't running)."""
+    try:
+        with urllib.request.urlopen(f"{OLLAMA}/api/ps", timeout=3) as r:
+            return sum(m.get("size_vram", 0) for m in json.load(r).get("models", []))
+    except (OSError, ValueError):
+        return 0
 
 
 def local_unload(model):

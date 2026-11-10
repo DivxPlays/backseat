@@ -6,9 +6,15 @@ version's entry is also its release notes on GitHub.
 ## Unreleased
 
 README at release: the installer checks your API key (Setup, step 3); "What's new" after an update (Updates); the
-About box says Backseat is made with the help of AI.
+About box says Backseat is made with the help of AI; tray > Is Backseat slowing my game? (Controls); tray > Character >
+Duo mode with (duo mode, the tray row in Controls; "Both (duo mode)" is gone).
 
 ### New
+- **Pick any duo partner.** Tray > Character > Duo mode with: any two characters on screen together, characters you
+  created included (a created character used to pair only with Vorn). "Both of you" by voice uses the one you picked.
+- **"Is Backseat slowing my game?"** In the tray menu: click it, go back to your game, and 30 seconds later a
+  notification says whether Backseat is taking frames (its CPU and memory, and the free local model's share of the
+  graphics card). Click the notification for what to turn off.
 - **What's new after an update.** The first time a new version starts, a window shows what changed, and their
   greeting mentions the update in their own words.
 - **The installer checks your API key** with one tiny call (about a hundred-thousandth of a dollar). A key Anthropic

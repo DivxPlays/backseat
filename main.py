@@ -354,6 +354,7 @@ class Bridge(QObject):
     wear = Signal(int, str)  # voice command: which character (0 = the current one) puts on which outfit
     switch = Signal(str)  # voice command: switch to a preset, or "both" (restarts him)
     update = Signal(str)  # a newer version is on GitHub
+    slow = Signal(str, str)  # "Is it slowing my game?" measured: verdict, details
 
 
 def set_clickthrough(widget, on):
@@ -1884,6 +1885,34 @@ class Companion:
                 self.jobs.put(("lore" if random.random() < 0.3 else "quiet", None))
 
 
+SLOW_SECONDS = 30
+
+
+def slow_report(core, cores, ram_mb, vram_gb, game, camera, local_in_games):
+    """ "Is it slowing my game?": (verdict, details) from SLOW_SECONDS of measuring. core: Backseat's CPU use in % of
+    one core; vram_gb: what the free local model held; game: whether a game was in front the whole time."""
+    share = core / max(1, cores)
+    heavy = share >= 10 or (game and vram_gb >= 1)
+    verdict = ("Backseat may be slowing your game" if heavy else "Backseat isn't what's slowing your game" if share < 5
+               else "Backseat takes a little from your game")
+    details = [f"Over {SLOW_SECONDS} seconds Backseat used {share:.1f}% of your CPU ({core:.0f}% of one core) and "
+               f"{ram_mb:,.0f} MB of memory."]
+    if not game:
+        details.append("No game was in front the whole time: start the check, then play for the full 30 seconds.")
+    if camera != "off":
+        details.append("The Discord camera is on: drawing it takes about a third of a CPU core. Turn it off in tray > "
+                       "Discord camera while nobody's watching it.")
+    if vram_gb >= 1:
+        details.append(f"The free local model holds {vram_gb:.1f} GB of your graphics card's memory"
+                       + (": turn off Settings > Brain & budget > Local model in games, and it leaves the card while "
+                          "you play." if local_in_games else " (it leaves the card when a game comes to the front)."))
+    if share >= 10:
+        details.append("That's more CPU than Backseat should need: tray > Report a problem, with these numbers.")
+    if not heavy and share < 5:
+        details.append("If the game still stutters, the cause is something else: its own settings, drivers or other apps.")
+    return verdict, "\n\n".join(details)
+
+
 def news_window(version, entry):
     """What's new: the version's CHANGELOG.md entry, shown once after an update."""
     box = QDialog()
@@ -2086,10 +2115,20 @@ def main():
         pick.setCheckable(True)
         pick.setChecked(preset == config.PRESET and not config.DUO)
         pick.triggered.connect(lambda _=False, p=preset: switch_to(p) if p != config.PRESET or config.DUO else None)
-    both = characters.addAction("Both (duo mode)")
-    both.setCheckable(True)
-    both.setChecked(config.DUO)
-    both.triggered.connect(lambda: switch_to("both") if not config.DUO else None)
+    duo_menu = characters.addMenu("Duo mode with")  # any two characters, created ones too
+    paired = comp.partner.get("PRESET") if comp.partner else None
+
+    def duo_with(preset):
+        set_setting("PARTNER", preset)
+        set_setting("DUO", True)
+        restart()
+
+    for preset in presets():
+        if preset != config.PRESET:
+            pick = duo_menu.addAction(preset.title())
+            pick.setCheckable(True)
+            pick.setChecked(preset == paired)
+            pick.triggered.connect(lambda _=False, p=preset: duo_with(p) if p != paired else None)
     camera = Camera(overlay, lambda: comp.focus)  # the Discord camera
     cam_menu = menu.addMenu("Discord camera")
     cam_picks = {}
@@ -2105,7 +2144,7 @@ def main():
 
     for key, values in (("CAMERA", ("off", "current", "both")), ("CAMERA_BACKGROUND", BACKGROUNDS)):
         for value in values:
-            label = {"off": "Off", "current": f"On: {config.NAME}", "both": "On: Vorn and Mika", "dark": "Background: dark",
+            label = {"off": "Off", "current": f"On: {config.NAME}", "both": "On: both characters", "dark": "Background: dark",
                      "green": "Background: green screen", "game": "Background: your game", "webcam": "Background: your webcam"}[value]
             cam_picks[key, value] = cam_menu.addAction(label)
             cam_picks[key, value].setCheckable(True)
@@ -2212,6 +2251,48 @@ def main():
         webbrowser.open(report_url(log.read_text(errors="replace")[-200_000:] if log.exists() else "", names, about))
 
     menu.addAction("Report a problem...").triggered.connect(report_problem)
+    last_slow = {}  # the last "Is it slowing my game?" result, opened by clicking its notification
+
+    def slow_check():
+        """Tray > Is Backseat slowing my game?: measure him for SLOW_SECONDS while you play (a notification, no window
+        to take your game's focus)."""
+        last_slow.clear()
+        tray.showMessage(APP, f"Measuring for {SLOW_SECONDS} seconds: go back to your game and play.")
+
+        def measure():
+            import psutil
+            me = psutil.Process()
+            procs = [me] + me.children(recursive=True)
+            for p in procs:
+                p.cpu_percent(None)  # (starts each one's count)
+            in_game = True
+            for _ in range(SLOW_SECONDS):
+                time.sleep(1)
+                in_game = in_game and comp.current_game() is not None
+            core = ram = 0.0
+            for p in procs:
+                try:
+                    core += p.cpu_percent(None)
+                    ram += p.memory_info().rss / 1e6
+                except psutil.Error:  # (a helper that ended meanwhile)
+                    pass
+            comp.bridge.slow.emit(*slow_report(core, psutil.cpu_count() or 1, ram, brain.local_vram() / 1e9, in_game,
+                                               config.CAMERA, config.LOCAL_IN_GAMES))
+
+        threading.Thread(target=measure, daemon=True).start()
+
+    def slow_measured(verdict, details):
+        last_slow["result"] = (verdict, details)
+        tray.showMessage(verdict, details.split("\n\n")[0] + " Click for more.")
+
+    def slow_details():
+        if "result" in last_slow:
+            QMessageBox.information(None, *last_slow.pop("result"))
+
+    comp.bridge.slow.connect(slow_measured)
+    comp.bridge.update.connect(lambda version: last_slow.clear())  # (that notification's click isn't this one's)
+    tray.messageClicked.connect(slow_details)
+    menu.addAction(f"Is {APP} slowing my game?...").triggered.connect(slow_check)
     menu.addAction(f"About {APP}...").triggered.connect(lambda: QMessageBox.about(None, f"About {APP}", (
         f"<h3>{APP} {updater.pretty(FULL_VERSION)}</h3><p>Your trash-talking gaming companions: Vorn and Mika.</p><p>Made by <b>{AUTHOR}</b>.</p>"
         "<p>Made with the help of AI: Anthropic's Claude (in Claude Code) writes and tests much of the code.</p>"

@@ -3,10 +3,7 @@
 ## Planned
 
 2.2.0 (picked 2026-11-10):
-- **Pick any duo partner:** pair any two characters, created ones included (today a created character pairs only with Vorn).
 - **Session recap card:** after a game, a picture with that session's stats and their verdict, ready to post (no ffmpeg).
-- **"Is it slowing my game?":** a tray button that measures Backseat's CPU and graphics card use for 30 seconds during
-  a match and says what to turn off.
 - **More holidays:** Lunar New Year, Valentine's outfits, St. Patrick's, Easter, Thanksgiving.
 
 - **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
@@ -63,6 +60,8 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.2.0 (in progress):
+- Pick any duo partner: tray > Character > Duo mode with, any two characters (created ones too).
+- "Is Backseat slowing my game?": 30 seconds of measuring in a match, a notification with the verdict and what to turn off.
 - "What's new" after an update: a window with the version's changes, and the greeting mentions the update.
 - The installer checks your API key with one tiny call (asks again for a rejected key, points a no-credit account to Billing).
 - The About box and the trailer's end card say Backseat is made with the help of AI (#3).

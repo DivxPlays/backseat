@@ -776,6 +776,23 @@ config.PERSONA = json.loads((config.PRESETS / "vorn.json").read_text(encoding="u
 assert brain.partner()["NAME"] == "Mika" and "turns" in brain.schema()["properties"] and "line" not in brain.schema()["properties"]
 assert brain.schema()["properties"]["turns"]["items"]["properties"]["speaker"]["enum"] == ["Vorn", "Mika"]
 assert "=== Vorn ===" in brain.system() and "=== Mika ===" in brain.system() and "Duo mode" in brain.system()
+# any duo partner: a created character pairs with Vorn; a missing one, or yourself, falls back to the usual pair
+with tempfile.TemporaryDirectory() as duo_dir:
+    real_presets = config.PRESETS
+    config.PRESETS = Path(duo_dir)
+    for p in ("vorn", "mika"):
+        shutil.copy(real_presets / f"{p}.json", duo_dir)
+    (Path(duo_dir) / "rook.json").write_text(json.dumps({"NAME": "Rook", "CHARACTER": "vorn", "PERSONA": "You are {name}.",
+                                                         "POWER": "Rage"}), encoding="utf-8")
+    try:
+        config.PARTNER = "rook"
+        assert brain.partner()["NAME"] == "Rook" and brain.partner()["PRESET"] == "rook" and "=== Rook ===" in brain.system()
+        config.PARTNER = "ghost"
+        assert brain.partner()["NAME"] == "Mika"
+        config.PARTNER = "vorn"  # (yourself)
+        assert brain.partner()["NAME"] == "Mika"
+    finally:
+        config.PRESETS, config.PARTNER = real_presets, ""
 # a story belongs to whoever told it; the one you called answers alone; nobody's past leaks into the other's
 assert "lore" not in brain.schema()["properties"] and "lore" in brain.schema()["properties"]["turns"]["items"]["required"]
 assert "conquests" not in main.SITUATIONS["lore"]  # Vorn's word, and every character tells stories
@@ -1965,6 +1982,16 @@ assert milestone({"total_seconds": 0, "met": "2024-02-29"}, date(2025, 3, 1))[0]
 # Start with Windows: the task runs him at normal priority (Task Scheduler's 7, below normal, starved his window in games)
 task_made = main.task_xml(r"PC\me", "pythonw.exe", "main.py --startup", r"C:\Backseat")
 assert "<Priority>4</Priority>" in task_made and "<Priority>7</Priority>" not in task_made
+
+# "Is it slowing my game?": a light footprint clears him; the camera, a loaded local model in a game, or heavy CPU are named
+verdict, details = main.slow_report(30, 24, 600, 0, True, "off", False)
+assert verdict.startswith("Backseat isn't") and "1.2% of your CPU (30% of one core)" in details and "camera" not in details
+verdict, details = main.slow_report(40, 8, 900, 6.7, True, "both", True)
+assert verdict.startswith("Backseat may be") and "Discord camera is on" in details and "6.7 GB" in details
+assert "Local model in games" in details
+assert "No game was in front" in main.slow_report(10, 8, 500, 0, False, "off", False)[1]
+assert "Report a problem" in main.slow_report(400, 16, 900, 0, True, "off", False)[1]  # 25% of the CPU
+assert brain.local_vram() >= 0  # (0 when Ollama isn't running)
 
 # What's new: once after an update (memory with days from before has no seen version yet), never on a fresh install
 news_text = "## 2.2.0 Beta (2026-11-11)\n\nNew things.\n\n## 2.1.1 Beta (2026-11-10)\n\nFixes.\n"

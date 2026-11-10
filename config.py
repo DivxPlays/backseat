@@ -7,7 +7,8 @@ CHARACTER = "vorn"  # which drawing: "vorn" or "mika" (from the preset)
 WAKE_NAMES = ["vorn", "vorne", "vern", "born", "bourne", "vaughn", "vaughan", "von", "forn", "fawn", "warn", "horn", "bjorn"]  # "Hey <name>" as Whisper may hear it
 POWER = "Bloodfire"  # the character's power-up form (from the preset)
 COLORS = {}  # the character's own colours over their build's: {"hair", "eyes", "skin", "outfit"} as "#rrggbb" (from the preset)
-DUO = False  # both characters on screen together (tray > Character > Both)
+DUO = False  # two characters on screen together (tray > Character > Duo mode with)
+PARTNER = ""  # duo mode's second character, a preset name; "" = Mika with Vorn, Vorn with anyone else
 OUTFIT = "random"  # Mika's outfit: "jacket", "hoodie", "gothic", "jersey", or "random" (a new one each launch)
 VORN_OUTFIT = "random"  # Vorn's: "warlord", "obsidian", "frostbound", "desert raider", "off-duty", or "random"
 
