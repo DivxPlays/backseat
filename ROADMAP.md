@@ -30,6 +30,9 @@ GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Pl
 - **Power-up colours** for created characters, and their **own outfit choice** instead of sharing Vorn's or Mika's.
 
 ### Quality
+- **"What's new" after an update** (asked for on 2026-11-10): the first time a new version starts, a small window
+  shows its CHANGELOG.md entry (it ships inside Backseat.zip, so no download), in their voice for one line. Friends who
+  update through the tray never see the release notes otherwise.
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
 - **An .exe installer instead of the .bat** (asked for on 2026-11-09): one Install-Backseat.exe to download and run,
