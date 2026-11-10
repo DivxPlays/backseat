@@ -2,8 +2,6 @@
 
 ## Planned
 
-2.2.0 (picked 2026-11-10):
-
 - **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
   frames, draw it in its own process or resend unchanged frames.
 
@@ -17,6 +15,8 @@ Built and self-checked, but not yet seen working on a real day:
 - The squad leaderboard with friends on a real Discord call.
 - 2.1.0: "Clip that!" and clips through Medal in a real game, a milestone party, and Report a problem opening a real issue.
 - 2.1.1: the lag fixes in a full Fortnite match (normal priority, the local model off the graphics card in games).
+- 2.2.0: a recap card after a real game, What's new after a real update, "Is Backseat slowing my game?" during a match,
+  the installer's key check with a brand-new key, a duo with a created character, and the new holidays on their days.
 
 ## Ideas for 2.2.0 (not decided: pick the ones you want)
 
