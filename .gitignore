@@ -52,3 +52,7 @@ build/clean-pc/
 build/linux-test/
 build/android-test/
 build/ios-test/
+
+# added by the Claude starter kit
+!.env.example
+build/release-report.*
