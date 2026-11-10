@@ -399,7 +399,7 @@ def task_xml(user, command, arguments, folder):
   <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId><Delay>PT20S</Delay></LogonTrigger></Triggers>
   <Principals><Principal id="Author"><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Priority>7</Priority></Settings>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Priority>4</Priority></Settings>
   <Actions Context="Author"><Exec><Command>{command}</Command><Arguments>{arguments}</Arguments><WorkingDirectory>{folder}</WorkingDirectory></Exec></Actions>
 </Task>"""
 
@@ -1890,6 +1890,9 @@ def main():
         if not boot:  # (started with Windows while he's already up: just bow out)
             user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
         return
+    import psutil
+    psutil.Process().nice(psutil.NORMAL_PRIORITY_CLASS)  # a task made by 2.0.1 to 2.1.0 starts him below normal: with a
+    # game taking the CPU, his window couldn't repaint in time (the characters lagged on a black background)
     if boot:
         logging.info("started with Windows%s", ": hidden until a game starts" if waiting else "")
     if waiting or (run_entry_on() and schtasks("/query", "/tn", TASK).returncode != 0):  # 2.0.0's way: on to the task

@@ -56,6 +56,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.1.1 (in progress):
+- Fix: started with Windows, Backseat ran at below-normal priority, so in games the characters lagged on a black background. Normal priority now.
 - Fix: games lagged with the free local model (Fortnite). In games Claude comments and the model leaves the graphics card; it loads in 6.7 GB instead of 10; the camera draws 15 fps; the screen is checked every 3 s.
 
 2.1.0 (2026-11-09):

@@ -11,6 +11,9 @@ version's entry is also its release notes on GitHub.
   while a game is in front, Claude Haiku makes the comments and the model is taken off the graphics card (Settings >
   Brain & budget > Local model in games turns the old way back on), and it loads with a smaller context (6.7 GB
   instead of 10).
+- **The characters lagged badly and showed a black background while a game was running.** Started with Windows
+  (or through its task), Backseat ran at below-normal CPU priority, so with a game taking the CPU their window
+  couldn't repaint in time. It now runs at normal priority however it starts.
 - Less work in the background while you play: the Discord camera draws 15 frames a second instead of 24 (it took half a
   CPU core), and the screen is checked for changes every 3 seconds instead of every second.
 

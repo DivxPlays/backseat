@@ -1928,6 +1928,10 @@ assert milestone(md, date(2027, 10, 31)) is None and "a year" in milestone(md, d
 assert milestone(md, date(2027, 12, 25))[0] == ["year 1"]  # missed the day: the next time you play
 assert milestone({"total_seconds": 0, "met": "2024-02-29"}, date(2025, 3, 1))[0] == ["year 1"]  # a leap-day start
 
+# Start with Windows: the task runs him at normal priority (Task Scheduler's 7, below normal, starved his window in games)
+task_made = main.task_xml(r"PC\me", "pythonw.exe", "main.py --startup", r"C:\Backseat")
+assert "<Priority>4</Priority>" in task_made and "<Priority>7</Priority>" not in task_made
+
 # About: a real version number and who made it
 assert re.fullmatch(r"\d+\.\d+\.\d+", main.VERSION) and main.AUTHOR == "DivxPlays"
 
