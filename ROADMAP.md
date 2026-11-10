@@ -14,10 +14,11 @@ Built and self-checked, but not yet seen working on a real day:
 - Steam stats with a real Steam Web API key.
 - The squad leaderboard with friends on a real Discord call.
 - 2.1.0: "Clip that!" and clips through Medal in a real game, a milestone party, and Report a problem opening a real issue.
+- 2.1.1: the lag fixes in a full Fortnite match (normal priority, the local model off the graphics card in games).
 
 ## Ideas for 2.2.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Planned; #1 is fixed for 2.1.1.
+GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Planned; #1 was fixed in 2.1.1.
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
@@ -56,7 +57,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 
 ## Done
 
-2.1.1 (in progress):
+2.1.1 (2026-11-10):
 - Fix (#1): the installer stopped on a fresh Windows (no winget). Without Python 3.12 it now unpacks Python's own package into Backseat's folder; a fresh Windows reaches the API key prompt in about 3 minutes.
 - Fix: started with Windows, Backseat ran at below-normal priority, so in games the characters lagged on a black background. Normal priority now.
 - Fix: games lagged with the free local model (Fortnite). In games Claude comments and the model leaves the graphics card; it loads in 6.7 GB instead of 10; the camera draws 15 fps; the screen is checked every 3 s.

@@ -2,7 +2,7 @@
 
 # Backseat: your trash-talking gaming companions
 
-Version 2.1.0 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
+Version 2.1.1 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
 [![Latest release](https://img.shields.io/github/v/release/DivxPlays/backseat?label=download)](https://github.com/DivxPlays/backseat/releases/latest) [![Downloads](https://img.shields.io/github/downloads/DivxPlays/backseat/total)](https://github.com/DivxPlays/backseat/releases) [![License: GPL v3](https://img.shields.io/github/license/DivxPlays/backseat)](LICENSE) ![Windows](https://img.shields.io/badge/platform-Windows-blue) [![GitHub stars](https://img.shields.io/github/stars/DivxPlays/backseat?style=social)](https://github.com/DivxPlays/backseat/stargazers)
 
@@ -78,7 +78,7 @@ Backseat drivers, but for your gaming: an animated, full-body character in the c
 1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
 2. Get it from the [latest release](https://github.com/DivxPlays/backseat/releases/latest) (no account needed): either download **Install-Backseat.bat** alone and double-click it (it downloads the rest itself), or download **Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. Developers can `git clone` the repo instead.
 3. The installer:
-   - installs Python 3.12 if it's missing (through winget),
+   - gets Python 3.12 if it's missing (Python's own package, 15 MB, unpacked into Backseat's folder: no setup program),
    - puts it in `%LOCALAPPDATA%\Programs\Backseat` (an older install in `Programs\Vorn` is moved there, memory and all),
    - installs everything he needs (a few minutes the first time),
    - asks for your API key (kept only in `api_key.txt` on that PC, never uploaded),
@@ -89,7 +89,7 @@ Backseat drivers, but for your gaming: an animated, full-body character in the c
    If Windows says the file came from the internet, click **More info > Run anyway**.
 4. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
 
-Running **Install Backseat.bat** from a newer download updates it; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall, turn off Start with Windows in his tray menu, quit him, then delete `%LOCALAPPDATA%\Programs\Vorn` and the two shortcuts.
+Running **Install Backseat.bat** from a newer download updates it; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall, turn off Start with Windows in his tray menu, quit him, then delete `%LOCALAPPDATA%\Programs\Backseat` and the two shortcuts.
 
 Working on his code instead? Put your key in `api_key.txt` in the code folder and double-click `run.bat`; it sets everything up there and starts him.
 

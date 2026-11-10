@@ -1,5 +1,5 @@
-"""Publish the current version as a GitHub release, after its version bump and CHANGELOG.md entry are committed and
-pushed:  .venv\\Scripts\\python release.py publish
+"""Publish the current version as a GitHub release, after its version bump and CHANGELOG.md entry are committed and the
+commit is tagged v<version> with only the tag pushed (the branch goes after):  .venv\\Scripts\\python release.py publish
 Its notes are how to install plus the version's CHANGELOG.md entry. It attaches Backseat.zip (the app with its installer
 inside; what auto-update downloads) and Install-Backseat.bat (the one-file installer: on its own it downloads the latest
 Backseat.zip itself)."""
@@ -67,9 +67,10 @@ def publish():
         sys.exit(f"Add a CHANGELOG.md entry for {pretty(version)} first (## {pretty(version)} (date)).")
     notes = HERE / "dist" / "notes.md"
     notes.write_text(INSTALL + "## Changelog\n\n" + entry + "\n", encoding="utf-8")
-    run("git", "fetch", "-q", "origin")
-    if run("git", "rev-parse", "HEAD") != run("git", "rev-parse", "origin/main"):
-        sys.exit("Push first: GitHub's main must be this commit.")
+    # the release goes out before the branch (README.md on GitHub only describes released versions): its tag, pushed
+    # alone, must be this commit (an annotated tag lists the commit it points to as "<sha> refs/tags/v...^{}")
+    if run("git", "rev-parse", "HEAD") not in run("git", "ls-remote", "--tags", "origin", f"v{version}").split():
+        sys.exit(f"Tag this commit and push only the tag first: git tag -a v{version} -m {version}, then push refs/tags/v{version}.")
     trailer = HERE / "dist" / "trailer.mp4"  # (a feature release re-renders it first; a hotfix keeps the last one)
     if not trailer.exists():  # the last release's, so the README's link to the latest release's trailer keeps working
         subprocess.run([GH, "release", "download", "--repo", "DivxPlays/backseat", "--pattern", "trailer.mp4", "--dir",

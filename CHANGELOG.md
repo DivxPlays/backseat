@@ -3,10 +3,11 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
-## Unreleased
+## 2.1.1 Beta (2026-11-10)
 
-README at release: "Install" no longer says Python comes "through winget": without Python 3.12, the installer
-unpacks Python's own package (15 MB) into Backseat's folder.
+Fixes for games lagging with Backseat running, and for installing on a new PC. The install fixes were tried on a fresh
+Windows (Windows Sandbox): it installs in about 3 minutes and the characters start. The lag fixes are self-checked but
+haven't been tried in a full Fortnite match yet.
 
 ### Fixed
 - **The installer stopped on a new PC** (#1). It installed Python with winget, which a fresh Windows doesn't have
