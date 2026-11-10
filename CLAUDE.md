@@ -3,6 +3,14 @@
 The app is called **Backseat** (it was called Vorn until 2026-11-08; the local folder is still E:\Claude\Vorn). Vorn and Mika are its characters.
 
 - **After every change, upload it.** Update README.md so it matches what changed (features, controls, settings, costs), take built items off ROADMAP.md, then commit and push to GitHub (origin = https://github.com/DivxPlays/backseat, public since 2026-11-09, branch main: everything pushed is public). The user asked for this on 2026-11-08, so don't ask first each time.
+- **Announcing it** (the user asked on 2026-11-10): when the project goes public, and for big releases, run
+  `/kit:launch`. Claude drafts posts for Reddit communities whose rules allow it, X and the other places the user
+  uses, shows each one, and posts only after the user's yes, from their own signed-in accounts (never creating
+  accounts). Every post is logged in `docs/launch.md`, and the threads are watched for problems and questions.
+- **Problems you don't fix go on GitHub** (the user asked on 2026-11-10): any problem you notice and don't fix right
+  now becomes a GitHub issue (`gh issue create`, labelled `bug` or `enhancement`): what happens, where it was seen,
+  the next step. Look for an existing issue first. In a public repo, include no personal data (names, paths, keys,
+  emails). Close it with the commit that fixes it.
 - **Runs on a fresh PC** (the user asked on 2026-11-10): before every release, run `Install-Backseat.bat` the way a new
   user does, on a fresh Windows: `powershell -File .claude/clean-pc-test.ps1 -Package <Install-Backseat.bat from the
   release> -Run Install-Backseat.bat -Wait 240`, and look at its screenshots and console text. It doesn't ship if it
