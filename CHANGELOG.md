@@ -12,8 +12,7 @@ version's entry is also its release notes on GitHub.
   Brain & budget > Local model in games turns the old way back on), and it loads with a smaller context (6.7 GB
   instead of 10).
 - Less work in the background while you play: the Discord camera draws 15 frames a second instead of 24 (it took half a
-  CPU core), the screen is checked for changes every 3 seconds instead of every second, and Backseat runs at
-  below-normal CPU priority, so the game comes first.
+  CPU core), and the screen is checked for changes every 3 seconds instead of every second.
 
 ## 2.1.0 Beta (2026-11-09)
 

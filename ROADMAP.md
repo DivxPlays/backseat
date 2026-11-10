@@ -56,7 +56,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.1.1 (in progress):
-- Fix: games lagged with the free local model (Fortnite). In games Claude comments and the model leaves the graphics card; it loads in 6.7 GB instead of 10; the camera draws 15 fps; the screen is checked every 3 s; below-normal CPU priority.
+- Fix: games lagged with the free local model (Fortnite). In games Claude comments and the model leaves the graphics card; it loads in 6.7 GB instead of 10; the camera draws 15 fps; the screen is checked every 3 s.
 
 2.1.0 (2026-11-09):
 - Milestones: 10 to 1,000 hours together, a month since you met and each year since, celebrated once at the next greeting or comment.

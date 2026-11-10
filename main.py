@@ -1890,9 +1890,6 @@ def main():
         if not boot:  # (started with Windows while he's already up: just bow out)
             user32.MessageBoxW(None, f"{config.NAME} is already running. Look for his icon in the system tray.", config.NAME, 0x40)
         return
-    import psutil
-    psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)  # your game comes first for the CPU (speech recognition,
-    # the Discord camera); their voice still plays on time (audio threads keep their own high priority)
     if boot:
         logging.info("started with Windows%s", ": hidden until a game starts" if waiting else "")
     if waiting or (run_entry_on() and schtasks("/query", "/tn", TASK).returncode != 0):  # 2.0.0's way: on to the task
