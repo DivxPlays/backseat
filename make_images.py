@@ -165,6 +165,9 @@ def main_images():
     overlay.cost_tag = lambda g: None  # (the link preview leaves out the spend tag: "$0.00 / $100" reads like a price)
     social(QWidget.grab(overlay).toImage())
     Image.fromarray(main.Camera(overlay, lambda: (0, 0)).frame()).save(OUT / "camera.png")  # what Discord sees
+    main.recap_card([pose(Vorn("warlord"), "smug")], {"game": "Fortnite", "seconds": 5400, "events": {"win": 2, "death": 7, "epic": 1},
+                    "respect": 42, "respect_before": 39}, "Seven deaths, two wins, one lucky shot you'll brag about for a "
+                    "week. Still pathetic, but less so.", "Vorn", main.datetime(2026, 11, 10, 21, 30)).save(str(OUT / "recap-card.png"))
     import settings_ui  # the character creator, filled in, with its live preview
     creator = settings_ui.CreatorWindow(Voice(), lambda dollars: None, lambda preset, name: None)
     creator.timer.stop()

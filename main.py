@@ -47,7 +47,8 @@ if RUNNING:
 import anthropic  # noqa: E402
 import keyboard  # noqa: E402
 from PySide6.QtCore import QObject, QPoint, QPointF, QRectF, Qt, QTimer, Signal  # noqa: E402
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap  # noqa: E402
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QIcon, QImage, QLinearGradient, QPainter, QPainterPath, QPen,  # noqa: E402
+                           QPixmap)
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QLineEdit, QMenu, QMessageBox, QPushButton,  # noqa: E402
                                QSystemTrayIcon, QTextBrowser, QVBoxLayout, QWidget)
 
@@ -71,7 +72,7 @@ from costs_ui import CostsWindow  # noqa: E402
 from memories_ui import MemoriesWindow  # noqa: E402
 from character import H as CH, HEAD_Y, W as CW, character_class, make_character, tier_for  # noqa: E402
 from memory import (SHAME, Memory, app_name, fmt, foreground_app, foreground_center, foreground_fullscreen,  # noqa: E402
-                    gpu_load, idle_seconds, is_game, milestone, steam_app, steam_hours, week as memory_week)
+                    gpu_load, idle_seconds, is_game, milestone, steam_app, steam_hours, tally, week as memory_week)
 from senses import (SR, Ducker, Ears, Eyes, Voice, WakeListener, changed, cue, game_display, listen_source_ok, new_clip,  # noqa: E402
                     save_clip, save_moment, videos_folder)
 from settings_ui import SettingsWindow, presets, set_setting  # noqa: E402
@@ -110,8 +111,11 @@ SITUATIONS = {
             "nothing happened, roast them for clipping nothing.",
     "breakdown": "The player just lost. These screenshots are from the last minute or so, oldest first. Break down what went "
                  "wrong, specific and tactical, still a roast. Up to 3 sentences, under 50 words.",
+    "recap": "The player just finished {time} of {game} and left it. What you saw in that stretch: {score}. Give your verdict "
+             "on the whole session in one or two short sentences (under 25 words), in character: it goes on their recap "
+             "card for their friends to see. (A look back: event none, respect same.)",
 }
-AUTO = {"change", "quiet", "lore", "nag", "breakdown", "music"}  # jobs he starts himself; they stop when the budget runs out
+AUTO = {"change", "quiet", "lore", "nag", "breakdown", "music", "recap"}  # jobs he starts himself; they stop when the budget runs out
 BANTER = ([1, 2, 3, 4, 5, 6], [2, 4, 3, 2, 1, 1])  # duo mode: how many lines an exchange runs (weights): usually short,
 # now and then a real argument. The small local model goes up to LOCAL_BANTER (each line is a call of its own)
 LOCAL_BANTER = 4
@@ -1380,7 +1384,7 @@ class Companion:
         if kind == "breakdown":
             jpegs = list(self.history)
         else:
-            shot = None if self.paused else self.eyes.look(self.focus)
+            shot = None if self.paused or kind == "recap" else self.eyes.look(self.focus)  # (a recap: the game is gone)
             jpegs = shot[1] if shot else []
             if shot:
                 self.base_thumb = shot[0]
@@ -1405,6 +1409,8 @@ class Companion:
             plays = self.listening.plays.get(tuple(arg), 1)
             situation = SITUATIONS["music"].format(song=arg[1], artist=arg[0]) + (
                 f" They've played it {plays} times this session: it's on repeat." if plays >= 3 else "")
+        if kind == "recap":  # a game you played a while is over: their verdict, for the recap card
+            situation = SITUATIONS["recap"].format(time=fmt(arg["seconds"]), game=arg["game"], score=tally(arg["events"]))
         if kind == "start" and self.coached:
             situation += (f" Also: your weekly coaching report on them is ready (tray > coaching report). Its headline: "
                           f'"{self.coached}". Mention it in a few words.')
@@ -1578,6 +1584,8 @@ class Companion:
             logging.info("milestone celebrated: %s", ", ".join(celebrate[0]))
         if shame and first:
             self.hall_entry(shame, first[0], title or app, first[1])
+        if kind == "recap" and first:
+            self.recap(arg, first[0], turns[0][0], turns[0][1], first[1])
         self.condense_memory()
 
     def wait_spoken(self, audio):
@@ -1677,7 +1685,13 @@ class Companion:
         """Auto-clips: a picture of `who` (the one who roasted the moment) in that mood and their outfit, next to the
         screenshot (" who.png"), for the highlights page to stand over the clip. A fresh drawing: the one on screen is
         busy animating."""
-        i = self.names.index(who) if who in self.names else 0
+        try:
+            self.drawn(self.names.index(who) if who in self.names else 0, mood).render(0.8).save(str(shot.with_name(f"{shot.stem} who.png")))
+        except Exception:
+            logging.warning("couldn't draw them for the clip", exc_info=True)
+
+    def drawn(self, i, mood):
+        """A fresh drawing of character i in that mood and their outfit, facing front (the one on screen is busy animating)."""
         build, colors = (config.CHARACTER, config.COLORS) if i == 0 else (self.partner["CHARACTER"], self.partner.get("COLORS"))
         char = make_character(build, colors)
         if i < len(self.dressers):
@@ -1687,10 +1701,24 @@ class Companion:
         char.set_mood(mood)
         for _ in range(5):
             char.step(1.0, 0.0)
+        return char
+
+    def recap(self, info, line, who, mood, audio):
+        """A game you played a while is over: their verdict on a recap card (Hall of Shame/Recaps), ready to post."""
         try:
-            char.render(0.8).save(str(shot.with_name(f"{shot.stem} who.png")))
+            i = self.names.index(who) if who in self.names else 0
+            chars = [self.drawn(k, mood if k == i else "idle") for k in range(len(self.names))]
+            when = datetime.now()
+            RECAPS.mkdir(parents=True, exist_ok=True)
+            name = re.sub(r'[<>:"/\\|?*]', "", info["game"])[:60].strip()  # (characters a file name can't have)
+            path = RECAPS / f"{when:%Y-%m-%d %H%M} {name}.png"
+            recap_card(chars, info, line, who, when).save(str(path))
+            logging.info("recap card: %s", path.name)
         except Exception:
-            logging.warning("couldn't draw them for the clip", exc_info=True)
+            return logging.warning("couldn't make the recap card", exc_info=True)
+        if audio is not None:
+            self.wait_spoken(audio)  # (the note would cut their verdict's bubble short)
+        self.bridge.note.emit("(recap card saved: tray > Recap cards)")
 
     def capture_clip(self, moment):
         """Auto-clips: press the capture tool's "save what just happened" key (CLIP_KEY) and give the video it saves to this
@@ -1806,7 +1834,7 @@ class Companion:
 
     def _watch(self):
         prev = last_save = last_music = last_thumb = time.monotonic()
-        was_game = False
+        was_game, stretch = False, None  # stretch: the game you're playing now, for its recap card (game_stretch)
         while True:
             time.sleep(1)
             now = time.monotonic()
@@ -1824,6 +1852,11 @@ class Companion:
                 if self.current_game():
                     self.wake_up()
                 continue
+            with self.mem.lock:
+                score, respect = dict(self.mem.session["events"]), self.mem.d["respect"]
+            stretch, recap = game_stretch(stretch, self.current_game(), now, score, respect)
+            if recap and not (self.muted or self.paused):
+                self.jobs.put(("recap", recap))
             afk = idle_seconds() > config.AFK_AFTER
             if afk:
                 self.streak_start = now  # a real break resets the no-break clock
@@ -1883,6 +1916,90 @@ class Companion:
                 self.jobs.put(("change", None))
             elif quiet > config.QUIET_ROAST and not self.muted:
                 self.jobs.put(("lore" if random.random() < 0.3 else "quiet", None))
+
+
+RECAPS = HALL / "Recaps"  # session recap cards
+RECAP_MIN, RECAP_GAP = 600, 120  # s: a game played 10+ minutes, then no game in front for 2 minutes, gets a recap card
+RECAP_LABELS = {"win": ("win", "wins"), "loss": ("loss", "losses"), "death": ("death", "deaths"), "fail": ("fail", "fails"),
+                "epic": ("epic play", "epic plays")}
+
+
+def game_stretch(stretch, game, now, events, respect):
+    """Follows the game you're playing (game: current_game()'s (key, name) or None; events: the session's score so far).
+    Returns (stretch, recap): recap is the finished stretch's numbers once it's worth a card, else None."""
+    def done(s):
+        if s["seen"] - s["since"] < RECAP_MIN:
+            return None
+        gained = {e: n - s["events"].get(e, 0) for e, n in events.items() if n > s["events"].get(e, 0)}
+        return {"game": s["game"], "seconds": s["seen"] - s["since"], "events": gained, "respect": respect,
+                "respect_before": s["respect"]}
+
+    if game:
+        if stretch and stretch["key"] == game[0]:
+            stretch["seen"] = now
+            return stretch, None
+        return ({"key": game[0], "game": game[1], "since": now, "seen": now, "events": dict(events), "respect": respect},
+                done(stretch) if stretch else None)  # (straight into another game: the last one's card)
+    if stretch and now - stretch["seen"] >= RECAP_GAP:
+        return None, done(stretch)
+    return stretch, None
+
+
+def recap_card(chars, info, line, who, when):
+    """A session recap card, 1200 x 630 (the size social sites and Discord preview): the characters, the stretch's
+    numbers and their verdict."""
+    width, height = 1200, 630
+    img = QImage(width, height, QImage.Format_RGB32)
+    g = QPainter(img)
+    g.setRenderHint(QPainter.Antialiasing)
+    g.setRenderHint(QPainter.SmoothPixmapTransform)
+    sky = QLinearGradient(0, 0, 0, height)
+    sky.setColorAt(0, QColor(36, 32, 48))
+    sky.setColorAt(1, QColor(14, 13, 18))
+    g.fillRect(img.rect(), sky)
+    x = 30.0
+    for char in chars:  # standing on the left, feet on the card's bottom edge
+        pic = char.render((height - 30) / CH)
+        g.drawImage(QPointF(x, height - pic.height()), pic)
+        x += pic.width() * 0.8
+    left, right = max(x + 40, 400.0), width - 50.0
+    gold, ink, dim = QColor(242, 198, 77), QColor(241, 233, 223), QColor(165, 157, 178)
+
+    def text(size, weight, color, top, tall, s, flags=Qt.AlignLeft | Qt.AlignVCenter):
+        g.setFont(QFont("Segoe UI", size, weight))
+        g.setPen(color)
+        g.drawText(QRectF(left, top, right - left, tall), flags, s)
+
+    text(13, QFont.Bold, gold, 46, 26, "SESSION RECAP")
+    g.setFont(QFont("Segoe UI", 34, QFont.Bold))
+    text(34, QFont.Bold, ink, 72, 64, QFontMetrics(g.font()).elidedText(info["game"], Qt.ElideRight, int(right - left)))
+    text(14, QFont.Normal, dim, 136, 28, f"{when:%A %d %B %Y}  ·  {fmt(info['seconds'])} played")
+    boxes = [(str(n), RECAP_LABELS[e][n != 1]) for e in RECAP_LABELS if (n := info["events"].get(e, 0))]
+    boxes = boxes[:4] + [(str(info["respect"]), f"respect ({info['respect'] - info['respect_before']:+d})")]
+    box_w = min(150.0, (right - left - 12 * (len(boxes) - 1)) / len(boxes))
+    for k, (number, label) in enumerate(boxes):
+        bx = left + k * (box_w + 12)
+        g.setPen(Qt.NoPen)
+        g.setBrush(QColor(255, 255, 255, 20))
+        g.drawRoundedRect(QRectF(bx, 186, box_w, 92), 12, 12)
+        g.setPen(gold)
+        g.setFont(QFont("Segoe UI", 26, QFont.Bold))
+        g.drawText(QRectF(bx, 192, box_w, 48), Qt.AlignCenter, number)
+        g.setPen(dim)
+        g.setFont(QFont("Segoe UI", 11))
+        g.drawText(QRectF(bx + 4, 240, box_w - 8, 30), Qt.AlignCenter, label)
+    quote, area = f"“{line}”", QRectF(left, 312, right - left, 210)
+    for size in (24, 22, 20, 18, 16):  # the biggest that fits
+        g.setFont(QFont("Segoe UI", size))
+        if g.boundingRect(area, Qt.TextWordWrap, quote).height() <= area.height():
+            break
+    g.setPen(ink)
+    said = g.boundingRect(area, Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop, quote)
+    g.drawText(area, Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop, quote)
+    text(16, QFont.Bold, gold, min(said.bottom(), area.bottom()) + 12, 30, f"— {who}")
+    text(11, QFont.Normal, dim, height - 46, 24, "BACKSEAT  ·  github.com/DivxPlays/backseat", Qt.AlignRight | Qt.AlignVCenter)
+    g.end()
+    return img
 
 
 SLOW_SECONDS = 30
@@ -2104,6 +2221,7 @@ def main():
 
     menu.addAction("Look up this game again").triggered.connect(relook)
     menu.addAction("Open battle reports").triggered.connect(lambda: REPORTS.exists() and os.startfile(REPORTS))
+    menu.addAction("Recap cards").triggered.connect(lambda: (RECAPS.mkdir(parents=True, exist_ok=True), os.startfile(RECAPS)))
     menu.addSeparator()
     menu.addAction("Memories (what they remember about you)...").triggered.connect(open_memories)
     menu.addAction("Export memory (to move him to another PC)...").triggered.connect(export_memory)

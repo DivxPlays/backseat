@@ -317,6 +317,7 @@ with tempfile.TemporaryDirectory() as d:
     # them over the clip: a fresh drawing of whoever roasted it (their build, colours, outfit and mood), shown with their line
     drawer = SimpleNamespace(names=["Vorn", "Mika"], partner={"CHARACTER": "mika", "COLORS": {"hair": "#ffffff"}},
                              dressers=[SimpleNamespace(outfit="obsidian"), SimpleNamespace(outfit="maid")], mem=m)
+    drawer.drawn = lambda i, mood: main.Companion.drawn(drawer, i, mood)
     main.Companion.portrait(drawer, hall / "a b.jpg", "Mika", "laugh")
     drawn = Image.open(hall / "a b who.png")
     assert drawn.size == (int(main.CW * 0.8), int(main.CH * 0.8)) and drawn.getchannel("A").getextrema()[1] == 255
@@ -1982,6 +1983,24 @@ assert milestone({"total_seconds": 0, "met": "2024-02-29"}, date(2025, 3, 1))[0]
 # Start with Windows: the task runs him at normal priority (Task Scheduler's 7, below normal, starved his window in games)
 task_made = main.task_xml(r"PC\me", "pythonw.exe", "main.py --startup", r"C:\Backseat")
 assert "<Priority>4</Priority>" in task_made and "<Priority>7</Priority>" not in task_made
+
+# Recap cards: a game played 10+ minutes, then none in front for 2, gets one; a short game or a quick alt-tab doesn't
+game_a, game_b = ("fortnite.exe", "Fortnite"), ("cs2.exe", "Counter-Strike 2")
+st, rc = main.game_stretch(None, game_a, 0, {"death": 1}, 30)
+st, rc = main.game_stretch(st, game_a, 700, {"death": 4, "win": 1}, 33)
+assert rc is None and st["seen"] == 700
+st, rc = main.game_stretch(st, None, 760, {"death": 4, "win": 1}, 33)
+assert rc is None and st  # (an alt-tab: still the same stretch)
+st, rc = main.game_stretch(st, None, 821, {"death": 4, "win": 1}, 33)
+assert st is None and rc == {"game": "Fortnite", "seconds": 700, "events": {"death": 3, "win": 1}, "respect": 33,
+                             "respect_before": 30}
+st, rc = main.game_stretch(None, game_a, 0, {}, 30)
+st, rc = main.game_stretch(st, game_b, 300, {}, 30)  # straight into another game after 5 minutes: no card yet
+assert rc is None and st["game"] == "Counter-Strike 2"
+card = main.recap_card([main.make_character("vorn", {})], {"game": "Fortnite", "seconds": 5400, "events": {"win": 2},
+                       "respect": 42, "respect_before": 39}, "Still pathetic.", "Vorn", main.datetime(2026, 11, 10, 21, 30))
+assert (card.width(), card.height()) == (1200, 630)
+assert "{time}" in main.SITUATIONS["recap"] and "recap" in main.AUTO
 
 # "Is it slowing my game?": a light footprint clears him; the camera, a loaded local model in a game, or heavy CPU are named
 verdict, details = main.slow_report(30, 24, 600, 0, True, "off", False)
