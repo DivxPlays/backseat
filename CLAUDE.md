@@ -3,6 +3,9 @@
 The app is called **Backseat** (it was called Vorn until 2026-11-08; the local folder is still E:\Claude\Vorn). Vorn and Mika are its characters.
 
 - **After every change, upload it.** Note what README.md will need (features, controls, settings, costs) under `## Unreleased` in CHANGELOG.md (README.md itself changes only at a release), take built items off ROADMAP.md, then commit and push to GitHub (origin = https://github.com/DivxPlays/backseat, public since 2026-11-09, branch main: everything pushed is public). The user asked for this on 2026-11-08, so don't ask first each time.
+- **Made with AI** (the user asked on 2026-11-10): the project always says it's made with the help of AI: a note
+  near the top of the README, in the app or launcher (About screen or footer), on the trailer's end card, and in
+  every launch post. The kit's guard blocks a README commit that doesn't say it.
 - **README goes out with the release** (the user asked on 2026-11-10): README.md on GitHub only ever describes a released version. Between releases, what it will need goes under `## Unreleased` in CHANGELOG.md. The release commit puts it into README.md, the release is published first (its tag pushed, then the GitHub release), and only then is the branch pushed. The kit's guard blocks a README push before its version has a release tag on GitHub.
 - **Announcing it** (the user asked on 2026-11-10): when the project goes public, and for big releases, run
   `/kit:launch`. Claude drafts posts for Reddit communities whose rules allow it, X and the other places the user
