@@ -1731,6 +1731,11 @@ bat = Path("Install Backseat.bat").read_bytes()
 assert b"\r\n" in bat and updater.ZIP.encode() in bat and b'if exist "%~dp0install.ps1" goto here' in bat  # one-file installer
 assert "AUTO_UPDATE" in config._DEFAULTS and "presets /XC" not in Path("install.ps1").read_text(encoding="utf-8")
 assert "/XD .venv .git __pycache__ \"Hall of Shame\" presets" in Path("install.ps1").read_text(encoding="utf-8")  # your characters stay
+# Python comes as its own zip with a pinned hash: a fresh Windows has no winget, and python.org's setup took 15+ min (#1)
+installer = Path("install.ps1").read_text(encoding="utf-8")
+assert "winget install" not in installer and "nuget.org/api/v2/package/python/3.12.10" in installer
+assert re.search(r'Get-FileHash \$zip -Algorithm SHA256\)\.Hash -ne "[0-9A-F]{64}"', installer)
+assert r'"$Dest\python\python.exe"' in installer  # found there next time (auto-update reruns the installer)
 
 # accurate stats: your SteamID from Steam's files, a game's stats from Steam (a wrong key or private profile is told
 # apart from a game without stats), and this session's real kills, deaths and wins as the rise in the running totals

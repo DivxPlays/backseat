@@ -15,7 +15,7 @@ function Find-Python {
         $exe = & py -3.12 -c "import sys; print(sys.executable)" 2>$null
         if ($LASTEXITCODE -eq 0 -and $exe) { return $exe.Trim() }
     }
-    foreach ($p in "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe", "$env:ProgramFiles\Python312\python.exe") {
+    foreach ($p in "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe", "$env:ProgramFiles\Python312\python.exe", "$Dest\python\python.exe") {
         if (Test-Path $p) { return $p }
     }
     return $null
@@ -39,8 +39,23 @@ foreach ($dir in $ShortcutDirs) { Remove-Item (Join-Path $dir "Vorn.lnk") -Error
 # 1. Python 3.12
 $python = Find-Python
 if (-not $python) {
-    Write-Host "Python 3.12 isn't installed. Installing it with winget..."
-    winget install --id Python.Python.3.12 -e --scope user --accept-package-agreements --accept-source-agreements
+    # Python's own zip (its NuGet package), unpacked into Backseat's folder: a fresh Windows has no winget yet, and the
+    # python.org setup program took 15+ minutes there. The hash pins that exact file.
+    Write-Host "Python 3.12 isn't installed. Downloading it (15 MB) into Backseat's folder..."
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $zip = Join-Path $env:TEMP "python-3.12.10.nupkg"
+    $ProgressPreference = "SilentlyContinue"  # Windows PowerShell's progress bar makes downloads many times slower
+    Invoke-WebRequest "https://www.nuget.org/api/v2/package/python/3.12.10" -OutFile $zip -UseBasicParsing
+    if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne "0EB85C2DFCCCCF1B17352DE4C397F69194035B7D37149EACC16F1147D93DE3B8") {
+        Remove-Item $zip
+        throw "The Python download was damaged. Run this again."
+    }
+    $unpacked = Join-Path $env:TEMP ("python-" + [guid]::NewGuid())
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory($zip, $unpacked)
+    New-Item -ItemType Directory -Force $Dest | Out-Null
+    Move-Item (Join-Path $unpacked "tools") (Join-Path $Dest "python")
+    Remove-Item $zip, $unpacked -Recurse -ErrorAction SilentlyContinue
     $python = Find-Python
     if (-not $python) { throw "Python 3.12 didn't install. Install it from python.org, then run this again." }
 }

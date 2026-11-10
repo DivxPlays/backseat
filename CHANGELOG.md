@@ -5,7 +5,14 @@ version's entry is also its release notes on GitHub.
 
 ## Unreleased
 
+README at release: "Install" no longer says Python comes "through winget": without Python 3.12, the installer
+unpacks Python's own package (15 MB) into Backseat's folder.
+
 ### Fixed
+- **The installer stopped on a new PC** (#1). It installed Python with winget, which a fresh Windows doesn't have
+  yet. Without Python 3.12, it now downloads Python's own package (15 MB, checked against a known fingerprint) and
+  unpacks it into Backseat's folder in seconds: no setup program, no admin prompt (python.org's setup program took
+  15 minutes or more on a fresh Windows).
 - **Games lagged badly with the free local model, and so did the characters (seen in Fortnite).** The local model
   thought on the game's graphics card for about 3 seconds a comment and held 10 GB of its memory the whole time. Now,
   while a game is in front, Claude Haiku makes the comments and the model is taken off the graphics card (Settings >

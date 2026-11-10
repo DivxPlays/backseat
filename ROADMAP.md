@@ -2,8 +2,6 @@
 
 ## Planned
 
-- **The installer stops on a fresh Windows** (#1): it installs Python with winget, which a fresh PC doesn't have yet.
-  Fall back to python.org's installer. Blocks the next release (it must pass the fresh-Windows test).
 - **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
   frames, draw it in its own process or resend unchanged frames.
 
@@ -19,7 +17,7 @@ Built and self-checked, but not yet seen working on a real day:
 
 ## Ideas for 2.2.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. Checked 2026-11-10: #1 and #2 (both in Planned).
+GitHub issues land in Planned with their number. Checked 2026-11-10: #2 is in Planned; #1 is fixed for 2.1.1.
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
@@ -59,6 +57,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.1.1 (in progress):
+- Fix (#1): the installer stopped on a fresh Windows (no winget). Without Python 3.12 it now unpacks Python's own package into Backseat's folder; a fresh Windows reaches the API key prompt in about 3 minutes.
 - Fix: started with Windows, Backseat ran at below-normal priority, so in games the characters lagged on a black background. Normal priority now.
 - Fix: games lagged with the free local model (Fortnite). In games Claude comments and the model leaves the graphics card; it loads in 6.7 GB instead of 10; the camera draws 15 fps; the screen is checked every 3 s.
 
