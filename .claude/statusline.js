@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Status line: model | branch (* = uncommitted changes) | context used | version from the VERSION file.
+// Status line: model | branch (* = uncommitted changes) | context used | version (+ commits since the last release).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -26,10 +26,15 @@ if (pct == null && cw.current_usage && cw.context_window_size) {
 }
 if (typeof pct === 'number') parts.push(`ctx ${Math.round(pct)}%`);
 
+// Version: the VERSION file, else the last release tag; "+12" = commits since that tag (time to suggest a bump?).
 // shortcut: only a VERSION file is read; add package.json etc. if a project keeps its version elsewhere.
-try {
-  const v = fs.readFileSync(path.join(ws.project_dir || dir, 'VERSION'), 'utf8').split(/\r?\n/)[0].trim();
-  if (v) parts.push('v' + v.replace(/^v/i, ''));
-} catch { /* no VERSION file */ }
+let version = '';
+try { version = fs.readFileSync(path.join(ws.project_dir || dir, 'VERSION'), 'utf8').split(/\r?\n/)[0].trim(); } catch { /* none */ }
+const tag = git('describe', '--tags', '--abbrev=0');
+if (!version) version = tag;
+if (version) {
+  const since = tag ? Number(git('rev-list', '--count', `${tag}..HEAD`)) : 0;
+  parts.push('v' + version.replace(/^v/i, '') + (since ? ` +${since}` : ''));
+}
 
 process.stdout.write(parts.join(' | '));
