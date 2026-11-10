@@ -67,6 +67,26 @@ VORN_LOOKS = {
                       suit=("#1e3a26", "#0e1e12"), cape=("#1e5a32", "#0c2a16"), lining="#f4f1ea", tabard=("#f4f1ea", "#b9b2a4"),
                       collar_c=("#f4f1ea", "#b9b2a4", "#ffffff"), gloves=("#4a0a0f", "#8e1b22"),
                       boots=("#2a1a12", "#120a06")),  # Christmas: crimson and gold, a green cape lined in white
+    "lantern lord": dict(steel=("#2a1e1c", "#0e0a09", "#4a3a36"), polish="#9a7a6a", trim=("#f2c64d", "#9a6b12"),
+                         suit=("#5a0c12", "#2a0508"), cape=("#c8102e", "#6a0814"), lining="#f2c64d", tabard=("#c8102e", "#6a0814"),
+                         collar="gorget", collar_c=("#f2c64d", "#9a6b12", "#ffe9a0"), gloves=("#2a1e1c", "#4a3a36"),
+                         boots=("#2a1e1c", "#0e0a09")),  # Lunar New Year: black lacquer, lucky red and gold
+    "heartbreaker": dict(steel=("#3a2a32", "#16101a", "#6a5060"), polish="#b88aa0", trim=("#ff4f8b", "#a01c4a"),
+                         suit=("#2a1420", "#12080e"), cape=("#7a0f2a", "#320610"), lining="#ff8fb1", tabard=("#ff4f8b", "#a01c4a"),
+                         collar_c=("#ffd6e6", "#c88aa4", "#ffffff"), gloves=("#3a2a32", "#6a5060"),
+                         boots=("#2a1420", "#12080e")),  # Valentine's: dark steel, a cape the colour of a bad decision
+    "emerald knight": dict(steel=("#1f7a3a", "#0c3a1a", "#4ab06a"), polish="#9af0b8", trim=("#f2c64d", "#9a6b12"),
+                           suit=("#123a20", "#06180c"), cape=("#0e4a24", "#05200e"), lining="#f2c64d", tabard=("#f2c64d", "#9a6b12"),
+                           collar_c=("#f4f1ea", "#b9b2a4", "#ffffff"), gloves=("#123a20", "#2a6a40"),
+                           boots=("#2a1a12", "#120a06")),  # St. Patrick's: green steel and gold
+    "spring warden": dict(steel=("#c9e8d8", "#7aa892", "#eefaf2"), polish="#ffffff", trim=("#c9a2e8", "#7a54a0"),
+                          suit=("#e8dcf0", "#a898b4"), cape=("#ffd1e3", "#c88aa4"), lining="#fff4b8", tabard=("#fff4b8", "#c8b870"),
+                          collar_c=("#ffffff", "#c8c0d0", "#ffffff"), gloves=("#c9a2e8", "#e4ccf4"),
+                          boots=("#a888c4", "#6a4e86")),  # Easter: pastel mint, lilac and yellow (he hates it)
+    "harvest lord": dict(steel=("#8a5a2a", "#4a2e12", "#c08a50"), polish="#e0b080", trim=("#d8652a", "#7a3412"),
+                         suit=("#4a2e1a", "#22140a"), cape=("#6a3a1a", "#2e1808"), lining="#e8a040", tabard=("#a8501a", "#4a220a"),
+                         collar="scarf", collar_c=("#d8652a", "#7a3412", "#f0a060"), gloves=("#5a3a22", "#8a6040"),
+                         boots=("#4a2e1a", "#22140a")),  # Thanksgiving: bronze and autumn orange, a scarf
     # earned (see VORN_UNLOCKS)
     "shadow marshal": dict(steel=("#2f3340", "#14161d", "#5a6072"), polish="#9aa3b8", trim=("#c9ced8", "#7d8494"),
                            suit=("#1d1a24", "#0c0a10"), cape=("#3a1f5c", "#1a0c2c"), lining="#c9ced8", tabard=("#3a1f5c", "#1a0c2c"),
@@ -84,7 +104,9 @@ VORN_LOOKS = {
                    gloves=("#8a6a2a", "#c9a050"), boots=("#e8e2d4", "#9a927f")),
 }
 # outfits you earn: (what counts, how much) -- see unlocks.py
-VORN_HOLIDAY = {"halloween": "dread king", "christmas": "yule king"}  # the season's look
+VORN_HOLIDAY = {"halloween": "dread king", "christmas": "yule king", "lunar new year": "lantern lord",
+                "valentine": "heartbreaker", "st patrick": "emerald knight", "easter": "spring warden",
+                "thanksgiving": "harvest lord"}  # the season's look
 VORN_UNLOCKS = {"shadow marshal": ("hours", 10), "battle-scarred": ("talks", 100), "bloodforged": ("streak", 7), "gilded": ("respect", 100)}
 
 
@@ -614,14 +636,33 @@ class Vorn:
         return self.OUTFITS[self.outfit]
 
     def _weather(self, g):
-        """Holidays: bats (Halloween), snow (Christmas), confetti (New Year's, your birthday) or hearts (Valentine's),
-        drifting around them. Each character's own, from their own clock."""
+        """Holidays: bats (Halloween), snow (Christmas), confetti (New Year's, your birthday), hearts (Valentine's),
+        clovers (St. Patrick's), petals (Easter), leaves (Thanksgiving) or rising lanterns (Lunar New Year), drifting
+        around them. Each character's own, from their own clock."""
         kind, t = WEATHER, self.t
         if not kind:
             return
         g.save()
         g.setPen(Qt.NoPen)
-        for i in range({"snow": 30, "confetti": 34, "bats": 6, "hearts": 12}[kind]):
+        for i in range({"snow": 30, "confetti": 34, "bats": 6, "hearts": 12, "clovers": 14, "petals": 24, "leaves": 16,
+                        "lanterns": 7}[kind]):
+            if kind == "lanterns":  # red paper lanterns rising slowly, glowing
+                x = (i * 61) % 360 - 20 + math.sin(t * 0.7 + i * 1.3) * 10
+                y = 1010 - (t * (22 + i % 3 * 5) + i * 149) % 1040
+                glow = QRadialGradient(P(x, y), 30)
+                glow.setColorAt(0, QColor(255, 170, 60, 90))
+                glow.setColorAt(1, QColor(255, 170, 60, 0))
+                g.setBrush(QBrush(glow))
+                g.drawEllipse(P(x, y), 30, 30)
+                g.setBrush(QBrush(QColor("#d81e2a")))
+                g.drawEllipse(P(x, y), 11, 14)
+                g.setBrush(QBrush(QColor("#f2c64d")))
+                g.drawRect(QRectF(x - 6, y - 16, 12, 4))
+                g.drawRect(QRectF(x - 6, y + 12, 12, 4))
+                g.setPen(pen(QColor("#f2c64d"), 1.4))
+                g.drawLine(P(x, y + 16), P(x, y + 26))
+                g.setPen(Qt.NoPen)
+                continue
             if kind == "bats":  # flapping across, with orange eyes
                 x = (t * (38 + i * 7) + i * 131) % 470 - 85
                 y = 90 + (i * 157) % 520 + math.sin(t * 2.6 + i) * 22
@@ -636,14 +677,33 @@ class Vorn:
                 for side in (-1, 1):
                     g.drawEllipse(P(x + side * 3.5, y - 2), 2, 2)
                 continue
-            fall = {"snow": 42, "confetti": 95, "hearts": 55}[kind] * (0.8 + (i * 37 % 10) / 25)
-            x = (i * 53) % 380 - 40 + math.sin(t * 0.9 + i * 1.7) * (14 if kind == "snow" else 8)
+            fall = {"snow": 42, "confetti": 95, "hearts": 55, "clovers": 50, "petals": 38, "leaves": 46}[kind] * (0.8 + (i * 37 % 10) / 25)
+            x = (i * 53) % 380 - 40 + math.sin(t * 0.9 + i * 1.7) * (14 if kind in ("snow", "petals", "leaves") else 8)
             y = (t * fall + i * 97) % 1040 - 30
             if kind == "snow":
                 g.setBrush(QBrush(QColor(255, 255, 255, 200)))
                 g.drawEllipse(P(x, y), 2.5 + i % 3, 2.5 + i % 3)
             elif kind == "hearts":
                 fill(g, heart(x, y, 7 + i % 3), alpha(QColor("#ff4f8b"), 0.8), 0)
+            elif kind == "clovers":  # three round leaves on a stem, turning as they fall
+                s = 4 + i % 2
+                g.setBrush(QBrush(QColor("#2fa84f")))
+                for k in range(3):
+                    a = t * 1.5 + i + k * 2.094
+                    g.drawEllipse(P(x + math.cos(a) * s, y + math.sin(a) * s), s, s)
+                g.setPen(pen(QColor("#1f7a3a"), 1.6))
+                g.drawLine(P(x, y), P(x + 3, y + 9))
+                g.setPen(Qt.NoPen)
+            elif kind in ("petals", "leaves"):  # spinning slowly on the way down
+                g.save()
+                g.translate(x, y)
+                g.rotate(t * (90 if kind == "petals" else 55) + i * 47)
+                if kind == "petals":
+                    g.setBrush(QBrush(alpha(QColor(("#ffd1e3", "#ffffff", "#fff4b8", "#c9e8d8")[i % 4]), 0.9)))
+                    g.drawEllipse(P(0, 0), 5, 3)
+                else:
+                    fill(g, poly((-9, 0), (0, -5), (9, 0), (0, 5)), QColor(("#d8652a", "#c0392b", "#e8a040", "#8a5a2a")[i % 4]), 0)
+                g.restore()
             else:
                 g.save()
                 g.translate(x, y)

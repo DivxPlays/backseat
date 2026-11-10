@@ -50,6 +50,19 @@ OUTFITS = {
                     stripe="#ff8a1f", sock_top=600, shoes="#1a0f22", shoe_trim="#ff8a1f", head="bow"),  # Halloween
     "holly": dict(top="dress", main="#c8102e", trim="#ffffff", accent="#1f7a3a", bottom="none", low="#c8102e", socks="#ffffff",
                   stripe="#c8102e", sock_top=640, shoes="#1a1720", shoe_trim="#ffffff", sleeves="puff", head="bow"),  # Christmas
+    "lantern": dict(top="dress", main="#c8102e", trim="#f2c64d", accent="#f2c64d", bottom="none", low="#c8102e", socks="#1a1720",
+                    stripe="#f2c64d", sock_top=640, shoes="#1a1720", shoe_trim="#f2c64d", pattern="#f2c64d",
+                    head="flower"),  # Lunar New Year: lucky red and gold
+    "cupid": dict(top="dress", main="#ffffff", trim="#ff4f8b", accent="#ff4f8b", bottom="none", low="#ffffff", socks="#ff8fb1",
+                  stripe="#ff4f8b", sock_top=660, shoes="#ff4f8b", shoe_trim="#ffffff", pattern="#ff4f8b", motif="hearts",
+                  head="bow"),  # Valentine's: white with red hearts
+    "clover": dict(top="jacket", main="#1f7a3a", trim="#f2c64d", accent="#ffffff", bottom="skirt", low="#145a2a", socks="#ffffff",
+                   stripe="#1f7a3a", sock_top=640, shoes="#1a1720", shoe_trim="#f2c64d", head="bow"),  # St. Patrick's
+    "pastel": dict(top="dress", main="#d8f0e4", trim="#ffffff", accent="#c9a2e8", bottom="none", low="#d8f0e4", socks="#fff4b8",
+                   stripe="#c9a2e8", sock_top=660, shoes="#c9a2e8", shoe_trim="#ffffff", sleeves="puff",
+                   head="flower"),  # Easter
+    "cozy": dict(top="hoodie", main="#c8642a", trim="#f4e4c8", accent="#7a3412", bottom="skirt", low="#5a3a22", socks="#3a2618",
+                 stripe="#f4e4c8", sock_top=700, shoes="#4a2e1a", shoe_trim="#f4e4c8"),  # Thanksgiving: a big autumn hoodie
     # earned (see UNLOCKS)
     "night owl": dict(top="hoodie", main="#1f2a4a", trim="#8fb4ff", accent="#ffe28a", bottom="shorts", low="#141b30",
                       socks="#2a355a", stripe="#ffe28a", sock_top=700, shoes="#f5f3f7", shoe_trim="#8fb4ff"),
@@ -60,7 +73,8 @@ OUTFITS = {
     "sweetheart": dict(top="dress", main="#ffd6e6", trim="#ffffff", accent="#ff4f8b", bottom="none", low="#ffd6e6", socks="#ffffff",
                        stripe="#ff8fb1", sock_top=680, shoes="#ff8fb1", shoe_trim="#ffffff", chest_bow=True, pattern="#ff8fb1"),
 }
-HOLIDAY = {"halloween": "pumpkin", "christmas": "holly"}
+HOLIDAY = {"halloween": "pumpkin", "christmas": "holly", "lunar new year": "lantern", "valentine": "cupid",
+           "st patrick": "clover", "easter": "pastel", "thanksgiving": "cozy"}
 # her own idle animations, on top of the shared ones (see character.IDLES)
 MIKA_IDLES = {
     "adjust headset": dict(time=2.4, pose=((110, -155, "open", 0.65), None), front=True, head=(-2, 0, -5), face=dict(open=-0.3)),
@@ -250,6 +264,9 @@ class Mika(Vorn):
         color = QColor(o["pattern"])
         for i in range(int((y1 - y0) / 34) * 3):
             cx, cy = 60 + (i * 67) % 180, y0 + (i * 37) % (y1 - y0)
+            if o.get("motif") == "hearts":  # (cupid) little hearts instead of flowers
+                fill(g, heart(cx, cy, 5.5), alpha(color, 0.9), 0)
+                continue
             g.setPen(Qt.NoPen)
             g.setBrush(QBrush(alpha(color, 0.85)))
             for k in range(5):

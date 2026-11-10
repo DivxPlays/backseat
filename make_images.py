@@ -146,6 +146,13 @@ def main_images():
         seasons += [pose(Vorn(VORN_HOLIDAY[holiday]), "smug").render(1.2), pose(Mika(Mika.HOLIDAY[holiday]), "laugh").render(1.2)]
     character.WEATHER = None
     backdrop(seasons, "holidays.png")
+    more = []
+    for holiday, weather in (("lunar new year", "lanterns"), ("valentine", "hearts"), ("st patrick", "clovers"),
+                             ("easter", "petals"), ("thanksgiving", "leaves")):
+        character.WEATHER = weather
+        more += [pose(Vorn(VORN_HOLIDAY[holiday]), "smug").render(0.9), pose(Mika(Mika.HOLIDAY[holiday]), "laugh").render(0.9)]
+    character.WEATHER = None
+    backdrop(more, "holidays-more.png")
     first = ("gothic", "hoodie", "jacket", "jersey")  # her original four, then Lovesick
     lineup([pose(Mika(o), m) for o, m in zip(first, ("smug", "laugh", "idle", "angry"))] + [pose(Mika("jacket"), "smug", power=True)],
            "mika.png")

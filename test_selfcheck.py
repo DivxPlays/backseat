@@ -346,12 +346,12 @@ for v in looks.values():
     v.glance_at = v.turn_at = v.blink_at = 1e9
     v.step(1.0, 0.0)
 renders = {o: bytes(v.render().constBits()) for o, v in looks.items()}
-assert len(set(renders.values())) == len(renders) == len(Vorn.OUTFITS) == 11 and Vorn("nope").outfit in Vorn.OUTFITS
+assert len(set(renders.values())) == len(renders) == len(Vorn.OUTFITS) == 16 and Vorn("nope").outfit in Vorn.OUTFITS
 # unlockable outfits: "random" only picks what you've earned; an explicit choice still works
 saved_outfit, config.VORN_OUTFIT, saved_earned = config.VORN_OUTFIT, "random", set(Vorn.earned)
 Vorn.earned.clear()
 assert not any(Vorn().outfit in Vorn.UNLOCKS for _ in range(60)) and Vorn("gilded").outfit == "gilded"
-assert "gilded" not in Vorn.wardrobe() and len(Vorn.wardrobe()) == 7  # 5, and the 2 holiday looks
+assert "gilded" not in Vorn.wardrobe() and len(Vorn.wardrobe()) == 12  # 5, and the 7 holiday looks
 Vorn.earned.add("gilded")
 assert "gilded" in Vorn.wardrobe() and "gilded" not in __import__("mika").Mika.earned  # each keeps their own
 Vorn.earned.clear()
@@ -917,14 +917,26 @@ assert holidays.today("", D(2026, 12, 31))[0] == holidays.today("", D(2027, 1, 1
 assert holidays.today("", D(2027, 2, 14))[0] == "valentine" and holidays.today("", D(2027, 3, 3)) is None
 assert holidays.today("02-10", D(2027, 2, 10))[0] == "birthday" and holidays.today("12-25", D(2026, 12, 25))[0] == "birthday"
 assert holidays.birthday_of("02-29") == (2, 29) and holidays.birthday_of("13-01") is None and holidays.birthday_of("feb 10") is None
+# the movable ones: Easter (computed), Thanksgiving (4th Thursday of November), Lunar New Year (a table: keep it filled)
+assert holidays.easter(2026) == D(2026, 4, 5) and holidays.easter(2027) == D(2027, 3, 28) and holidays.easter(2038) == D(2038, 4, 25)
+assert holidays.thanksgiving(2026) == D(2026, 11, 26) and holidays.thanksgiving(2027) == D(2027, 11, 25)
+assert D.today().year + 1 in holidays.LUNAR_NEW_YEAR, "add the next Lunar New Year dates to holidays.LUNAR_NEW_YEAR"
+assert holidays.today("", D(2027, 2, 6))[::2] == ("lunar new year", "lanterns") and holidays.today("", D(2027, 3, 17))[0] == "st patrick"
+assert holidays.today("", D(2027, 3, 28))[::2] == ("easter", "petals") and holidays.today("", D(2026, 11, 29))[::2] == ("thanksgiving", "leaves")
+assert holidays.today("", D(2029, 2, 13))[0] == "lunar new year"  # its own day beats Valentine's season
+assert holidays.today("", D(2029, 2, 14))[0] == "valentine" and holidays.today("", D(2026, 12, 1))[0] == "christmas"
+for key in holidays.calendar(2027):  # every holiday dresses both of them, in looks that exist
+    if key != "new year":
+        assert Vorn.HOLIDAY[key] in Vorn.OUTFITS and Mika.HOLIDAY[key] in Mika.OUTFITS, key
 saved_season, saved_outfit, config.VORN_OUTFIT = (character.SEASON, character.WEATHER), config.VORN_OUTFIT, "random"
 character.SEASON = "christmas"
 assert Vorn().outfit == "yule king" and Mika("random").outfit == "holly" and Vorn("obsidian").outfit == "obsidian"  # a pick stays
 character.SEASON = None
 assert not any(Vorn().outfit in Vorn.HOLIDAY.values() for _ in range(40))  # out of season: never the holiday looks
-for weather in ("bats", "snow", "confetti", "hearts"):
+for weather in ("bats", "snow", "confetti", "hearts", "clovers", "petals", "leaves", "lanterns"):
     character.WEATHER = weather
     assert not Vorn("warlord").render().isNull() and not Mika("jacket").render().isNull()
+assert not Mika("cupid").render().isNull()  # (hearts on her dress instead of flowers)
 character.SEASON, character.WEATHER = saved_season
 config.VORN_OUTFIT = saved_outfit
 from settings_ui import SettingsWindow  # noqa: E402

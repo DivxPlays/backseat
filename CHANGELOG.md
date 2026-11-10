@@ -8,9 +8,14 @@ version's entry is also its release notes on GitHub.
 README at release: the installer checks your API key (Setup, step 3); "What's new" after an update (Updates); the
 About box says Backseat is made with the help of AI; tray > Is Backseat slowing my game? (Controls); tray > Character >
 Duo mode with (duo mode, the tray row in Controls; "Both (duo mode)" is gone); recap cards, with
-docs/images/recap-card.png, and tray > Recap cards (How it behaves, Controls; one Haiku call per game, in Cost).
+docs/images/recap-card.png, and tray > Recap cards (How it behaves, Controls; one Haiku call per game, in Cost); five
+more holidays, with docs/images/holidays-more.png next to holidays.png (Holidays: dates, outfits and weather).
 
 ### New
+- **Five more holidays**, each with an outfit for both and its own weather around them: Lunar New Year (rising
+  lanterns), Valentine's Day (now Feb 12 to 14, with outfits: heartbreaker and cupid), St. Patrick's Day (clovers),
+  Easter (petals) and Thanksgiving (falling leaves). Like Halloween and Christmas, the looks switch in by themselves
+  when the outfit is on "Surprise me", and they work the day into a line now and then.
 - **Session recap cards.** When you leave a game you played for 10 minutes or more, they give their verdict on the
   session out loud, and it goes on a card with the game, the time played, your wins, deaths and epic plays, and their
   respect: a picture ready to post (tray > Recap cards). One short Claude call per game (about 0.05 cents), or free with

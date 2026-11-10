@@ -3,7 +3,6 @@
 ## Planned
 
 2.2.0 (picked 2026-11-10):
-- **More holidays:** Lunar New Year, Valentine's outfits, St. Patrick's, Easter, Thanksgiving.
 
 - **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
   frames, draw it in its own process or resend unchanged frames.
@@ -59,6 +58,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 ## Done
 
 2.2.0 (in progress):
+- More holidays: Lunar New Year, Valentine's outfits, St. Patrick's, Easter and Thanksgiving, each with outfits for both and its own weather.
 - Session recap cards: leave a game played 10+ minutes and their verdict goes on a card with your numbers (Hall of Shame/Recaps).
 - Pick any duo partner: tray > Character > Duo mode with, any two characters (created ones too).
 - "Is Backseat slowing my game?": 30 seconds of measuring in a match, a notification with the verdict and what to turn off.

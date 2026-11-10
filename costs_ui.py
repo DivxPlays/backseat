@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout, QWidge
 
 import config
 
-GROUPS = [("Talking to him", {"ask", "look", "heard", "clip"}), ("Automatic comments", {"change", "quiet", "lore", "nag", "start"}),
+GROUPS = [("Talking to him", {"ask", "look", "heard", "clip"}), ("Automatic comments", {"change", "quiet", "lore", "nag", "start", "recap"}),
           ("Post-match breakdowns", {"breakdown"}), ("Battle reports", {"report"}),
           ("Music (Spotify comments and song lookups)", {"music"})]
 
