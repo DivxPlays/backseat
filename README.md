@@ -8,6 +8,20 @@ Version 2.1.0 (beta) · Made by DivxPlays (tray > About Backseat shows the versi
 
 **[Download](https://github.com/DivxPlays/backseat/releases/latest)** · [Trailer](https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4) · [Setup](#setup) · [Controls and hotkeys](#controls) · [Voice commands](#voice-commands-free) · [How it behaves](#how-it-behaves) · [Cost](#cost) · [Settings](#tweaking) · [Updates](#updates) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/DivxPlays/backseat/issues) · [License](#license)
 
+**Contents**
+
+- [Setup](#setup)
+- [Controls](#controls)
+- [How it behaves](#how-it-behaves)
+- [Cost](#cost)
+- [Discord](#discord)
+- [Privacy](#privacy)
+- [Tweaking](#tweaking)
+- [Updates](#updates)
+- [What's on GitHub](#whats-on-github)
+- [Moving him to another PC](#moving-him-to-another-pc)
+- [License](#license)
+
 Backseat drivers, but for your gaming: an animated, full-body character in the corner of your screen, Vorn the warlord or Mika the yandere gamer girl (or both). He watches what you play, comments, gives hints when you ask, remembers you between sessions, and roasts your hours played. His brain is Claude.
 
 <p align="center"><a href="https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4"><img src="docs/images/trailer.gif" width="560" alt="Backseat trailer: Vorn and Mika roasting a Fortnite skydive, then Vorn thrown across the screen"></a><br><a href="https://github.com/DivxPlays/backseat/releases/latest/download/trailer.mp4"><b>Watch the full trailer (81 s, with sound)</b></a></p>
