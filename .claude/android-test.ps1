@@ -100,16 +100,16 @@ $log = Get-Content (Join-Path $results "logcat.txt")
 $crashed = [bool]($package -and ($log | Select-String -SimpleMatch "Process: $package"))
 $errors = @($log | Select-String "FATAL EXCEPTION|ANR in |UnsatisfiedLinkError|Fatal signal" | Select-Object -First 20 | ForEach-Object { "$_".Trim() })
 $errorWindow = $focus -match "Application Error|Not Responding|isn't responding"
+$ok = [bool]($installed -and $launched -and $running -and -not $crashed -and -not $errors.Count -and -not $errorWindow)
+$verdict = if (-not $installed) { "FAIL: it didn't install: $install" }
+  elseif (-not $launched) { "FAIL: $package has no app to start (no launcher activity)" }
+  elseif ($crashed -or $errors.Count) { "FAIL: it crashed or reported errors: $(if ($errors.Count) { $errors[0] } else { 'see logcat.txt' })" }
+  elseif ($errorWindow) { "FAIL: an error is on screen: $focus" }
+  elseif (-not $running) { "FAIL: it wasn't running at the end; it closed or crashed" }
+  else { "PASS: $package installed, started and kept running on a fresh Android phone" }
 [ordered]@{ apk = $Apk; installed = [bool]$installed; package = $package; launched = $launched; running = $running;
-  crashed = $crashed; focus = $focus; errorLines = $errors } |
+  crashed = $crashed; focus = $focus; errorLines = $errors; pass = $ok; verdict = $verdict } |
   ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 (Join-Path $results "result.json")
-
-$ok = $installed -and $launched -and $running -and -not $crashed -and -not $errors.Count -and -not $errorWindow
-if (-not $installed) { "FAIL: it didn't install: $install" }
-elseif (-not $launched) { "FAIL: $package has no app to start (no launcher activity)" }
-elseif ($crashed -or $errors.Count) { "FAIL: it crashed or reported errors: $(if ($errors.Count) { $errors[0] } else { 'see logcat.txt' })" }
-elseif ($errorWindow) { "FAIL: an error is on screen: $focus" }
-elseif (-not $running) { "FAIL: it wasn't running at the end; it closed or crashed" }
-else { "PASS: $package installed, started and kept running on a fresh Android phone" }
+$verdict
 "look at the screenshots before trusting it: $results\shot-1.png, shot-2.png, shot-3.png (its log in $results\logcat.txt)"
 exit $(if ($ok) { 0 } else { 1 })

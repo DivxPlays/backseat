@@ -25,6 +25,26 @@ The app is called **Backseat** (it was called Vorn until 2026-11-08; the local f
   GitHub's macOS runners), set up the first time it's needed, after asking the user before installing anything.
   The tests are in `.claude/`: `linux-test.ps1`, `android-test.ps1` and `ios-test.ps1`, each with `-Setup`
   the first time; `/kit:release` runs them.
+
+  **Every OS first, then the release** (the user asked on 2026-11-10): all of these tests, Windows included, come
+  before the release is posted. `/kit:release` puts their verdicts in one release report, and the guard holds the
+  release's tag and `gh release create` until it shows every OS the release is for passed on this build. Run the
+  test scripts with `powershell -ExecutionPolicy Bypass -File .claude/<script>` (Windows blocks them otherwise); for
+  Steam Deck, `linux-test.ps1 -Proton` runs the Windows build under GE-Proton, exactly as on the Deck.
+- **Player features** (the user asked on 2026-11-10): every launcher or app players run has these.
+  `/kit:release` checks them before each release; one that's missing gets built, or stays a GitHub issue until it is.
+  - **Update checker:** on start (at most once a day, silent when offline) it asks GitHub for the latest release and,
+    when there's a newer one, offers it with its notes and a link. It never updates without the player's yes.
+  - **Crash report button:** after a crash, a "Report this crash" button opens a new GitHub issue in the browser,
+    filled in with the version, Windows version and the end of the log, with user names and paths taken out.
+    Nothing is sent unless the player submits it.
+  - **"What's new":** the first start after an update shows that version's changes, in the CHANGELOG's words, once.
+  - **Controller** (launchers): it works with a gamepad alone, for Steam Deck and the couch: every button reachable,
+    A to choose, B to go back, the focused item clearly marked.
+
+  Here: the update checker (`updater.py`: daily, tray > Update), the crash report (`report_url()` in
+  `main.py`, a filled-in issue with names, paths and keys taken out) and "What's new". Backseat isn't a launcher, so
+  the controller rule doesn't apply.
 - **Always suggest features** (the user asked on 2026-11-10): when a piece of work is done, suggest 1 to 3 new
   features or improvements that aren't planned yet, each with one line on why. There's always more to add. The ones
   the user likes go on the roadmap.

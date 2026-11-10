@@ -104,12 +104,15 @@ if (Test-Path $results) { Remove-Item -Recurse -Force $results }
 if ($LASTEXITCODE -or -not (Test-Path (Join-Path $results "result.json"))) { throw "the run left no results; read it on GitHub: $($run.url)" }
 
 $r = Get-Content (Join-Path $results "result.json") -Raw | ConvertFrom-Json
-$ok = $r.built -and $r.launched -and $r.running -and -not $r.crashed -and -not @($r.errorLines).Count
-if (-not $r.built) { "FAIL: it didn't build for the iOS Simulator: $(@($r.buildErrors)[0]) (all of it in $results\build.log)" }
-elseif (-not $r.launched) { "FAIL: it built but didn't start on the simulated iPhone" }
-elseif ($r.crashed) { "FAIL: it crashed (a crash report came up)" }
-elseif (@($r.errorLines).Count) { "FAIL: it reported errors: $(@($r.errorLines)[0])" }
-elseif (-not $r.running) { "FAIL: it wasn't running at the end; it closed or crashed" }
-else { "PASS: $($r.app) built, started and kept running on a simulated iPhone" }
+$ok = [bool]($r.built -and $r.launched -and $r.running -and -not $r.crashed -and -not @($r.errorLines).Count)
+$verdict = if (-not $r.built) { "FAIL: it didn't build for the iOS Simulator: $(@($r.buildErrors)[0]) (all of it in $results\build.log)" }
+  elseif (-not $r.launched) { "FAIL: it built but didn't start on the simulated iPhone" }
+  elseif ($r.crashed) { "FAIL: it crashed (a crash report came up)" }
+  elseif (@($r.errorLines).Count) { "FAIL: it reported errors: $(@($r.errorLines)[0])" }
+  elseif (-not $r.running) { "FAIL: it wasn't running at the end; it closed or crashed" }
+  else { "PASS: $($r.app) built, started and kept running on a simulated iPhone" }
+$r | Add-Member pass $ok -Force; $r | Add-Member verdict $verdict -Force  # for the release report
+$r | ConvertTo-Json -Depth 3 | Set-Content -Encoding UTF8 (Join-Path $results "result.json")
+$verdict
 "look at the screenshots before trusting it: $results\shot-1.png, shot-2.png, shot-3.png (its log in $results\app.log)"
 exit $(if ($ok) { 0 } else { 1 })
