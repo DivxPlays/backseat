@@ -52,6 +52,8 @@ build/clean-pc/
 build/linux-test/
 build/android-test/
 build/ios-test/
+build/clean-pc-upgrade/
+build/previous/
 
 # added by the Claude starter kit
 !.env.example
