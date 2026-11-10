@@ -69,7 +69,7 @@ def publish():
     notes.write_text(INSTALL + "## Changelog\n\n" + entry + "\n", encoding="utf-8")
     # the release goes out before the branch (README.md on GitHub only describes released versions): its tag, pushed
     # alone, must be this commit (an annotated tag lists the commit it points to as "<sha> refs/tags/v...^{}")
-    if run("git", "rev-parse", "HEAD") not in run("git", "ls-remote", "--tags", "origin", f"v{version}").split():
+    if run("git", "rev-parse", "HEAD") not in run("git", "ls-remote", "--tags", "origin", f"v{version}^{{}}").split():
         sys.exit(f"Tag this commit and push only the tag first: git tag -a v{version} -m {version}, then push refs/tags/v{version}.")
     trailer = HERE / "dist" / "trailer.mp4"  # (a feature release re-renders it first; a hotfix keeps the last one)
     if not trailer.exists():  # the last release's, so the README's link to the latest release's trailer keeps working
