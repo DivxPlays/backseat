@@ -5,8 +5,8 @@ The app is called **Backseat** (it was called Vorn until 2026-11-08; the local f
 - **After every change, upload it.** Update README.md so it matches what changed (features, controls, settings, costs), take built items off ROADMAP.md, then commit and push to GitHub (origin = https://github.com/DivxPlays/backseat, public since 2026-11-09, branch main: everything pushed is public). The user asked for this on 2026-11-08, so don't ask first each time.
 - **Announcing it** (the user asked on 2026-11-10): when the project goes public, and for big releases, run
   `/kit:launch`. Claude drafts posts for Reddit communities whose rules allow it, X and the other places the user
-  uses, shows each one, and posts only after the user's yes, from their own signed-in accounts (never creating
-  accounts). Every post is logged in `docs/launch.md`, and the threads are watched for problems and questions.
+  uses, shows them all together, and on the user's go posts them itself in the user's Opera GX browser,
+  where the user signs in (never creating accounts or typing passwords). Every post is logged in `docs/launch.md`, and the threads are watched for problems and questions.
 - **Problems you don't fix go on GitHub** (the user asked on 2026-11-10): any problem you notice and don't fix right
   now becomes a GitHub issue (`gh issue create`, labelled `bug` or `enhancement`): what happens, where it was seen,
   the next step. Look for an existing issue first. In a public repo, include no personal data (names, paths, keys,
