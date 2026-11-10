@@ -2,7 +2,10 @@
 
 ## Planned
 
-Nothing yet: 2.0.0 shipped everything that was planned (see Done).
+- **The installer stops on a fresh Windows** (#1): it installs Python with winget, which a fresh PC doesn't have yet.
+  Fall back to python.org's installer. Blocks the next release (it must pass the fresh-Windows test).
+- **The Discord camera may cost game frames** (#2): measure it in a game at normal priority; if it still costs
+  frames, draw it in its own process or resend unchanged frames.
 
 ## Not yet tested in real use
 
@@ -16,7 +19,7 @@ Built and self-checked, but not yet seen working on a real day:
 
 ## Ideas for 2.2.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. No issues yet (checked 2026-11-09).
+GitHub issues land in Planned with their number. Checked 2026-11-10: #1 and #2 (both in Planned).
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.

@@ -3,7 +3,7 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
-## 2.1.1 (not released yet)
+## Unreleased
 
 ### Fixed
 - **Games lagged badly with the free local model, and so did the characters (seen in Fortnite).** The local model
