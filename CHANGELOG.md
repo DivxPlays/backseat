@@ -3,12 +3,10 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
-## Unreleased
+## 2.3.0 Beta (2026-11-10)
 
-README at release: ranked mode (How it behaves: a bullet; Controls: "Ranked mode" in the tray row, and "ranked mode" /
-"it's ranked" / "ranked off" in the voice commands); patch day (How it behaves: a bullet; Cost: about a cent per game
-update; Settings: the Game profiles box now says it looks up patch notes too); Discord camera: "15 fps" becomes "15 fps
-(7.5 while nobody talks or moves)".
+Ranked mode, their take on your game's patch notes, and a lighter Discord camera. Still beta: all of it is
+self-checked, none of it has been tried in a real ranked match yet.
 
 ### New
 - **Ranked mode.** In a ranked or competitive match they keep quiet while you play: they speak only when you die,
