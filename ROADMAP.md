@@ -18,6 +18,8 @@ Built and self-checked, but not yet seen working on a real day:
   the installer's key check with a brand-new key, a duo with a created character, and the new holidays on their days.
 - 2.3.0: ranked mode in a real ranked match (spotted on screen, quiet mid-play, talking at deaths and after),
   a patch-day reaction after a real game update, and the Discord camera's cost in a game (#2: measured outside games only).
+- 2.4.0 (unreleased): Install-Backseat.exe downloaded through a browser on a real PC (Windows' warning, an antivirus
+  scan), and its uninstaller from Windows Settings > Apps (both checked in Windows Sandbox only).
 
 ## Ideas for 2.4.0 (not decided: pick the ones you want)
 
@@ -33,11 +35,9 @@ GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.3.0:
 ### Quality
 - **Our history page:** respect over time, outfit progress, trivia and challenge records, squad boards and Steam stats, any time.
 - **Bigger free model:** benchmark a larger local vision model on the RTX 4090 against frame rate (a model download).
-- **An .exe installer instead of the .bat** (asked for on 2026-11-09): one Install-Backseat.exe to download and run,
-  with Backseat's icon, a proper window and an uninstaller, built by the release script (for example with Inno Setup,
-  a free tool download). An unsigned .exe still gets Windows' "More info > Run anyway" warning, and antivirus flags
-  unsigned installers more often than a .bat; a code-signing certificate (about $10 a month through Azure Trusted
-  Signing, or more elsewhere) removes most of that.
+- **Sign the installer:** a code-signing certificate (about $10 a month through Azure Trusted Signing, or more
+  elsewhere) removes Windows' "More info > Run anyway" warning on Install-Backseat.exe and makes antivirus false
+  alarms rarer.
 
 ## Bigger ideas (a later version)
 
@@ -57,6 +57,10 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 - Twitch/YouTube chat integration and the OBS overlay mode (you passed on these).
 
 ## Done
+
+2.4.0 (in progress):
+- Install-Backseat.exe: a one-click installer with Backseat's icon, and an uninstaller in Windows Settings > Apps that
+  asks before deleting your memory, settings and key.
 
 2.3.0 (2026-11-10):
 - Ranked mode: in a ranked match (spotted on screen, or "ranked mode") they only talk at breaks, and keep score.

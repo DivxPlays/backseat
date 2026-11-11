@@ -3,6 +3,24 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
+## Unreleased
+
+README at release: Setup step 2 becomes "download **Install-Backseat.exe** and double-click it" (the .bat and the zip
+stay as other ways), with "More info > Run anyway" for the unsigned .exe; step 3 says the installer window shows
+progress and offers to start Backseat; the uninstall line becomes Windows Settings > Apps > Backseat > Uninstall (it asks
+before deleting your memory, settings, key, characters and Hall of Shame; an install made with the .bat gets the
+uninstaller by running the .exe once). "What's on GitHub" mentions installer.iss.
+
+### New
+- **Install-Backseat.exe, a one-click installer.** Download it and double-click it: it shows Backseat's icon and a
+  progress window, gets Python and everything Backseat needs in a window you can watch, asks for your API key there,
+  and offers to start Backseat when it's done. No admin rights. It installs into the same folder as before, so running
+  it over an install made with the .bat updates that install. Windows still warns the first time because the installer
+  isn't signed: click **More info > Run anyway**. The .bat and Backseat.zip are still on each release.
+- **An uninstaller.** Windows Settings > Apps > Backseat > Uninstall closes Backseat, turns off Start with Windows,
+  removes the shortcuts, the program and its Python, and asks whether to delete your memory, settings, API key,
+  characters and Hall of Shame too. No keeps them, so installing again picks up where you left off.
+
 ## 2.3.0 Beta (2026-11-10)
 
 Ranked mode, their take on your game's patch notes, and a lighter Discord camera. Still beta: all of it is

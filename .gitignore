@@ -55,6 +55,7 @@ build/ios-test/
 build/clean-pc-upgrade/
 build/previous/
 build/exe/
+build/uninstall-test/
 
 # added by the Claude starter kit
 !.env.example
