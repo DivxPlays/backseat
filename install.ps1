@@ -1,5 +1,6 @@
 # Installs Backseat on this PC: Python 3.12 if needed, its files in %LOCALAPPDATA%\Programs\Backseat, everything it needs,
-# your API key, and Start menu + desktop shortcuts. Run it through "Install Backseat.bat". Running it again updates it.
+# your API key, and Start menu + desktop shortcuts. Install-Backseat.exe (installer.iss) and "Install Backseat.bat" run
+# it, and so does auto-update (updater.py). Running it again updates it.
 # The parameters are for testing; a normal install uses the defaults.
 param(
     [string]$Dest = (Join-Path $env:LOCALAPPDATA "Programs\Backseat"),
@@ -27,12 +28,12 @@ Write-Host "Installing Backseat into $Dest" -ForegroundColor Yellow
 if ((Test-Path $Old) -and -not (Test-Path $Dest)) {
     Write-Host "Moving your Vorn install (memory, settings and key included) to $Dest"
     Move-Item $Old $Dest
-    $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $boot = (Get-ItemProperty $run -ErrorAction SilentlyContinue).VornCompanion
-    if ($boot) {
-        Set-ItemProperty $run BackseatCompanion ($boot.Replace($Old, $Dest))
-        Remove-ItemProperty $run VornCompanion
-    }
+}
+$run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"  # (Install-Backseat.exe moves the folder itself, before this runs)
+$boot = (Get-ItemProperty $run -ErrorAction SilentlyContinue).VornCompanion
+if ($boot) {
+    Set-ItemProperty $run BackseatCompanion ($boot.Replace($Old, $Dest))
+    Remove-ItemProperty $run VornCompanion
 }
 foreach ($dir in $ShortcutDirs) { Remove-Item (Join-Path $dir "Vorn.lnk") -ErrorAction SilentlyContinue }
 
@@ -110,6 +111,11 @@ foreach ($dir in $ShortcutDirs) {
     $link.Description = "Backseat: Vorn and Mika, your trash-talking gaming companions"
     $link.Save()
 }
+
+# 6. Installed with Install-Backseat.exe: Windows Settings > Apps shows the version an auto-update brought (installer.iss's AppId)
+$apps = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{9CFB28A7-8A68-4EAF-AA77-952507EC47E8}_is1"
+$version = [regex]::Match((Get-Content (Join-Path $Dest "main.py") -Raw), '"Backseat", "([\d.]+)"').Groups[1].Value
+if ((Test-Path $apps) -and $version) { Set-ItemProperty $apps DisplayVersion $version }
 
 Write-Host ""
 Write-Host "Backseat is installed. Start it from the Start menu or the desktop shortcut." -ForegroundColor Green

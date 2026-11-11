@@ -1,17 +1,22 @@
 """Publish the current version as a GitHub release, after its version bump and CHANGELOG.md entry are committed and the
 commit is tagged v<version> with only the tag pushed (the branch goes after):  .venv\\Scripts\\python release.py publish
-Its notes are how to install plus the version's CHANGELOG.md entry. It attaches Backseat.zip (the app with its installer
-inside; what auto-update downloads) and Install-Backseat.bat (the one-file installer: on its own it downloads the latest
-Backseat.zip itself)."""
+Its notes are how to install plus the version's CHANGELOG.md entry. It attaches Install-Backseat.exe (the installer most
+people download: installer.iss, built with Inno Setup 6), Backseat.zip (the app with its installer inside; what
+auto-update downloads) and Install-Backseat.bat (the one-file installer: on its own it downloads the latest Backseat.zip
+itself)."""
+import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 from updater import STAGE, VERSION, changelog, pretty
 
 GH = r"C:\Program Files\GitHub CLI\gh.exe"
 HERE = Path(__file__).parent
+ISCC = next((p for p in (Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/Inno Setup 6/ISCC.exe",
+                         Path(os.environ.get("ProgramFiles(x86)", "")) / "Inno Setup 6/ISCC.exe") if p.exists()), None)
 
 
 def run(*args):
@@ -24,17 +29,18 @@ def full_version(main_py):
     return version if stage == "release" else f"{version}-{stage}"
 
 
-INSTALL = ("## Install\n\nDownload **Install-Backseat.bat** below and double-click it: it downloads the rest itself. Or download "
-           "**Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. You need an Anthropic API key "
-           "(console.anthropic.com); the installer asks for it. If Windows says the file came from the internet, click **More "
-           "info > Run anyway**.\n\n"
+INSTALL = ("## Install\n\nDownload **Install-Backseat.exe** below and double-click it. If Windows says it protected your PC, "
+           "click **More info > Run anyway** (the installer isn't signed). You need an Anthropic API key "
+           "(console.anthropic.com); the installer asks for it. Uninstall it in Windows Settings > Apps. "
+           "Or download **Install-Backseat.bat** (it downloads the rest itself), or **Backseat.zip**: extract it and "
+           "double-click **Install Backseat.bat** inside.\n\n"
            "## Updating\n\n"
            "- **On 2.0.0 or newer:** Backseat checks GitHub for a new version once a day when it starts. When one is out, "
            "Windows shows a notification and the tray icon's menu (right-click the icon by the clock) shows **Update to "
            "x.y.z**: click it and say Yes. It closes, updates in a window you can watch and starts again. Your memory, "
            "settings, API key, Hall of Shame and characters stay as they are. To check any time: right-click the tray icon > "
            "**Check for updates...**\n"
-           "- **On 1.x, or not sure:** download **Install-Backseat.bat** below and double-click it. It updates your install "
+           "- **On 1.x, or not sure:** download **Install-Backseat.exe** below and double-click it. It updates your install "
            "in place and keeps all of the above.\n"
            "- **No update offered?** Settings > Brain & budget > Updates must be on. A copy made with `git clone` updates "
            "with `git pull` instead.\n\n"
@@ -50,6 +56,14 @@ def build():
     dist.mkdir(exist_ok=True)
     run("git", "archive", "--format=zip", "--prefix=Backseat/", "-o", str(dist / "Backseat.zip"), "HEAD")
     shutil.copy(HERE / "Install Backseat.bat", dist / "Install-Backseat.bat")
+    if not ISCC:
+        sys.exit("Install-Backseat.exe needs Inno Setup 6: winget install JRSoftware.InnoSetup")
+    src = HERE / "build" / "exe"  # the same committed files, unpacked for the .exe
+    shutil.rmtree(src, ignore_errors=True)
+    with zipfile.ZipFile(dist / "Backseat.zip") as z:
+        z.extractall(src)
+    run(str(ISCC), "/Q", f"/DSrc={src / 'Backseat'}", f"/DVersion={version.split('-')[0]}", f"/DName={pretty(version)}",
+        f"/O{dist}", str(HERE / "installer.iss"))
     return version
 
 
@@ -68,7 +82,8 @@ def publish():
     if not trailer.exists():  # the last release's, so the README's link to the latest release's trailer keeps working
         subprocess.run([GH, "release", "download", "--repo", "DivxPlays/backseat", "--pattern", "trailer.mp4", "--dir",
                         str(trailer.parent)], cwd=HERE, capture_output=True)
-    files = [str(HERE / "dist" / "Backseat.zip"), str(HERE / "dist" / "Install-Backseat.bat")] + ([str(trailer)] if trailer.exists() else [])
+    files = [str(HERE / "dist" / name) for name in ("Install-Backseat.exe", "Backseat.zip", "Install-Backseat.bat")]
+    files += [str(trailer)] if trailer.exists() else []
     run(GH, "release", "create", f"v{version}", *files,
         "--title", f"Backseat {pretty(version)}", "--notes-file", str(notes), "--target", run("git", "rev-parse", "HEAD"), "--latest")
     print(f"released v{version}")
