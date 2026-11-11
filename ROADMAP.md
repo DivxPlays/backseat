@@ -18,12 +18,12 @@ Built and self-checked, but not yet seen working on a real day:
   the installer's key check with a brand-new key, a duo with a created character, and the new holidays on their days.
 - 2.3.0: ranked mode in a real ranked match (spotted on screen, quiet mid-play, talking at deaths and after),
   a patch-day reaction after a real game update, and the Discord camera's cost in a game (#2: measured outside games only).
-- 2.4.0 (unreleased): Install-Backseat.exe downloaded through a browser on a real PC (Windows' warning, an antivirus
+- 2.4.0: Install-Backseat.exe downloaded through a browser on a real PC (Windows' warning, an antivirus
   scan), and its uninstaller from Windows Settings > Apps (both checked in Windows Sandbox only).
 
-## Ideas for 2.4.0 (not decided: pick the ones you want)
+## Ideas for 2.5.0 (not decided: pick the ones you want)
 
-GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.3.0: no open issues; #1 was fixed in 2.1.1, #3 in 2.2.0 and #2 in 2.3.0.
+GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.4.0: no open issues; #1 was fixed in 2.1.1, #3 in 2.2.0 and #2 in 2.3.0.
 
 ### Squad and clips
 - **Squad trivia:** menu trivia your Discord friends can answer too; the first right answer scores on the squad board.
@@ -58,7 +58,7 @@ Added 2026-11-09 at your request. Not designed yet: each needs its own plan firs
 
 ## Done
 
-2.4.0 (in progress):
+2.4.0 (2026-11-10):
 - Install-Backseat.exe: a one-click installer with Backseat's icon, and an uninstaller in Windows Settings > Apps that
   asks before deleting your memory, settings and key.
 
