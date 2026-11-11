@@ -76,7 +76,8 @@ begin
     'catch { Write-Host $_ -ForegroundColor Red; Read-Host ''Setup failed (the reason is above). Press Enter to close''; exit 1 }"',
     ExpandConstant('{app}'), SW_SHOW, ewWaitUntilTerminated, Code) and (Code = 0);
   if not Done then
-    MsgBox('Backseat''s setup didn''t finish. Check your internet connection, then run Install-Backseat.exe again.', mbError, MB_OK);
+    SuppressibleMsgBox('Backseat''s setup didn''t finish. Check your internet connection, then run Install-Backseat.exe again.',
+      mbError, MB_OK, IDOK);
 end;
 
 { yours: kept when you uninstall and say No to deleting them (the uninstaller's own files go after this runs) }
@@ -121,9 +122,10 @@ begin
     RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'BackseatCompanion');
     DeleteFile(ExpandConstant('{userprograms}\Backseat.lnk'));  { install.ps1 made these }
     DeleteFile(ExpandConstant('{userdesktop}\Backseat.lnk'));
-    Wipe := MsgBox('Also delete your memory, settings, API key, characters and Hall of Shame?' + #13#13 +
+    { (a silent uninstall, /SUPPRESSMSGBOXES, takes the default: keep them; a plain MsgBox would wait for a click) }
+    Wipe := SuppressibleMsgBox('Also delete your memory, settings, API key, characters and Hall of Shame?' + #13#13 +
       'No keeps them in ' + App + ', so installing Backseat again picks up where you left off.',
-      mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES;
+      mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES;
   end;
   if CurUninstallStep = usPostUninstall then
     if Wipe then
