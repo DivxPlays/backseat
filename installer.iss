@@ -77,8 +77,8 @@ begin
     RenameFile(Vorn, ExpandConstant('{app}'));  { installed when it was called Vorn: memory, settings and key come along }
   if CurStep <> ssPostInstall then
     exit;
-  WizardForm.StatusLabel.Caption := 'Installing Python and what Backseat needs (a few minutes the first time). ' +
-    'Then the blue window asks for your API key.';
+  WizardForm.StatusLabel.Caption := 'Installing Python and what Backseat needs (a few minutes the first time)...';
+  WizardForm.FilenameLabel.Caption := 'Then the blue window asks for your API key.';  { (one line each: longer is cut off) }
   Done := Exec('powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "try { & ' +
     Quoted(ExpandConstant('{app}\install.ps1')) + ' -Dest ' + Quoted(ExpandConstant('{app}')) + ' -NoLaunch; exit 0 } ' +
     'catch { Write-Host $_ -ForegroundColor Red; Read-Host ''Setup failed (the reason is above). Press Enter to close''; exit 1 }"',
