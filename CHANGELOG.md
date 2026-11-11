@@ -3,13 +3,10 @@
 Every version, newest first. Stages, least to most finished: pre-alpha, alpha, pre-beta, beta, release. Each released
 version's entry is also its release notes on GitHub.
 
-## Unreleased
+## 2.4.0 Beta (2026-11-10)
 
-README at release: Setup step 2 becomes "download **Install-Backseat.exe** and double-click it" (the .bat and the zip
-stay as other ways), with "More info > Run anyway" for the unsigned .exe; step 3 says the installer window shows
-progress and offers to start Backseat; the uninstall line becomes Windows Settings > Apps > Backseat > Uninstall (it asks
-before deleting your memory, settings, key, characters and Hall of Shame; an install made with the .bat gets the
-uninstaller by running the .exe once). "What's on GitHub" mentions installer.iss.
+A real installer: Install-Backseat.exe installs Backseat with a double-click, and Windows Settings > Apps can uninstall
+it. Still beta: tested on a fresh Windows in Windows Sandbox, not yet downloaded through a browser on a real PC.
 
 ### New
 - **Install-Backseat.exe, a one-click installer.** Download it and double-click it: it shows Backseat's icon and a

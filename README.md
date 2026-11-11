@@ -2,7 +2,7 @@
 
 # Backseat: your trash-talking gaming companions
 
-Version 2.3.0 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
+Version 2.4.0 (beta) · Made by DivxPlays (tray > About Backseat shows the version you have) · Formerly called Vorn
 
 [![Latest release](https://img.shields.io/github/v/release/DivxPlays/backseat?label=download)](https://github.com/DivxPlays/backseat/releases/latest) [![Downloads](https://img.shields.io/github/downloads/DivxPlays/backseat/total)](https://github.com/DivxPlays/backseat/releases) [![License: GPL v3](https://img.shields.io/github/license/DivxPlays/backseat)](LICENSE) ![Windows](https://img.shields.io/badge/platform-Windows-blue) [![GitHub stars](https://img.shields.io/github/stars/DivxPlays/backseat?style=social)](https://github.com/DivxPlays/backseat/stargazers)
 
@@ -84,20 +84,20 @@ And five more, each in its own weather: Lunar New Year (Lantern Lord and Lantern
 ## Setup
 
 1. Get an API key at console.anthropic.com (pay-as-you-go, separate from a Claude.ai subscription).
-2. Get it from the [latest release](https://github.com/DivxPlays/backseat/releases/latest) (no account needed): either download **Install-Backseat.bat** alone and double-click it (it downloads the rest itself), or download **Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. Developers can `git clone` the repo instead.
-3. The installer:
+2. Get it from the [latest release](https://github.com/DivxPlays/backseat/releases/latest) (no account needed): download **Install-Backseat.exe** and double-click it. Or download **Install-Backseat.bat** alone and double-click it (it downloads the rest itself), or download **Backseat.zip**, extract it and double-click **Install Backseat.bat** inside. Developers can `git clone` the repo instead.
+3. The installer (no admin rights needed; the .exe shows its progress, and its blue window does the rest):
    - gets Python 3.12 if it's missing (Python's own package, 15 MB, unpacked into Backseat's folder: no setup program),
    - puts it in `%LOCALAPPDATA%\Programs\Backseat` (an older install in `Programs\Vorn` is moved there, memory and all),
    - installs everything he needs (a few minutes the first time),
    - asks for your API key (kept only in `api_key.txt` on that PC, never uploaded) and checks it with one tiny call (about a hundred-thousandth of a dollar): a key Anthropic doesn't accept is asked for again, and an account with no credit yet is pointed to Billing,
-   - adds Backseat shortcuts to the Start menu and desktop, and starts it.
+   - adds Backseat shortcuts to the Start menu and desktop, and starts it (the .exe asks first).
 
    Running it again updates an install: your memory, settings, key, Hall of Shame and characters are never touched (a character you edited in Settings keeps your edits; only characters the PC doesn't have yet are added).
 
-   If Windows says the file came from the internet, click **More info > Run anyway**.
+   If Windows says the file came from the internet, or that it protected your PC, click **More info > Run anyway**: the installer isn't signed.
 4. Set your games to **borderless windowed**. Exclusive fullscreen draws over every overlay.
 
-Running **Install Backseat.bat** from a newer download updates it; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall, turn off Start with Windows in his tray menu, quit him, then delete `%LOCALAPPDATA%\Programs\Backseat` and the two shortcuts.
+Running the installer (the .exe or the .bat) from a newer download updates it; your memory, settings and key are kept. To bring your memory along from another PC, see **Moving him to another PC** below. To uninstall: Windows Settings > Apps > Backseat > Uninstall. It closes him, turns off Start with Windows, removes the shortcuts and the program, and asks whether to delete your memory, settings, key, characters and Hall of Shame too (No keeps them, so installing again picks up where you left off). Installed with the .bat? Run Install-Backseat.exe once to get the uninstaller, or quit him, turn off Start with Windows in his tray menu and delete `%LOCALAPPDATA%\Programs\Backseat` and the two shortcuts.
 
 Working on his code instead? Put your key in `api_key.txt` in the code folder and double-click `run.bat`; it sets everything up there and starts him.
 
@@ -261,7 +261,7 @@ Once a day (when he starts) he checks GitHub for a newer version (the version nu
 
 ## What's on GitHub
 
-The code, this README, [CHANGELOG.md](CHANGELOG.md) (what changed in each version), [ROADMAP.md](ROADMAP.md) (planned features), [LICENSE](LICENSE) (the GNU GPL v3), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
+The code, the installer's recipe (`installer.iss`, built into Install-Backseat.exe with [Inno Setup](https://jrsoftware.org/isinfo.php)), this README, [CHANGELOG.md](CHANGELOG.md) (what changed in each version), [ROADMAP.md](ROADMAP.md) (planned features), [LICENSE](LICENSE) (the GNU GPL v3), the shortcut icon (`vorn.ico`), the sound effects in `sounds/` (public domain, credited in `sounds/CREDITS.md`) and the pictures in `docs/images`. The pictures are drawn from the code by `make_images.py` (using the default settings, never yours), so they always show how the characters look right now. The repo is public. Your API key, his memory of you, your settings, the characters you created, logs, battle reports and the Hall of Shame stay on your PC only (see `.gitignore`), so a fresh copy on another PC starts with a blank memory.
 
 ## Moving him to another PC
 
