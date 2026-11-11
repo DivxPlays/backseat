@@ -25,7 +25,6 @@ AppUpdatesURL=https://github.com/DivxPlays/backseat/releases
 DefaultDirName={localappdata}\Programs\Backseat
 DisableDirPage=yes
 DisableProgramGroupPage=yes
-DisableReadyPage=yes
 PrivilegesRequired=lowest
 OutputBaseFilename=Install-Backseat
 SetupIconFile={#Src}\vorn.ico
@@ -58,6 +57,14 @@ begin
   Result := S;
   StringChangeEx(Result, '''', '''''', True);
   Result := '''' + Result + '''';
+end;
+
+{ one click: double-clicking the .exe was the "yes". Inno always shows its Ready page when there's no other page
+  (DisableReadyPage is ignored then), so it presses its own Install button (a posted BM_CLICK, after the page is up) }
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = wpReady then
+    PostMessage(WizardForm.NextButton.Handle, $00F5, 0, 0);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
