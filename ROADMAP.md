@@ -46,6 +46,13 @@ GitHub issues land in Planned with their number. Checked 2026-11-10 after 2.4.0:
 
 Added 2026-11-09 at your request. Not designed yet: each needs its own plan first.
 
+- **Replace Vorn** (asked for 2026-11-12): a new main character beside Mika. "Hey Vorn" is hard for voice recognition
+  (Whisper hears Vern, Born, Bourne, Vaughn, Bjorn...: 13 spellings in config.py's WAKE_NAMES), and his look is wearing
+  thin. To decide: a name that's easy to hear (two syllables, unlike any common word), a new body and face (created
+  characters built on Vorn's body need one to move to), personality, voice, outfits and a power-up of their own
+  (Bloodfire is his), and whether Vorn retires or stays as a character you can still pick. Your memory, respect, hours
+  and earned outfits carry over. New pictures, trailer scenes and icon. An original design, like Vorn and Mika.
+
 - **Cloud sync between PCs:** memory, settings, characters, the Hall of Shame and battle reports kept in step between your
   PCs, instead of tray > Export memory and Import by hand. The cheapest route needs no server of ours: keep them in a
   folder OneDrive, Google Drive or Dropbox already syncs, encrypted with a passphrase (memory.json holds personal notes),
