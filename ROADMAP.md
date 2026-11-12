@@ -2,7 +2,10 @@
 
 ## Planned
 
-Nothing right now: pick from the ideas below.
+- **OLED burn-in guard** (asked for 2026-11-11): today they sit on the same pixels in their corner for hours, which can
+  burn into an OLED screen. Instead: every few minutes the whole overlay (them, the bubble, the cost tag) shifts a few
+  pixels around its spot, the way OLED monitors' own pixel shift does; now and then they walk to another spot along the
+  bottom edge; and they fade down when nobody has talked for a while. A setting, on by default.
 
 ## Not yet tested in real use
 
